@@ -159,7 +159,7 @@ project folder.
 
     data = requests.get('https://raw.githubusercontent.com/kammerje/P-pop/main/TestPlanetPopulation.txt')
 
-    with open('path/ppop_catalog.txt', 'wb') as file:
+    with open('data_creation/ppop_catalog.txt', 'wb') as file:
         file.write(data.content)
 
 Loading the Catalog
@@ -171,7 +171,7 @@ Now, the P-Pop catalog can be loaded in. An example catalog can be found in
 .. code-block:: python
     :lineno-start: 25
 
-    bus.data.catalog_from_ppop(input_path='path/ppop_catalog.txt')
+    bus.data.catalog_from_ppop(input_path='data_creation/ppop_catalog.txt')
 
 .. Important::
 
@@ -325,7 +325,7 @@ After a simulation run, the results can be saved as a hdf5 file for later analys
 .. code-block:: python
     :lineno-start: 79
 
-    bus.data.export_catalog(output_path='path/filename.hdf5')
+    bus.data.export_catalog(output_path='data_creation/filename.hdf5')
 
 
 Reading the Results
@@ -338,7 +338,7 @@ A previously saved simulation can be read into LIFEsim by running
 
     bus_read = lifesim.Bus()
     bus_read.data.options.set_scenario('baseline')
-    bus_read.data.import_catalog(input_path='path/filename.hdf5')
+    bus_read.data.import_catalog(input_path='data_creation/filename.hdf5')
 
 
 Interpreting Results

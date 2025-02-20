@@ -1,0 +1,4 @@
+lifesim/gui/data_creation/run_name_catalog.hdf5 filter=lfs diff=lfs merge=lfs -text
+lifesim/gui/data_creation/test_runs_0_catalog.hdf5 filter=lfs diff=lfs merge=lfs -text
+lifesim/gui/data_creation/run_name.yaml filter=lfs diff=lfs merge=lfs -text
+lifesim/gui/data_creation/test_runs_0.yaml filter=lfs diff=lfs merge=lfs -text

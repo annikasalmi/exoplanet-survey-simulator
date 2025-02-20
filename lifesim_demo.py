@@ -1,5 +1,5 @@
 import requests
-
+import os
 import lifesim
 
 # ---------- Set-Up ----------
@@ -12,21 +12,28 @@ bus.data.options.set_scenario('baseline')
 
 # set options manually
 bus.data.options.set_manual(diameter=4.)
-bus.data.options.set_manual(output_path='path/')
-bus.data.options.set_manual(output_filename='run_name')
+bus.data.options.set_manual(output_path='data_creation/')
+bus.data.options.set_manual(output_filename='test_runs_0')
 
 # ---------- Downloading the P-Pop catalog ----------
 
 data = requests.get('https://raw.githubusercontent.com/kammerje/P-pop/main/TestPlanetPopulation.txt')
 
-with open('path/ppop_catalog.txt', 'wb') as file:
-    file.write(data.content)
+if os.path.isdir('data_creation'):
+    pass
+else:
+    os.makedirs('data_creation')
+if os.path.exists(os.path.join('data_creation','ppop_catalog.txt')):
+    pass
+else:
+    with open(os.path.join('data_creation','ppop_catalog.txt'), 'wb') as file:
+        file.write(data.content)
 
 # ---------- Loading the Catalog ----------
 
-bus.data.catalog_from_ppop(input_path='path/ppop_catalog.txt')
-bus.data.catalog_remove_distance(stype=0, mode='larger', dist=0.)  # remove all A stars
-bus.data.catalog_remove_distance(stype=4, mode='larger', dist=10.)  # remove M stars > 10pc to
+bus.data.catalog_from_ppop(input_path='data_creation/ppop_catalog.txt')
+bus.data.catalog_remove_distance(stype='A', mode='larger', dist=0.)  # remove all A stars
+bus.data.catalog_remove_distance(stype='M', mode='larger', dist=10.)  # remove M stars > 10pc to
 # speed up calculation
 
 # ---------- Creating the Instrument ----------
@@ -84,5 +91,5 @@ bus.save()
 # ---------- Reading the Results ----------
 # import a previously saved catalog
 bus_read = lifesim.Bus()
-bus_read.build_from_config('path/run_name.yaml')
-bus_read.data.import_catalog(input_path='path/filename.hdf5')
+bus_read.build_from_config('data_creation/test_runs_0.yaml')
+bus_read.data.import_catalog(input_path='data_creation/test_runs_0_catalog.hdf5')

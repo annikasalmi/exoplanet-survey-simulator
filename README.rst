@@ -1,3 +1,7 @@
+FORKED FROM https://github.com/fdannert/LIFEsim
+
+This is that README.md. Will add my own README as this project progresses
+
 LIFEsim
 =======
 

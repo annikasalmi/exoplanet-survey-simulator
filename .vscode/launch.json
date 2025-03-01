@@ -7,19 +7,16 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal"
+        },
+        {
+            "name": "P-pop.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "P-pop/P-pop.py",
+            "console": "integratedTerminal"
         }
     ]
 }
-// {
-//     "version": "0.2.0",
-//     "configurations": [
-//         {
-//             "name": "current_file",
-//             "type": "debugpy",
-//             "request": "launch",
-//             "program": "${file}",
-//             "console": "integratedTerminal"
-//         },
 //         {
 //             "name": "forward_model",
 //             "type": "debugpy",

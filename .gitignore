@@ -6,3 +6,16 @@
 /lifesim/gui/data_creation/ppop_catalog.txt
 /lifesim/gui/data_creation/*.yaml
 /lifesim/gui/data_creation/*.hdf5
+TestPlanetPopulation.txt
+/Figures/*
+/P-pop/__pycache__/*
+/P-pop/AlbedoModels/__pycache__/*
+/P-pop/EccentricityModels/__pycache__/*
+/P-pop/ExozodiModels/__pycache__/*
+/P-pop/MassModels/__pycache__/*
+/P-pop/MassModels/Forecaster/__pycache__/*
+/P-pop/OrbitModels/__pycache__/*
+/P-pop/PlanetDistributions/__pycache__/*
+/P-pop/StabilityModels/__pycache__/*
+/P-pop/ScalingModels/__pycache__/*
+/P-pop/StarCatalogs/__pycache__/*

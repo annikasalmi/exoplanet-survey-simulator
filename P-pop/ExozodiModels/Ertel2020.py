@@ -35,7 +35,7 @@ class ExozodiModel():
         
         # Model parameters.
         if (Scenario == 'baseline'):
-            self.ExozodiData = np.load('ExozodiModels/ExozodiNominal.npy')
+            self.ExozodiData = np.load('P-pop/ExozodiModels/ExozodiNominal.npy')
         elif (Scenario == 'pessimistic'):
             self.ExozodiData = np.load('ExozodiModels/ExozodiPessimistic.npy')
         elif (Scenario == 'optimistic'):

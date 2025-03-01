@@ -2,6 +2,7 @@ import numpy as np
 from scipy.stats import norm
 from scipy.stats import truncnorm 
 import h5py 
+import os
 
 ## constant
 mearth2mjup = 317.828
@@ -17,13 +18,13 @@ mupper = 3e5
 n_pop = 4
 
 ## read parameter file
-hyper_file = 'MassModels/Forecaster/fitting_parameters.h5'
+hyper_file = os.path.join(os.getcwd(), 'P-Pop','MassModels','Forecaster','fitting_parameters.h5')
 h5 = h5py.File(hyper_file, 'r')
 all_hyper = h5['hyper_posterior'][:]
 h5.close()
 
 ## function
-from func import piece_linear, ProbRGivenM, classification
+from MassModels.Forecaster.func import piece_linear, ProbRGivenM, classification
 
 ##############################################
 

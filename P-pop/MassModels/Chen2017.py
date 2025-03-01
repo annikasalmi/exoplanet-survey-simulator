@@ -16,7 +16,7 @@ import numpy as np
 import sys
 
 sys.path.append('MassModels/Forecaster')
-import mr_forecast
+import MassModels.Forecaster.mr_forecast as mr_forecast
 
 
 # =============================================================================

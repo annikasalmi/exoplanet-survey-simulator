@@ -35,7 +35,7 @@ class HWOData(Data):
     def __init__(self, Data):
         super().__init__()
         self.catalog=Data.catalog
-        self.IWA = 62e-6
+        self.IWA = 124e-6
         self.planet_flux_star_ratio = 10e-10
         self.flux_ratio = self.calc_flux()
         self.iwa_constraint = self.calc_iwa_constraint()
@@ -50,7 +50,7 @@ class HWOData(Data):
         return iwa_constraint
     
     def determine_detectable(self):
-        iwa_condition = self.iwa_constraint <= self.IWA
+        iwa_condition = self.iwa_constraint >= self.IWA
         flux_condition = self.flux_ratio >= self.flux_ratio
         total_condition = iwa_condition & flux_condition
         self.catalog['hwo_detectable'] = total_condition

@@ -403,7 +403,7 @@ class SystemGenerator():
                             df_new = self.System.write_df()
                             df = pd.concat([df, df_new], ignore_index=True)
                 
-            sys.stdout.write('\r--> Star %.0f of %.0f, scaling = %.1f' % ((i+1), Nstars, Scale))
+            # sys.stdout.write('\r--> Star %.0f of %.0f, scaling = %.1f' % ((i+1), Nstars, Scale))
             sys.stdout.flush()
         print('')
         

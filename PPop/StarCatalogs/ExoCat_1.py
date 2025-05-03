@@ -226,25 +226,25 @@ class StarCatalog():
         
         # Print.
         text1 = len(SC_out)/float(Nin)*100.
-        print('--> Including %.0f = %.2f%% stars' % (len(SC_out), text1))
+        # print('--> Including %.0f = %.2f%% stars' % (len(SC_out), text1))
         text2 = np.unique(np.array(Stype))
-        if (Stypes is None):
-            print('--> Including spectral types '+str(text2))
-        else:
-            text3 = [f for f in text2 if f not in Stypes]
-            print('--> Including spectral types '+str(Stypes)+', excluding spectral types '+str(text3))
+        # if (Stypes is None):
+        #     print('--> Including spectral types '+str(text2))
+        # else:
+        #     text3 = [f for f in text2 if f not in Stypes]
+        #     print('--> Including spectral types '+str(Stypes)+', excluding spectral types '+str(text3))
         text4 = np.min(SC_out['Dist'])
         text5 = np.max(SC_out['Dist'])
-        if (Dist_range is None):
-            print('--> Distance in [%.2f, %.2f] pc' % (text4, text5))
-        else:
-            print('--> Distance in [%.2f, %.2f] pc' % (text4, text5)+', distance limits [%.2f, %.2f] pc' % (Dist_range[0], Dist_range[1]))
+        # if (Dist_range is None):
+        #     print('--> Distance in [%.2f, %.2f] pc' % (text4, text5))
+        # else:
+        #     print('--> Distance in [%.2f, %.2f] pc' % (text4, text5)+', distance limits [%.2f, %.2f] pc' % (Dist_range[0], Dist_range[1]))
         text6 = np.min(SC_out['Dec'])
         text7 = np.max(SC_out['Dec'])
-        if (Dec_range is None):
-            print('--> Declination in [%.2f, %.2f] deg' % (text6, text7))
-        else:
-            print('--> Declination in [%.2f, %.2f] deg' % (text6, text7)+', declination limits [%.2f, %.2f] deg' % (Dec_range[0], Dec_range[1]))
+        # if (Dec_range is None):
+        #     print('--> Declination in [%.2f, %.2f] deg' % (text6, text7))
+        # else:
+        #     print('--> Declination in [%.2f, %.2f] deg' % (text6, text7)+', declination limits [%.2f, %.2f] deg' % (Dec_range[0], Dec_range[1]))
         
         return SC_out
     

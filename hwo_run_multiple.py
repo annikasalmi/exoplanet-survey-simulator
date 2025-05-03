@@ -3,64 +3,109 @@ import numpy as np
 import time
 import os
 import pandas as pd
+import multiprocessing as mp
 
 from lifesim.core.hwo_data import HWOData
 from ppop_generator import PPop
-from tools import PPOP_DIR
+from tools import PPOP_DATA_DIR
 
-# generate files
-PPopObj = PPop()
 
-# reduce nuniverses, nstars for testing
-## how to initialize a blank dict with pregiven memory size??
+def run_single(i):
+    '''
+    Runs a single instance of the PPop simulation and HWO data analysis.
+    '''
+    PPopObj = PPop() # i guess we'll reinstantiate each run...
 
-for i in range(3):
-    t=time.time()
-    filename = 'test_runs_' + str(i) # str
-    data_path = os.path.join(PPOP_DIR, 'data', filename)
+    filename = f'test_runs_{i}'
+    data_path = os.path.join(PPOP_DATA_DIR, filename)
+
     df = PPopObj.run_ppop(data_path, ntest=100, nuniverses=1)
     PPopObj.catalog_from_ppop(data_path, df=df)
-    PPopObj.catalog_remove_distance(stype='A', mode='larger', dist=0.)  # remove all A stars
-    PPopObj.catalog_remove_distance(stype='M', mode='larger', dist=10.)  # remove M stars > 10pc to
+    PPopObj.catalog_remove_distance(stype='A', mode='larger', dist=0.0)
+    PPopObj.catalog_remove_distance(stype='M', mode='larger', dist=10.0)
 
     hwo_data = HWOData(PPopObj.catalog)
-
     hwo_data.determine_detectable()
 
-    df_hab, df_false = hwo_data.organize_data()
-
-    if i == 0:
-        mapping_hab = zip(df_hab.T.columns, df_hab.stype)
-        mapping_unhab = zip(df_false.T.columns, df_false.stype)
-        df_hab_total = df_hab.T.rename(columns=dict(mapping_hab)).drop('stype').reset_index(drop=True)
-        df_false_total = df_false.T.rename(columns=dict(mapping_unhab)).drop('stype').reset_index(drop=True)
-    else:
-        df_hab_total.loc[len(df_hab_total)] = df_hab.count_overall.values
-        df_false_total.loc[len(df_false_total)] = df_false.count_overall.values
-
-    print(f'total time is {time.time()-t} seconds')
-
-df_results = pd.DataFrame(columns=['stypes', 'count_hab', 'error_hab', 'count_unhab', 'error_unhab'])
-for i in df_hab_total.columns:
-    count = np.mean(df_hab_total[i])
-    err = np.std(df_hab_total[i])
-    count_unhab = np.mean(df_false_total[i])
-    err_unhab = np.std(df_false_total[i])
-    df = pd.DataFrame(data={'stypes': [i], 'count_hab': [count], 'error_hab': [err], 
-                                        'count_unhab': [count_unhab], 'error_unhab': [err_unhab]})
-    df_results = pd.concat([df_results,df], ignore_index=True)
-
-df_results.to_csv('hwo_results.csv', index=False)
+    df = hwo_data.catalog
     
-stypes=df_results.stypes.values
-x = np.arange(len(stypes)) 
-width=0.4
-plt.bar(x-0.2, df_results.count_hab, yerr=df_results.error_hab, width=width)#, color='cyan') 
-plt.bar(x+0.2, df_results.count_unhab, yerr=df_results.error_unhab, width=width)#, color='orange') 
-plt.xticks(x, stypes) 
-plt.xlabel("Stellar Type") 
-plt.ylabel("Count") 
-plt.title('HWO Detectability')
-plt.legend(["Habitable", "Inhabitable"]) 
-plt.show() 
-a=1
+    bins = [0, 1.5, 3.0, 6.0]
+    labels = ['<1.5', '1.5–3.0', '3.0–6.0']
+    df['radius_bin'] = pd.cut(df['radius_p'], bins=bins, labels=labels, include_lowest=True)
+
+    # Add "Rocky HZ" bin
+    rocky_hz = df[(df['habitable'] == True) & (df['radius_p'] < 1.5)].copy()
+    rocky_hz['radius_bin'] = 'Rocky HZ'
+
+    # Combine all rows
+    df_all = pd.concat([df, rocky_hz], ignore_index=True)
+
+    # Group by star type and radius bin
+    grouped_df = df_all.groupby(['stype', 'radius_bin']).size().reset_index(name='count')
+
+    return grouped_df
+
+def main():
+    start = time.time()
+    n_runs = 3
+
+    # Run in parallel
+    with mp.Pool(processes=mp.cpu_count()) as pool:
+        results = pool.map(run_single, range(n_runs))
+    # Combine all run results
+    df_all = pd.concat(results, keys=range(n_runs)).reset_index(level=0).rename(columns={'level_0': 'run'})
+
+    # Pivot to get one row per run, one column per (stype, radius_bin)
+    df_pivot = df_all.pivot_table(index='run', columns=['stype', 'radius_bin'], values='count', fill_value=0)
+
+    # Compute mean and std across runs
+    df_mean = df_pivot.mean(axis=0)
+    df_std = df_pivot.std(axis=0)
+
+    # Convert MultiIndex back to DataFrame
+    grouped_sum = df_mean.reset_index(name='count')
+    grouped_sum['error'] = df_std.values
+
+    # Pivot to plotting format
+    pivot_counts = grouped_sum.pivot(index='stype', columns='radius_bin', values='count').fillna(0)
+    pivot_errors = grouped_sum.pivot(index='stype', columns='radius_bin', values='error').fillna(0)
+
+    # Reorder for clean plotting
+    star_order = ['F', 'G', 'K', 'M']
+    bin_labels = ['<1.5', '1.5–3.0', '3.0–6.0', 'Rocky HZ']
+    pivot_counts = pivot_counts.reindex(star_order).reindex(columns=bin_labels, fill_value=0)
+    pivot_errors = pivot_errors.reindex(star_order).reindex(columns=bin_labels, fill_value=0)
+
+    # Create grouped bar plot
+    colors = ['lightblue', 'deepskyblue', 'midnightblue', 'forestgreen']
+    hatches = ['...', 'ooo', 'OO', None]
+    bar_width = 0.2
+    x = np.arange(len(star_order))
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    for i, label in enumerate(bin_labels):
+        heights = pivot_counts[label].tolist()
+        errors = pivot_errors[label].tolist()
+
+        ax.bar(x + i * bar_width, heights, width=bar_width,
+               yerr=errors, label=label,
+               color=colors[i], hatch=hatches[i], edgecolor='black')
+
+        # Add text annotations
+        for j, (h, err) in enumerate(zip(heights, errors)):
+            ax.text(x[j] + i * bar_width, h + 2, f"{int(h)}±{int(err)}", ha='center', fontsize=8)
+
+    ax.set_xticks(x + 1.5 * bar_width)
+    ax.set_xticklabels(star_order)
+    ax.set_ylabel('Detectable Planets')
+    ax.set_title('Detectable Planets by Star Type (D = 2.0 m, Scenario 1)')
+    ax.legend(title='Planet Radius')
+    plt.tight_layout()
+    plt.show()
+
+    print(f"Total time: {time.time() - start:.2f} seconds")
+
+
+if __name__ == '__main__':
+    mp.set_start_method('spawn')
+    main()

@@ -9,9 +9,9 @@
 TestPlanetPopulation.txt
 /Figures/*
 /PPop/__pycache__/*
-/PPop/AlbedoModels/__pycache__/*
+/PPop/AlbedoModels/__pycache__/*.pyc
 /PPop/EccentricityModels/__pycache__/*
-/PPop/ExozodiModels/__pycache__/*
+/PPop/ExozodiModels/__pycache__/*.pyc
 /PPop/MassModels/__pycache__/*
 /PPop/MassModels/Forecaster/__pycache__/*
 /PPop/OrbitModels/__pycache__/*
@@ -21,3 +21,6 @@ TestPlanetPopulation.txt
 /PPop/StarCatalogs/__pycache__/*
 /PPop/Figures/
 /PPop/data/*
+__pycache__/*.pyc
+lifesim/core/__pycache__/*.pyc
+/PPop/__pycache__/*.pyc

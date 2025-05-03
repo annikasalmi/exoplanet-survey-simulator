@@ -52,7 +52,7 @@ class PlanetDistribution():
             print('--> WARNING: '+str(Scenario)+' is an unknown scenario')
             Scenario = 'baseline'
             self.Rates = np.array([[1.38, 8.42, 20.59, 0., 0.], [1.95, 9.94, 0., 26.85, 28.85], [0.41, 4.15, 0., 24.59, 19.98], [0., 2.72, 18.73, 27.58, 18.08], [0., 1.59, 8.29, 14.51, 8.61], [0., 0.65, 3.25, 3.37, 1.97], [0., 0.38, 1.05, 0.56, 0.]])*1e-2
-        print('--> Using scenario '+str(Scenario))
+        # print('--> Using scenario '+str(Scenario))
         self.BinsRp = np.log(np.array([0.5, 1., 1.5, 2., 2.5, 3., 3.5, 4.])) # Rearth
         self.BinsPorb = np.log(np.array([0.5, 1.7, 5.5, 18.2, 60.3, 200.])) # d
         

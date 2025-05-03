@@ -63,7 +63,7 @@ class PlanetDistribution():
             self.p2 = -0.65
             self.Pbrk = 1581. # d
             self.c0 = 0.84
-        print('--> Using scenario '+str(Scenario))
+        # print('--> Using scenario '+str(Scenario))
         self.Mp_lims = [3., 600.] # 10 Mearth
         self.Porb_lims = [10., 10000.] # d
         self.CM = 1./(self.Mp_lims[1]**self.m1/self.m1-self.Mp_lims[0]**self.m1/self.m1)

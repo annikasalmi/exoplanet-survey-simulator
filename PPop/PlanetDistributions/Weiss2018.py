@@ -60,7 +60,7 @@ class PlanetDistribution():
             self.Gamma = [0.38, 0.73]
             self.alpha = [-0.19, -1.18]
             self.beta = [0.26, 0.59]
-        print('--> Using scenario '+str(Scenario))
+        # print('--> Using scenario '+str(Scenario))
         self.Rbrk = [0., 3.4, np.inf] # Rearth
         self.ytod = 365.24
         self.Rp_lims = [0.5, 16.] # Rearth

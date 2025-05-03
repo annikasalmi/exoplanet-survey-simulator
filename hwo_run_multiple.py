@@ -52,15 +52,19 @@ def main():
     # Run in parallel
     with mp.Pool(processes=mp.cpu_count()) as pool:
         results = pool.map(run_single, range(n_runs))
-
     # Combine all run results
-    df_all = pd.concat(results, ignore_index=True)
+    df_all = pd.concat(results, keys=range(n_runs)).reset_index(level=0).rename(columns={'level_0': 'run'})
 
-    # Sum counts and calculate error (sqrt(N))
-    grouped_sum = df_all.groupby(['stype', 'radius_bin']).count().reset_index()
-    grouped_sum['error'] = grouped_sum['sum']**0.5  # Poisson assumption
+    # Pivot to get one row per run, one column per (stype, radius_bin)
+    df_pivot = df_all.pivot_table(index='run', columns=['stype', 'radius_bin'], values='count', fill_value=0)
 
-    grouped_sum = grouped_sum.rename(columns={'sum': 'count'})
+    # Compute mean and std across runs
+    df_mean = df_pivot.mean(axis=0)
+    df_std = df_pivot.std(axis=0)
+
+    # Convert MultiIndex back to DataFrame
+    grouped_sum = df_mean.reset_index(name='count')
+    grouped_sum['error'] = df_std.values
 
     # Pivot to plotting format
     pivot_counts = grouped_sum.pivot(index='stype', columns='radius_bin', values='count').fillna(0)

@@ -28,36 +28,33 @@ for i in range(3):
 
     df_hab, df_false = hwo_data.organize_data()
 
-    hab_dict_temp = dict(np.asarray(df_hab))
-    unhab_dict_temp = dict(np.asarray(df_false))
-    print(hab_dict_temp)
-    print(unhab_dict_temp)
-    if type(hab_dict_temp['F']) != int:
-        a=1
-
     if i == 0:
-        total_hab_dict = hab_dict_temp
-        total_unhab_dict = unhab_dict_temp
+        mapping_hab = zip(df_hab.T.columns, df_hab.stype)
+        mapping_unhab = zip(df_false.T.columns, df_false.stype)
+        df_hab_total = df_hab.T.rename(columns=dict(mapping_hab)).drop('stype').reset_index(drop=True)
+        df_false_total = df_false.T.rename(columns=dict(mapping_unhab)).drop('stype').reset_index(drop=True)
     else:
-        for key in hab_dict_temp:
-            if type(total_hab_dict[key]) == int:
-                list_hab_dict = list([total_hab_dict[key]])
-                list_unhab_dict = list([total_unhab_dict[key]])
-            else:
-                pass
-            list_hab_dict.append(hab_dict_temp[key])
-            list_unhab_dict.append(unhab_dict_temp[key])
-            total_hab_dict[key] = list_hab_dict
-            total_unhab_dict[key] = list_unhab_dict
+        df_hab_total.loc[len(df_hab_total)] = df_hab.count_overall.values
+        df_false_total.loc[len(df_false_total)] = df_false.count_overall.values
 
     print(f'total time is {time.time()-t} seconds')
 
-
-x = np.arange(len(df_size.stype.unique())) 
+df_results = pd.DataFrame(columns=['stypes', 'count_hab', 'error_hab', 'count_unhab', 'error_unhab'])
+for i in df_hab_total.columns:
+    count = np.mean(df_hab_total[i])
+    err = np.std(df_hab_total[i])
+    count_unhab = np.mean(df_false_total[i])
+    err_unhab = np.std(df_false_total[i])
+    df = pd.DataFrame(data={'stypes': [i], 'count_hab': [count], 'error_hab': [err], 
+                                        'count_unhab': [count_unhab], 'error_unhab': [err_unhab]})
+    df_results = pd.concat([df_results,df], ignore_index=True)
+    
+stypes=df_results.stypes.values
+x = np.arange(len(stypes)) 
 width=0.4
-plt.bar(x-0.2, df_hab.count_overall, width)#, color='cyan') 
-plt.bar(x+0.2, df_false.count_overall, width)#, color='orange') 
-plt.xticks(x, df_size.stype.unique()) 
+plt.bar(x-0.2, df_results.count_hab, yerr=df_results.error_hab, width=width)#, color='cyan') 
+plt.bar(x+0.2, df_results.count_unhab, yerr=df_results.error_unhab, width=width)#, color='orange') 
+plt.xticks(x, stypes) 
 plt.xlabel("Stellar Type") 
 plt.ylabel("Count") 
 plt.title('HWO Detectability')

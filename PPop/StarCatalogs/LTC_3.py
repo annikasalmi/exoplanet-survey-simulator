@@ -89,7 +89,7 @@ class StarCatalog():
         """
         
         # Print.
-        print('--> Reading star catalog LTC_3.csv')
+        # print('--> Reading star catalog LTC_3.csv')
         
         # Read input star catalog.
         Nin = 0

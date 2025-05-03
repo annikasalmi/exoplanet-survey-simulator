@@ -95,25 +95,65 @@ class PPop():
                                                 ntest,
                                                 self.FigDir,
                                                 self.block)
-        SysGen.SimulateUniverses(name,
+        df = SysGen.SimulateUniverses(name,
                                 nuniverses)
+        return df
 
     def catalog_from_ppop(self,data_path=os.path.join(PPOP_DATA_DIR, 'test_planet_pop.txt'),
-                            overwrite: bool = False):
-            """
-            Read the contents of the P-Pop output file (in .txt or .fits format) to a catalog. Note that reading catalogs
-            in .fits format is significantly faster.
+                            overwrite: bool = False, df=None):
+        """
+        Read the contents of the P-Pop output file (in .txt or .fits format) to a catalog. Note that reading catalogs
+        in .fits format is significantly faster.
 
-            Parameters
-            ----------
-            overwrite : bool
-                If set to true, existing catalogs can overwritten.
+        Parameters
+        ----------
+        overwrite : bool
+            If set to true, existing catalogs can overwritten.
 
-            Raises
-            ------
-            ValueError
-                If the data class already has an initialized catalog and overwrite is set to False.
-            """
+        Raises
+        ------
+        ValueError
+            If the data class already has an initialized catalog and overwrite is set to False.
+        """
+        df_old = df # j in case for debugging TODO: get rid of this
+        # turn df data into the correct format
+        if df is not None:
+            original_cols = df.columns
+            df['radius_p'] = df['rp']
+            df['p_orb'] = df['Porb']
+            df['mass_p'] = df['Mp']
+            df['ecc_p'] = df['ep']
+            df['inc_p'] = df['ip']
+            df['large_omega_p'] = df['Omegap']
+            df['small_omega_p'] = df['omegap']
+            df['theta_p'] = df['thetap']
+            df['albedo_bond'] = df['Abond']
+            df['albedo_geom_vis'] = df['AgeomVIS']
+            df['albedo_geom_mir'] = df['AgeomMIR']
+            df['z'] = df['z']
+            df['semimajor_p'] = df['ap']
+            df['sep_p'] = df['rp']
+            df['angsep'] = df['AngSep']
+            df['maxangsep'] = df['maxAngSep']
+            df['flux_p'] = df['Fp']
+            df['fp'] = df['fp']
+            df['temp_p'] = df['Tp']
+            df['radius_s'] = [df['Star'][i].Rad for i in range(len(df))]
+            df['mass_s'] = df['Msun']
+            df['temp_s'] = [df['Star'][i].Teff for i in range(len(df))]
+            df['distance_s'] = [df['Star'][i].Dist for i in range(len(df))]
+            df['ra'] = [df['Star'][i].RA for i in range(len(df))]
+            df['dec'] = [df['Star'][i].Dec for i in range(len(df))]
+            df['nuniverse'] = df['Nuniverse']
+            df['nstar'] = df['Nstar']
+            df['stype'] = [df['Star'][i].Stype for i in range(len(df))]
+            df['id'] = np.arange(0, len(df['dec']), 1)
+            df['name_s'] =  [df['Star'][i].Name for i in range(len(df))]
+            df = df.drop(columns=original_cols, axis=1)
+
+            self.catalog = df
+
+        else:
             # initialize catalog
             self.catalog = pd.DataFrame(columns=['radius_p',
                                                 'p_orb',
@@ -384,53 +424,53 @@ class PPop():
                                                 'name_s': pd.Series(['None']*hdu[1].data.shape[0], dtype=pd.StringDtype())})
                 hdu.close()
 
-            # create mask returning only unique stars
-            _, temp = np.unique(self.catalog.nstar, return_index=True)
-            star_mask = np.zeros_like(self.catalog.nstar, dtype=bool)
-            star_mask[temp] = True
+        # create [mask returning only unique stars
+        _, temp = np.unique(self.catalog.nstar, return_index=True)
+        star_mask = np.zeros_like(self.catalog.nstar, dtype=bool)
+        star_mask[temp] = True
 
-            # TODO: why is this commented out? AFAIK P-Pop uses equitorial coordinates
-            # transform from equitorial to ecliptic coordinates
-            coord = SkyCoord(self.catalog.ra, self.catalog.dec, frame='icrs', unit='deg')
-            coord_ec = coord.transform_to(BarycentricMeanEcliptic())
-            self.catalog['lon'] = np.array(coord_ec.lon.radian)
-            self.catalog['lat'] = np.array(coord_ec.lat.radian)
+        # TODO: why is this commented out? AFAIK P-Pop uses equitorial coordinates
+        # transform from equitorial to ecliptic coordinates
+        coord = SkyCoord(self.catalog.ra, self.catalog.dec, frame='icrs', unit='deg')
+        coord_ec = coord.transform_to(BarycentricMeanEcliptic())
+        self.catalog['lon'] = np.array(coord_ec.lon.radian)
+        self.catalog['lat'] = np.array(coord_ec.lat.radian)
 
-            # add the inner/ outer edges and centers of the habitable zone
-            s_in = np.zeros_like(self.catalog.nstar, dtype=float)
-            s_out = np.zeros_like(self.catalog.nstar, dtype=float)
-            l_sun = np.zeros_like(self.catalog.nstar, dtype=float)
+        # add the inner/ outer edges and centers of the habitable zone
+        s_in = np.zeros_like(self.catalog.nstar, dtype=float)
+        s_out = np.zeros_like(self.catalog.nstar, dtype=float)
+        l_sun = np.zeros_like(self.catalog.nstar, dtype=float)
 
-            hz_in = np.zeros_like(self.catalog.nstar, dtype=float)
-            hz_out = np.zeros_like(self.catalog.nstar, dtype=float)
-            hz_center = np.zeros_like(self.catalog.nstar, dtype=float)
+        hz_in = np.zeros_like(self.catalog.nstar, dtype=float)
+        hz_out = np.zeros_like(self.catalog.nstar, dtype=float)
+        hz_center = np.zeros_like(self.catalog.nstar, dtype=float)
 
-            for _, n in enumerate(np.where(star_mask)[0]):
-                s_in[self.catalog.nstar == self.catalog.nstar[n]], \
-                s_out[self.catalog.nstar == self.catalog.nstar[n]], \
-                l_sun[self.catalog.nstar == self.catalog.nstar[n]], \
-                hz_in[self.catalog.nstar == self.catalog.nstar[n]], \
-                hz_out[self.catalog.nstar == self.catalog.nstar[n]], \
-                hz_center[self.catalog.nstar == self.catalog.nstar[n]] \
-                    = single_habitable_zone(model=self.options.models['habitable'],
-                                            temp_s=self.catalog.temp_s[n],
-                                            radius_s=self.catalog.radius_s[n])
+        for _, n in enumerate(np.where(star_mask)[0]):
+            s_in[self.catalog.nstar == self.catalog.nstar[n]], \
+            s_out[self.catalog.nstar == self.catalog.nstar[n]], \
+            l_sun[self.catalog.nstar == self.catalog.nstar[n]], \
+            hz_in[self.catalog.nstar == self.catalog.nstar[n]], \
+            hz_out[self.catalog.nstar == self.catalog.nstar[n]], \
+            hz_center[self.catalog.nstar == self.catalog.nstar[n]] \
+                = single_habitable_zone(model=self.options.models['habitable'],
+                                        temp_s=self.catalog.temp_s[n],
+                                        radius_s=self.catalog.radius_s[n])
 
-            self.catalog['s_in'] = s_in
-            self.catalog['s_out'] = s_out
-            self.catalog['l_sun'] = l_sun
-            self.catalog['hz_in'] = hz_in
-            self.catalog['hz_out'] = hz_out
-            self.catalog['hz_center'] = hz_center
-            self.catalog['habitable'] = np.logical_and.reduce((
-                (self.catalog['semimajor_p'] > self.catalog['hz_in']).to_numpy(),
-                (self.catalog['semimajor_p'] < self.catalog['hz_out']).to_numpy(),
-                (self.catalog['radius_p'].ge(0.5)).to_numpy(),
-                (self.catalog['radius_p'].le(1.5)).to_numpy()))
+        self.catalog['s_in'] = s_in
+        self.catalog['s_out'] = s_out
+        self.catalog['l_sun'] = l_sun
+        self.catalog['hz_in'] = hz_in
+        self.catalog['hz_out'] = hz_out
+        self.catalog['hz_center'] = hz_center
+        self.catalog['habitable'] = np.logical_and.reduce((
+            (self.catalog['semimajor_p'] > self.catalog['hz_in']).to_numpy(),
+            (self.catalog['semimajor_p'] < self.catalog['hz_out']).to_numpy(),
+            (self.catalog['radius_p'].ge(0.5)).to_numpy(),
+            (self.catalog['radius_p'].le(1.5)).to_numpy()))
 
-    # TODO: Definition of stype here is wrong. It should be an int not a string.
-    #   Think about this a bit more. It is important to keep the ints in the DataFrame, but that
-    #   decreases usability. Maybe an option is to use intermediate masks for the stellar types.
+        # TODO: Definition of stype here is wrong. It should be an int not a string.
+        #   Think about this a bit more. It is important to keep the ints in the DataFrame, but that
+        #   decreases usability. Maybe an option is to use intermediate masks for the stellar types.
     def catalog_remove_distance(self,
                                 stype: str,
                                 dist: float,
@@ -460,14 +500,14 @@ class PPop():
         # create masks selecting closer or more far away planets
         if mode == 'larger':
             mask = np.logical_and(self.catalog.stype == stype,
-                                  self.catalog.distance_s >= dist)
+                                self.catalog.distance_s >= dist)
         elif mode == 'smaller':
             mask = np.logical_and(self.catalog.stype == stype,
-                                  self.catalog.distance_s <= dist)
+                                self.catalog.distance_s <= dist)
         else:
             warnings.warn('Mode ' + mode + ' not available. Using mode larger.')
             mask = np.logical_and(self.catalog.stype == stype,
-                                  self.catalog.distance_s >= dist)
+                                self.catalog.distance_s >= dist)
 
         # drop the planets to remove from the data
         self.catalog = self.catalog.drop(np.where(mask)[0])

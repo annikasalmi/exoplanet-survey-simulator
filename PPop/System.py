@@ -12,7 +12,7 @@
 
 import numpy as np
 import scipy.optimize as so
-
+import pandas as pd
 
 # =============================================================================
 # SYSTEM
@@ -272,6 +272,67 @@ class System():
         self.append(Name)
         
         pass
+
+        
+    def write(self,
+              Name):
+        """
+        Parameters
+        ----------
+        Name: str
+            Name of the output planet table.
+        """
+        
+        Table = open(Name+'.txt', 'w')
+        
+        # Old header.
+        Table.write('nMC\tRp\tPorb\tMp\tecc\tinc\tOmega\tomega\ttheta\tAbond\tAgeomVIS\tAgeomMIR\tzodis\ta\trp\tang_sep\tang_sep_max\tFinc\tf\tTp\tnstar\tRs\tMs\tTs\tdist\tstype\tra\tdec\tlGal\tbGal\t\n')
+        
+        # New header.
+        Table.write('Nuniverse\tRp\tPorb\tMp\tep\tip\tOmegap\tomegap\tthetap\tAbond\tAgeomVIS\tAgeomMIR\tz\tap\trp\tAngSep\tmaxAngSep\tFp\tfp\tTp\tNstar\tRs\tMs\tTs\tDs\tStype\tRA\tDec\tlGal\tbGal\t\n')
+        
+        Table.close()
+        
+        self.append(Name)
+        
+        pass
+
+     
+    def write_df(self):
+        """
+        Write out to a dataframe
+        """
+            
+        data = {}
+        
+        for attr in dir(self):
+            if attr.startswith('_'):
+                continue  # skip private/internal variables
+            try:
+                value = getattr(self, attr)
+                # Flatten single-element arrays
+                if isinstance(value, np.ndarray) and value.size == 1:
+                    value = value[0]
+                data[attr] = value
+            except AttributeError:
+                continue  # just skip anything that can't be accessed
+
+        try:
+            data=pd.DataFrame(data)
+        except ValueError:
+            data=pd.DataFrame([data])
+
+        try:
+            data.drop(columns=['write_df'], inplace=True)
+        except:
+            pass
+
+        try:
+            data.drop(columns=['write'], inplace=True)
+        except:
+            pass
+        
+        return data
     
     def append(self,
                Name):

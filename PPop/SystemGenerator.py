@@ -13,6 +13,7 @@
 import os
 import sys
 import time
+import pandas as pd
 
 import PPop.Star, PPop.System
 
@@ -343,7 +344,8 @@ class SystemGenerator():
     
     def SimulateUniverses(self,
                           Name,
-                          Nuniverses=1):
+                          Nuniverses=1, 
+                          write_to_file = False):
         """
         Parameters
         ----------
@@ -351,6 +353,8 @@ class SystemGenerator():
             Name of the output planet table.
         Nuniverses: int
             Number of universes to be simulated.
+        write_to_file: bool
+            If True, write the planet population table directly to file.
         """
         
         # Print.
@@ -383,12 +387,21 @@ class SystemGenerator():
                 # type (i.e. if the system is not None), create a new
                 # planet population table (if it hasn't already been created)
                 # and write the simulated planets to it.
-                if (self.System is not None):
-                    if (self.TableFlag == False):
-                        self.System.write(Name)
-                        self.TableFlag = True
-                    else:
-                        self.System.append(Name)
+                if write_to_file == True:
+                    if (self.System is not None):
+                        if (self.TableFlag == False):
+                            self.System.write(Name)
+                            self.TableFlag = True
+                        else:
+                            self.System.append(Name)
+                else:
+                    if (self.System is not None):
+                        if (self.TableFlag == False):
+                            df = self.System.write_df()
+                            self.TableFlag = True
+                        else:
+                            df_new = self.System.write_df()
+                            df = pd.concat([df, df_new], ignore_index=True)
                 
             sys.stdout.write('\r--> Star %.0f of %.0f, scaling = %.1f' % ((i+1), Nstars, Scale))
             sys.stdout.flush()
@@ -402,7 +415,10 @@ class SystemGenerator():
         else:
             print('--> Finished after %.0f s, drawing stable system failed %.0f times' % (t1-t0, self.StabilityModel.Nfails))
         
-        pass
+        if write_to_file == True:
+            pass
+        else:
+            return df
     
     def getStar(self,
                 index):

@@ -26,14 +26,9 @@ def run_single(i):
 
     hwo_data = HWOData(PPopObj.catalog)
     hwo_data.determine_detectable()
-    df_hab, df_false = hwo_data.organize_data()
+    grouped_data = hwo_data.organize_data()
 
-    return {
-        'hab_values': df_hab.count_overall.values,
-        'hab_stypes': df_hab.stype.tolist(),
-        'false_values': df_false.count_overall.values,
-        'false_stypes': df_false.stype.tolist()
-    }
+    return grouped_data
 
 def main():
     start = time.time()
@@ -63,22 +58,59 @@ def main():
             'count_unhab': [count_unhab],
             'error_unhab': [err_unhab]
         })
-        df_results = pd.concat([df_results, df], ignore_index=True)
+        df_all = pd.concat([df_results, df], ignore_index=True)
 
     # Save results
-    df_results.to_csv(os.path.join(PPOP_DATA_DIR, 'hwo_results.csv'), index=False)
+    df_all.to_csv(os.path.join(PPOP_DATA_DIR, 'hwo_results.csv'), index=False)
+
+    # Define bins and labels
+    bins = [0, 1.0, 1.5, 2.5, np.inf]
+    labels = ['<1.0', '1.0–1.5', '1.5–2.5', '>2.5']
+    df_all['radius_bin'] = pd.cut(df_all['planet_radius'], bins=bins, labels=labels, include_lowest=True)
+
+    # Count by star type and radius bin
+    grouped = df_all.groupby(['stype', 'radius_bin']).agg(
+        count=('count_overall', 'sum')
+    ).reset_index()
+
+    grouped['error'] = grouped['count'].apply(lambda x: x**0.5)
+
+    pivot_counts = grouped.pivot(index='stype', columns='radius_bin', values='count').fillna(0)
+    pivot_errors = grouped.pivot(index='stype', columns='radius_bin', values='error').fillna(0)
+
+    # Sort by desired star type order
+    star_order = ['F', 'G', 'K', 'M']
+    pivot_counts = pivot_counts.reindex(star_order)
+    pivot_errors = pivot_errors.reindex(star_order)
+
+    # Build plotting groups
+    groups = {
+        label: (pivot_counts[label].tolist(), pivot_errors[label].tolist())
+        for label in labels
+    }
 
     # Plotting
-    stypes = df_results.stypes.values
-    x = np.arange(len(stypes))
-    width = 0.4
-    plt.bar(x - 0.2, df_results.count_hab, yerr=df_results.error_hab, width=width, label='Habitable')
-    plt.bar(x + 0.2, df_results.count_unhab, yerr=df_results.error_unhab, width=width, label='Inhabitable')
-    plt.xticks(x, stypes)
-    plt.xlabel("Stellar Type")
-    plt.ylabel("Count")
-    plt.title('HWO Detectability')
-    plt.legend()
+    colors = ['lightblue', 'deepskyblue', 'midnightblue', 'forestgreen']
+    hatches = ['...', 'ooo', 'OO', None]
+    bar_width = 0.2
+    star_types = pivot_counts.index.tolist()
+    x = np.arange(len(star_types))
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    for i, (label, (heights, errors)) in enumerate(groups.items()):
+        ax.bar(x + i * bar_width, heights, width=bar_width,
+               yerr=errors, label=label,
+               color=colors[i], hatch=hatches[i], edgecolor='black')
+
+        # Optional annotations
+        for j, (h, err) in enumerate(zip(heights, errors)):
+            ax.text(x[j] + i * bar_width, h + 2, f"{int(h)}±{int(err)}", ha='center', fontsize=8)
+
+    ax.set_xticks(x + 1.5 * bar_width)
+    ax.set_xticklabels(star_types)
+    ax.set_ylabel('Detectable Planets')
+    ax.set_title("Detectable Planets by Star Type (D = 2.0 m, Scenario 1)")
+    ax.legend(title='Planet Radius')
     plt.tight_layout()
     plt.show()
 
@@ -87,55 +119,3 @@ def main():
 if __name__ == '__main__':
     mp.set_start_method("spawn")  # especially important for macOS/Windows
     main()
-
-# df_results = pd.DataFrame(columns=['stypes', 'count_hab', 'error_hab', 'count_unhab', 'error_unhab'])
-# for i in df_hab_total.columns:
-#     count = np.mean(df_hab_total[i])
-#     err = np.std(df_hab_total[i])
-#     count_unhab = np.mean(df_false_total[i])
-#     err_unhab = np.std(df_false_total[i])
-#     df = pd.DataFrame(data={'stypes': [i], 'count_hab': [count], 'error_hab': [err], 
-#                                         'count_unhab': [count_unhab], 'error_unhab': [err_unhab]})
-#     df_results = pd.concat([df_results,df], ignore_index=True)
-
-# df_results.to_csv(os.path.join(PPOP_DATA_DIR,'hwo_results.csv'), index=False)
-    
-# stypes=df_results.stypes.values
-# x = np.arange(len(stypes)) 
-# width=0.4
-# plt.bar(x-0.2, df_results.count_hab, yerr=df_results.error_hab, width=width)#, color='cyan') 
-# plt.bar(x+0.2, df_results.count_unhab, yerr=df_results.error_unhab, width=width)#, color='orange') 
-# plt.xticks(x, stypes)
-# plt.xlabel("Stellar Type") 
-# plt.ylabel("Count") 
-# plt.title('HWO Detectability')
-# plt.legend(["Habitable", "Inhabitable"]) 
-# plt.show() 
-# a=1
-
-
-
-# PPopObj = PPop()
-# for i in range(3):
-#     t=time.time()
-#     filename = 'test_runs_' + str(i) # str
-#     data_path = os.path.join(PPOP_DATA_DIR, filename)
-#     df = PPopObj.run_ppop(data_path, ntest=100, nuniverses=1)
-#     PPopObj.catalog_from_ppop(data_path, df=df)
-#     PPopObj.catalog_remove_distance(stype='A', mode='larger', dist=0.)  # remove all A stars
-#     PPopObj.catalog_remove_distance(stype='M', mode='larger', dist=10.)  # remove M stars > 10pc to
-
-#     hwo_data = HWOData(PPopObj.catalog)
-
-#     hwo_data.determine_detectable()
-
-#     df_hab, df_false = hwo_data.organize_data()
-
-#     if i == 0:
-#         mapping_hab = zip(df_hab.T.columns, df_hab.stype)
-#         mapping_unhab = zip(df_false.T.columns, df_false.stype)
-#         df_hab_total = df_hab.T.rename(columns=dict(mapping_hab)).drop('stype').reset_index(drop=True)
-#         df_false_total = df_false.T.rename(columns=dict(mapping_unhab)).drop('stype').reset_index(drop=True)
-#     else:
-#         df_hab_total.loc[len(df_hab_total)] = df_hab.count_overall.values
-#         df_false_total.loc[len(df_false_total)] = df_false.count_overall.values

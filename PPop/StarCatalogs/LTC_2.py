@@ -225,11 +225,11 @@ class StarCatalog():
         text1 = len(SC_out)/float(Nin)*100.
         print('--> Including %.0f = %.2f%% stars' % (len(SC_out), text1))
         text2 = np.unique(np.array(Stype))
-        if (Stypes is None):
-            print('--> Including spectral types '+str(text2))
-        else:
-            text3 = [f for f in text2 if f not in Stypes]
-            print('--> Including spectral types '+str(Stypes)+', excluding spectral types '+str(text3))
+        # if (Stypes is None):
+        #     print('--> Including spectral types '+str(text2))
+        # else:
+        #     text3 = [f for f in text2 if f not in Stypes]
+        #     print('--> Including spectral types '+str(Stypes)+', excluding spectral types '+str(text3))
         text4 = np.min(SC_out['Dist'])
         text5 = np.max(SC_out['Dist'])
         if (Dist_range is None):

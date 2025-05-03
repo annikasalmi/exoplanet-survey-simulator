@@ -49,6 +49,8 @@ for i in df_hab_total.columns:
     df = pd.DataFrame(data={'stypes': [i], 'count_hab': [count], 'error_hab': [err], 
                                         'count_unhab': [count_unhab], 'error_unhab': [err_unhab]})
     df_results = pd.concat([df_results,df], ignore_index=True)
+
+df_results.to_csv('hwo_results.csv', index=False)
     
 stypes=df_results.stypes.values
 x = np.arange(len(stypes)) 

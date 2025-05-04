@@ -1,13 +1,5 @@
-import sys
-import warnings
-
-import numpy as np
 import pandas as pd
-from astropy.io import fits
-from astropy.coordinates import SkyCoord, BarycentricMeanEcliptic
 
-from lifesim.util.options import Options
-from lifesim.util.habitable import single_habitable_zone
 from lifesim.core.data import Data
 
 
@@ -50,7 +42,7 @@ class HWOData():
         return flux_ratio
     
     def calc_iwa_constraint(self):
-        iwa_constraint = self.catalog.sep_p.values /self.catalog.distance_s
+        iwa_constraint = self.catalog.angsep
         return iwa_constraint
     
     def determine_detectable(self):

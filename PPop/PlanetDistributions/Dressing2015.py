@@ -36,7 +36,7 @@ class PlanetDistribution():
         """
         
         # Print.
-        print('--> Initializing Dressing2015 planet distribution')
+        # print('--> Initializing Dressing2015 planet distribution')
         
         # Model parameters.
         self.returns = ['Rp', 'Porb']

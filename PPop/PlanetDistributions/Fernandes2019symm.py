@@ -33,7 +33,7 @@ class PlanetDistribution():
         """
         
         # Print.
-        print('--> Initializing Fernandes2019symm planet distribution')
+        # print('--> Initializing Fernandes2019symm planet distribution')
         
         # Model parameters.
         self.returns = ['Mp', 'Porb']

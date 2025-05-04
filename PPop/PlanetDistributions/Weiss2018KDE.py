@@ -34,7 +34,7 @@ class PlanetDistribution():
         """
         
         # Print.
-        print('--> Initializing Weiss2018KDE planet distribution')
+        # print('--> Initializing Weiss2018KDE planet distribution')
         
         # Model parameters
         self.returns = ['Rp', 'Porb']

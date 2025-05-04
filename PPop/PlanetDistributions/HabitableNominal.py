@@ -39,7 +39,7 @@ class PlanetDistribution():
         """
         
         # Print.
-        print('--> Initializing HabitableNominal planet distribution')
+        # print('--> Initializing HabitableNominal planet distribution')
         
         # Constants.
         self.G = 6.674e-11 # m^3/kg/s^2

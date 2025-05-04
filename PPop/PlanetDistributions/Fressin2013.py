@@ -36,7 +36,7 @@ class PlanetDistribution():
         """
         
         # Print.
-        print('--> Initializing Fressin2013 planet distribution')
+        # print('--> Initializing Fressin2013 planet distribution')
         
         # Model parameters.
         self.returns = ['Rp', 'Porb']

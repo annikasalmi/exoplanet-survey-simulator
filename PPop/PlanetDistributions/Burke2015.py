@@ -33,7 +33,7 @@ class PlanetDistribution():
         """
         
         # Print.
-        print('--> Initializing Burke2015 planet distribution')
+        # print('--> Initializing Burke2015 planet distribution')
         
         # Model parameters.
         self.returns = ['Rp', 'Porb']

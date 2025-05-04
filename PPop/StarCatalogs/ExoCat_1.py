@@ -12,8 +12,10 @@
 
 import astropy.table as at
 import csv
+import os
 import matplotlib.pyplot as plt
 import numpy as np
+from tools import PPOP_STAR_DIR
 
 
 # =============================================================================
@@ -29,7 +31,7 @@ class StarCatalog():
                  Stypes=['B', 'A', 'F', 'G', 'K', 'M', 'D'],
                  Dist_range=[0, 30], # pc
                  Dec_range=[-90, 90], # deg
-                 Path='StarCatalogs/ExoCat_1.csv'):
+                 Path=os.path.join(PPOP_STAR_DIR,'ExoCat_1.csv')):
         """
         Parameters
         ----------
@@ -54,7 +56,7 @@ class StarCatalog():
              Stypes=['B', 'A', 'F', 'G', 'K', 'M', 'D'],
              Dist_range=[0, 30], # pc
              Dec_range=[-90, 90], # deg
-             Path='StarCatalogs/ExoCat_1.csv'):
+             Path=os.path.join(PPOP_STAR_DIR,'ExoCat_1.csv')):
         """
         Parameters
         ----------

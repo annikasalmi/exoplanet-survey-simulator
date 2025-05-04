@@ -33,7 +33,7 @@ class PlanetDistribution():
         """
         
         # Print.
-        print('--> Initializing SAG13 planet distribution')
+        # print('--> Initializing SAG13 planet distribution')
         
         # Model parameters.
         self.returns = ['Rp', 'Porb']

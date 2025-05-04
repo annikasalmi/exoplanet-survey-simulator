@@ -49,7 +49,7 @@ class PPop():
         # A different planet distribution can be assigned to each spectral type.
         # dict, StarCatalog.Stype as keys, PlanetDistribution as data
         # SEE MORE options in gp.py
-        self.StypeToModel = {'A': SAG13, 'F': SAG13, 'G': SAG13, 'K': SAG13, 'M': SAG13}
+        self.StypeToModel = {'A': SAG13, 'F': SAG13, 'G': SAG13, 'K': SAG13, 'M': Dressing2015}
         self.Scenario = 'baseline' # 'pessimistic', 'optimistic', for +/- 1-sigma lower/higher error bars planet dist.
         self.ScalingModel = BinarySuppression # or None
 
@@ -115,11 +115,10 @@ class PPop():
         ValueError
             If the data class already has an initialized catalog and overwrite is set to False.
         """
-        df_old = df # j in case for debugging TODO: get rid of this
         # turn df data into the correct format
         if df is not None:
             original_cols = df.columns
-            df['radius_p'] = df['rp']
+            df['radius_p'] = df['Rp']
             df['p_orb'] = df['Porb']
             df['mass_p'] = df['Mp']
             df['ecc_p'] = df['ep']

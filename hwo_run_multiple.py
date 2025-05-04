@@ -98,7 +98,7 @@ def main():
     ax.set_xticks(x + 1.5 * bar_width)
     ax.set_xticklabels(star_order)
     ax.set_ylabel('Detectable Planets')
-    ax.set_title('Detectable Planets by Star Type (D = 2.0 m, Scenario 1)')
+    ax.set_title('Detectable Planets by Star Type')
     ax.legend(title='Planet Radius')
     plt.tight_layout()
     plt.show()

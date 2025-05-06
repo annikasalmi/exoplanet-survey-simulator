@@ -12,7 +12,7 @@ from tools import PPOP_DATA_DIR
 
 NUNIVERSES = 1
 NTEST = 100
-NRUNS = 500
+NRUNS = 10
 STAR_CATALOG = 'LTC_3'#ExoCat_1'  # or 'LTC_3'
 
 

@@ -1,0 +1,24 @@
+name: Run Code on Push
+
+on:
+  push:
+    branches:
+      - annika/master  # Change to your desired branch
+
+jobs:
+  run-my-code:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.8.0'  # or whatever you need
+
+      - name: Run my script
+        run: |
+          echo "Running my code"
+          python tests/integration.py

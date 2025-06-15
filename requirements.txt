@@ -7,4 +7,6 @@ PyQt5==5.15.11
 requests==2.32.3
 scipy==1.10.1
 tqdm==4.67.1
+gitdb==4.0.12
+GitPython==3.1.44
 git+https://github.com/fdannert/SpectRes.git

@@ -1,7 +1,9 @@
+import os
+print(os.getcwd())
+
 import matplotlib.pyplot as plt
 import numpy as np
 import time
-import os
 import pandas as pd
 import multiprocessing as mp
 from PPop.StarCatalogs import CrossfieldBrightSample, ExoCat_1, LTC_2, LTC_3
@@ -12,7 +14,6 @@ from tools import PPOP_DATA_DIR
 
 NRUNS = 1
 STAR_CATALOG = 'LTC_3'#ExoCat_1'  # or 'LTC_3'
-
 
 def run_single(i):
     '''

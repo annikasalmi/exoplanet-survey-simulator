@@ -78,7 +78,7 @@ class HWOData():
         return flux_ratio
     
     def calc_iwa_constraint(self):
-        iwa_constraint = self.catalog.angsepconst
+        iwa_constraint = self.catalog.angsep
         return iwa_constraint
     
     def determine_detectable(self):

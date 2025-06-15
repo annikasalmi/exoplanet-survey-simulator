@@ -2,7 +2,7 @@ import numpy as np
 from scipy.stats import truncnorm 
 import h5py 
 import os
-from tools import PPOP_DIR
+from tools.paths import PPOP_DIR
 
 ## constant
 mearth2mjup = 317.828

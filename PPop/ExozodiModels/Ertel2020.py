@@ -15,7 +15,7 @@ import os
 import numpy as np
 import scipy.stats as stats
 
-from tools import PPOP_DIR
+from tools.paths import PPOP_DIR
 
 
 # =============================================================================

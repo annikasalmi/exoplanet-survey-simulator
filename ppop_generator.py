@@ -14,7 +14,7 @@ from astropy.coordinates import SkyCoord, BarycentricMeanEcliptic
 
 from lifesim.util.habitable import single_habitable_zone
 from lifesim.util.options import Options
-from tools import PPOP_DATA_DIR
+from tools.paths import PPOP_DATA_DIR
 
 # Import your own catalogs, distributions and models here.
 import PPop.SystemGenerator as SystemGenerator

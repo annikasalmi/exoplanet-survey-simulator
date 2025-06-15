@@ -3,7 +3,7 @@ name: Run Code on Push
 on:
   push:
     branches:
-      - annika/master  # Change to your desired branch
+      - hotfix/int-tests  # Change to your desired branch
 
 jobs:
   run-my-code:
@@ -24,7 +24,8 @@ jobs:
       - name: Check working directory
         run: pwd && ls -al
 
-      - name: Run integration.py with PYTHONPATH set
+      - name: Set PYTHONPATH and run integration
+        working-directory: /home/runner/work/mdwarf-habitability/mdwarf-habitability
         run: |
-          export PYTHONPATH=/home/runner/work/mdwarf-habitability/mdwarf-habitability
+          export PYTHONPATH=$(pwd)
           python tests/integration.py

@@ -1,5 +1,4 @@
 import os
-print(os.getcwd())
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,7 +9,7 @@ from PPop.StarCatalogs import CrossfieldBrightSample, ExoCat_1, LTC_2, LTC_3
 
 from lifesim.core.hwo_data import HWOData
 from ppop_generator import PPop
-from tools import PPOP_DATA_DIR
+from tools.paths import PPOP_DATA_DIR
 
 NRUNS = 1
 STAR_CATALOG = 'LTC_3'#ExoCat_1'  # or 'LTC_3'

@@ -15,7 +15,7 @@ import csv
 import os
 import matplotlib.pyplot as plt
 import numpy as np
-from tools import PPOP_STAR_DIR
+from tools.paths import PPOP_STAR_DIR
 
 
 # =============================================================================

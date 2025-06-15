@@ -51,7 +51,7 @@ class HWOData():
         temperature_K = np.asarray(temperature_K)
         
         exponent = (const.h * const.c) / (wavelength_m * const.k * temperature_K)
-        numerator = 2 * const.h * const**2
+        numerator = 2 * const.h * const.c**2
         denominator = (wavelength_m**5) * (np.exp(exponent) - 1)
         return numerator / denominator
 

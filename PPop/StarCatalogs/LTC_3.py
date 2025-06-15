@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-from tools import PPOP_DIR
+from tools.paths import PPOP_DIR
 
 
 # =============================================================================

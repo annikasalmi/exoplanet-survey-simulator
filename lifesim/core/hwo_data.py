@@ -60,7 +60,7 @@ class HWOData():
         flux_planet_a = self.blackbody_flux(const.min_wavelength_hwo, self.catalog.temp_p.values)
         flux_planet_b = self.blackbody_flux(const.max_wavelength_hwo, self.catalog.temp_p.values)
 
-        planet_flux = max(flux_planet_a, flux_planet_b)
+        planet_flux = np.maximum(flux_planet_a, flux_planet_b)
         return planet_flux
 
     def calc_flux(self):
@@ -73,7 +73,7 @@ class HWOData():
         flux_ratio_a = self.catalog.radius_p.values**2 * flux_planet_a / (self.catalog.radius_s.values**2 * flux_star_a)
         flux_ratio_b = self.catalog.radius_p.values**2 * flux_planet_b / (self.catalog.radius_s.values**2 * flux_star_b)
 
-        flux_ratio = max(flux_ratio_a, flux_ratio_b)
+        flux_ratio = np.maximum(flux_ratio_a, flux_ratio_b)
 
         return flux_ratio
     

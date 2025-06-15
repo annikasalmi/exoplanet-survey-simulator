@@ -3,7 +3,7 @@ name: Run Code on Push
 on:
   push:
     branches:
-      - hotfix/int-tests  # Change to your desired branch
+      - annika/master  
 
 jobs:
   run-my-code:
@@ -16,7 +16,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.8'  # or whatever you need
+          python-version: '3.8'  
 
       - name: Install dependencies
         run: pip install -r requirements.txt

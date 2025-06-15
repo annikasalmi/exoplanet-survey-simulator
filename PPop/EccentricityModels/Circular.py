@@ -20,8 +20,11 @@ import numpy as np
 
 class EccentricityModel():
     
-    def __init__(self):
+    def __init__(self, seed):
+        self.seed = seed
         
+        # Set random seed
+        np.random.seed(seed)
         pass
     
     def getEccentricity(self,

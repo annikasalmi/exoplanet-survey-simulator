@@ -14,6 +14,7 @@ import os
 import sys
 import time
 import pandas as pd
+import numpy as np
 
 import PPop.Star, PPop.System
 
@@ -123,7 +124,7 @@ class SystemGenerator():
                                           block=block)
         
         # Get mass model.
-        self.MassModel = self.getMassModel(MassModel, self.seed)
+        self.MassModel = self.getMassModel(MassModel)
         if (SummaryPlots == True):
             self.MassModel.SummaryPlot(Ntest=Ntest,
                                        FigDir=FigDir,
@@ -155,7 +156,7 @@ class SystemGenerator():
                                                 block=block)
         
         # Get orbit model.
-        self.OrbitModel = self.getOrbitModel(OrbitModel, self.seed)
+        self.OrbitModel = self.getOrbitModel(OrbitModel)
         if (SummaryPlots == True):
             self.OrbitModel.SummaryPlot(self.EccentricityModel,
                                         Ntest=Ntest,
@@ -163,7 +164,7 @@ class SystemGenerator():
                                         block=block)
         
         # Get albedo model.
-        self.AlbedoModel = self.getAlbedoModel(AlbedoModel, self.seed)
+        self.AlbedoModel = self.getAlbedoModel(AlbedoModel)
         if (SummaryPlots == True):
             self.AlbedoModel.SummaryPlot(Ntest=Ntest,
                                          FigDir=FigDir,
@@ -171,7 +172,7 @@ class SystemGenerator():
         
         # Get exozodiacal dust model.
         self.ExozodiModel = self.getExozodiModel(ExozodiModel,
-                                                 Scenario, self.seed)
+                                                 Scenario)
         if (SummaryPlots == True):
             self.ExozodiModel.SummaryPlot(Ntest=Ntest,
                                           FigDir=FigDir,
@@ -215,7 +216,7 @@ class SystemGenerator():
         PlanetDistributions = {}
         for i, key_i in enumerate(StypeToModel):
             if (i == 0):
-                PlanetDistributions[key_i] = StypeToModel[key_i].PlanetDistribution(Scenario)
+                PlanetDistributions[key_i] = StypeToModel[key_i].PlanetDistribution(Scenario, seed=self.seed)
             else:
                 isnew = True
                 for j, key_j in enumerate(StypeToModel):
@@ -223,7 +224,7 @@ class SystemGenerator():
                         PlanetDistributions[key_i] = PlanetDistributions[key_j]
                         isnew = False
                 if (isnew == True):
-                    PlanetDistributions[key_i] = StypeToModel[key_i].PlanetDistribution(Scenario)
+                    PlanetDistributions[key_i] = StypeToModel[key_i].PlanetDistribution(Scenario, seed=self.seed)
         
         return PlanetDistributions
     
@@ -244,10 +245,10 @@ class SystemGenerator():
         if (ScalingModel is None):
             return None
         else:
-            return ScalingModel.ScalingModel()
+            return ScalingModel.ScalingModel(seed=self.seed)
     
     def getMassModel(self,
-                     MassModel, seed):
+                     MassModel):
         """
         Parameters
         ----------
@@ -260,7 +261,7 @@ class SystemGenerator():
             Instance of class MassModel.
         """
         
-        return MassModel.MassModel(seed)
+        return MassModel.MassModel(seed=self.seed)
     
     def getEccentricityModel(self,
                              EccentricityModel):
@@ -276,7 +277,7 @@ class SystemGenerator():
             Instance of class EccentricityModel.
         """
         
-        return EccentricityModel.EccentricityModel()
+        return EccentricityModel.EccentricityModel(seed=self.seed)
     
     def getStabilityModel(self,
                           StabilityModel):
@@ -295,10 +296,10 @@ class SystemGenerator():
         if (StabilityModel is None):
             return None
         else:
-            return StabilityModel.StabilityModel()
+            return StabilityModel.StabilityModel(seed=self.seed)
     
     def getOrbitModel(self,
-                      OrbitModel, seed):
+                      OrbitModel):
         """
         Parameters
         ----------
@@ -311,7 +312,7 @@ class SystemGenerator():
             Instance of class OrbitModel.
         """
         
-        return OrbitModel.OrbitModel(self.seed)
+        return OrbitModel.OrbitModel(seed=self.seed)
     
     def getAlbedoModel(self,
                        AlbedoModel):
@@ -327,7 +328,7 @@ class SystemGenerator():
             Instance of class AlbedoModel.
         """
         
-        return AlbedoModel.AlbedoModel()
+        return AlbedoModel.AlbedoModel(seed=self.seed)
     
     def getExozodiModel(self,
                        ExozodiModel,
@@ -346,7 +347,7 @@ class SystemGenerator():
             Instance of class ExozodiModel.
         """
         
-        return ExozodiModel.ExozodiModel(Scenario)
+        return ExozodiModel.ExozodiModel(Scenario, seed=self.seed)
     
     def SimulateUniverses(self,
                           Name,

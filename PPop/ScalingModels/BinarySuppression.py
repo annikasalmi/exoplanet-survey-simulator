@@ -20,8 +20,11 @@ import numpy as np
 
 class ScalingModel():
     
-    def __init__(self):
+    def __init__(self, seed):
+        self.seed = seed
         
+        # Set random seed for reproducibility
+        np.random.seed(seed)
         pass
     
     def getScale(self,

@@ -10,9 +10,7 @@ from lifesim.core.hwo_data import HWOData
 from ppop_generator import PPop
 from tools import PPOP_DATA_DIR
 
-NUNIVERSES = 1
-NTEST = 100
-NRUNS = 10
+NRUNS = 3
 STAR_CATALOG = 'LTC_3'#ExoCat_1'  # or 'LTC_3'
 
 
@@ -20,8 +18,8 @@ def run_single(i):
     '''
     Runs a single instance of the PPop simulation and HWO data analysis.
     '''
-    print(f"Running simulation {i}...")
-    PPopObj = PPop(seed=i) # i guess we'll reinstantiate each run...
+    PPopObj = PPop(seed=i)
+
     if STAR_CATALOG == 'ExoCat_1':
         PPopObj.StarCatalog = ExoCat_1
     elif STAR_CATALOG == 'LTC_3':
@@ -30,7 +28,7 @@ def run_single(i):
     filename = f'test_runs_{i}'
     data_path = os.path.join(PPOP_DATA_DIR, filename)
 
-    df = PPopObj.run_ppop(data_path, ntest=NTEST, nuniverses=NUNIVERSES)
+    df = PPopObj.run_ppop(seed=i, data_path=data_path)
     PPopObj.catalog_from_ppop(data_path, df=df)
     PPopObj.catalog_remove_distance(stype='A', mode='larger', dist=0.0)
     PPopObj.catalog_remove_distance(stype='M', mode='larger', dist=10.0)
@@ -39,6 +37,7 @@ def run_single(i):
     hwo_data.determine_detectable()
 
     df = hwo_data.catalog
+    
     bins = [0, 1.5, 3.0, 6.0]
     labels = ['<1.5', '1.5–3.0', '3.0–6.0']
     df['radius_bin'] = pd.cut(df['radius_p'], bins=bins, labels=labels, include_lowest=True)
@@ -53,17 +52,19 @@ def run_single(i):
     # Group by star type and radius bin
     grouped_df = df_all.groupby(['stype', 'radius_bin']).size().reset_index(name='count')
 
-    print(f"Simulation {i} complete.")
-
     return grouped_df
 
 def main(parallel=False):
     start = time.time()
     n_runs = NRUNS
 
-    # Run in parallel
-    with mp.Pool(processes=mp.cpu_count()-2) as pool:
-        results = pool.map(run_single, range(n_runs))
+    if parallel:
+        # Run in parallel
+        with mp.Pool(processes=mp.cpu_count()) as pool:
+            results = pool.map(run_single, range(n_runs))
+    else:
+        # Run sequentially
+        results = [run_single(i) for i in range(n_runs)]
     # Combine all run results
     df_all = pd.concat(results, keys=range(n_runs)).reset_index(level=0).rename(columns={'level_0': 'run'})
 
@@ -87,8 +88,6 @@ def main(parallel=False):
     bin_labels = ['<1.5', '1.5–3.0', '3.0–6.0', 'Rocky HZ']
     pivot_counts = pivot_counts.reindex(star_order).reindex(columns=bin_labels, fill_value=0)
     pivot_errors = pivot_errors.reindex(star_order).reindex(columns=bin_labels, fill_value=0)
-
-    grouped_sum.to_csv(os.path.join(PPOP_DATA_DIR, 'grouped_sum.csv'))
 
     # Create grouped bar plot
     colors = ['lightblue', 'deepskyblue', 'midnightblue', 'forestgreen']
@@ -115,8 +114,9 @@ def main(parallel=False):
     ax.set_title('Detectable Planets by Star Type')
     ax.legend(title='Planet Radius')
     plt.tight_layout()
-    plt.savefig(f"planets_hwo_nruns{NRUNS}_ntests{NTEST}_nuniverse{NUNIVERSES}_{STAR_CATALOG}.png", dpi=300, bbox_inches='tight')
+    plt.savefig(f"planets_hwo_nruns{NRUNS}_{STAR_CATALOG}.png", dpi=300, bbox_inches='tight')
     plt.show()
+
     print(f"Total time: {time.time() - start:.2f} seconds")
 
 

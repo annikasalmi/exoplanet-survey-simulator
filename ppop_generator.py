@@ -102,7 +102,7 @@ class PPop():
                                                 self.FigDir,
                                                 self.block,
                                                 seed=seed)
-        df = SysGen.SimulateUniverses(name,
+        df = SysGen.SimulateUniverses(data_path,
                                 nuniverses)
         return df
 

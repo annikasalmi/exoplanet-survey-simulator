@@ -21,7 +21,7 @@ def run_single(i):
     Runs a single instance of the PPop simulation and HWO data analysis.
     '''
     print(f"Running simulation {i}...")
-    PPopObj = PPop() # i guess we'll reinstantiate each run...
+    PPopObj = PPop(seed=i) # i guess we'll reinstantiate each run...
     if STAR_CATALOG == 'ExoCat_1':
         PPopObj.StarCatalog = ExoCat_1
     elif STAR_CATALOG == 'LTC_3':
@@ -57,7 +57,7 @@ def run_single(i):
 
     return grouped_df
 
-def main():
+def main(parallel=False):
     start = time.time()
     n_runs = NRUNS
 

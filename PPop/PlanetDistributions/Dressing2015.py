@@ -27,14 +27,18 @@ class PlanetDistribution():
     """
     
     def __init__(self,
-                 Scenario):
+                 Scenario, seed):
         """
         Parameters
         ----------
         Scenario: 'baseline', 'pessimistic', 'optimistic'
             Scenario for planet occurrence rates.
         """
+        self.seed = seed
+
         
+        # Set random seed.
+        np.random.seed(self.seed)
         # Print.
         # print('--> Initializing Dressing2015 planet distribution')
         

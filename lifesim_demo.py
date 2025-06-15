@@ -2,6 +2,11 @@ import requests
 import os
 import lifesim
 
+### needs to be modified to run 500 cases
+# first tho just setting up dummy i 
+
+i = 0
+
 # ---------- Set-Up ----------
 
 # create bus
@@ -39,7 +44,7 @@ bus.data.catalog_remove_distance(stype='M', mode='larger', dist=10.)  # remove M
 # ---------- Creating the Instrument ----------
 
 # create modules and add to bus
-instrument = lifesim.Instrument(name='inst')
+instrument = lifesim.Instrument(name='inst', seed = i)
 bus.add_module(instrument)
 
 transm = lifesim.TransmissionMap(name='transm')

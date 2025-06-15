@@ -59,14 +59,18 @@ class Instrument(InstrumentModule):
     """
 
     def __init__(self,
-                 name: str):
+                 name: str,
+                 seed: int):
         """
         Parameters
         ----------
         name : str
             Name of the instrument module.
         """
+        self.seed = seed
 
+        # Set random seed.
+        np.random.seed(self.seed)
         super().__init__(name=name)
 
     def apply_options(self):

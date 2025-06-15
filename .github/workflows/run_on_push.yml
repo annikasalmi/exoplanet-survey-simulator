@@ -21,7 +21,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run my script
+      - name: Run integration.py with PYTHONPATH set
         run: |
-          echo "Running my code"
-          python tests/integration.py
+          export PYTHONPATH=$(pwd)/LIFEsim
+          python LIFEsim/tests/integration.py

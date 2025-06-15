@@ -14,12 +14,12 @@ def run_single(i):
     '''
     Runs a single instance of the PPop simulation and HWO data analysis.
     '''
-    PPopObj = PPop() # i guess we'll reinstantiate each run...
+    PPopObj = PPop(seed=i) # i guess we'll reinstantiate each run...
 
     filename = f'test_runs_{i}'
     data_path = os.path.join(PPOP_DATA_DIR, filename)
 
-    df = PPopObj.run_ppop(data_path, ntest=100, nuniverses=1)
+    df = PPopObj.run_ppop(seed=i, data_path=data_path)
     PPopObj.catalog_from_ppop(data_path, df=df)
     PPopObj.catalog_remove_distance(stype='A', mode='larger', dist=0.0)
     PPopObj.catalog_remove_distance(stype='M', mode='larger', dist=10.0)
@@ -45,13 +45,17 @@ def run_single(i):
 
     return grouped_df
 
-def main():
+def main(parallel=False):
     start = time.time()
     n_runs = 3
 
-    # Run in parallel
-    with mp.Pool(processes=mp.cpu_count()) as pool:
-        results = pool.map(run_single, range(n_runs))
+    if parallel:
+        # Run in parallel
+        with mp.Pool(processes=mp.cpu_count()) as pool:
+            results = pool.map(run_single, range(n_runs))
+    else:
+        # Run sequentially
+        results = [run_single(i) for i in range(n_runs)]
     # Combine all run results
     df_all = pd.concat(results, keys=range(n_runs)).reset_index(level=0).rename(columns={'level_0': 'run'})
 

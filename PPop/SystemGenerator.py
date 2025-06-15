@@ -41,7 +41,8 @@ class SystemGenerator():
                  SummaryPlots,
                  Ntest,
                  FigDir,
-                 block):
+                 block,
+                 seed):
         """
         Parameters
         ----------
@@ -80,8 +81,13 @@ class SystemGenerator():
             Directory to which summary plots are saved.
         block: bool
             If True, blocks plots when showing.
+        seed: int
+            Seed for random number generator.
         """
-        
+        self.seed = seed
+        # Set random seed.
+        np.random.seed(self.seed)
+
         # Create directory to which summary plots are saved
         if (FigDir is not None and not os.path.exists(FigDir)):
             os.makedirs(FigDir)
@@ -117,7 +123,7 @@ class SystemGenerator():
                                           block=block)
         
         # Get mass model.
-        self.MassModel = self.getMassModel(MassModel)
+        self.MassModel = self.getMassModel(MassModel, self.seed)
         if (SummaryPlots == True):
             self.MassModel.SummaryPlot(Ntest=Ntest,
                                        FigDir=FigDir,
@@ -149,7 +155,7 @@ class SystemGenerator():
                                                 block=block)
         
         # Get orbit model.
-        self.OrbitModel = self.getOrbitModel(OrbitModel)
+        self.OrbitModel = self.getOrbitModel(OrbitModel, self.seed)
         if (SummaryPlots == True):
             self.OrbitModel.SummaryPlot(self.EccentricityModel,
                                         Ntest=Ntest,
@@ -157,7 +163,7 @@ class SystemGenerator():
                                         block=block)
         
         # Get albedo model.
-        self.AlbedoModel = self.getAlbedoModel(AlbedoModel)
+        self.AlbedoModel = self.getAlbedoModel(AlbedoModel, self.seed)
         if (SummaryPlots == True):
             self.AlbedoModel.SummaryPlot(Ntest=Ntest,
                                          FigDir=FigDir,
@@ -165,7 +171,7 @@ class SystemGenerator():
         
         # Get exozodiacal dust model.
         self.ExozodiModel = self.getExozodiModel(ExozodiModel,
-                                                 Scenario)
+                                                 Scenario, self.seed)
         if (SummaryPlots == True):
             self.ExozodiModel.SummaryPlot(Ntest=Ntest,
                                           FigDir=FigDir,
@@ -241,7 +247,7 @@ class SystemGenerator():
             return ScalingModel.ScalingModel()
     
     def getMassModel(self,
-                     MassModel):
+                     MassModel, seed):
         """
         Parameters
         ----------
@@ -254,7 +260,7 @@ class SystemGenerator():
             Instance of class MassModel.
         """
         
-        return MassModel.MassModel()
+        return MassModel.MassModel(seed)
     
     def getEccentricityModel(self,
                              EccentricityModel):
@@ -292,7 +298,7 @@ class SystemGenerator():
             return StabilityModel.StabilityModel()
     
     def getOrbitModel(self,
-                      OrbitModel):
+                      OrbitModel, seed):
         """
         Parameters
         ----------
@@ -305,7 +311,7 @@ class SystemGenerator():
             Instance of class OrbitModel.
         """
         
-        return OrbitModel.OrbitModel()
+        return OrbitModel.OrbitModel(self.seed)
     
     def getAlbedoModel(self,
                        AlbedoModel):
@@ -512,6 +518,7 @@ class SystemGenerator():
                                  self.StabilityModel,
                                  Nstar,
                                  Nuniverse,
-                                 Scale)
+                                 Scale,
+                                 self.seed)
         else:
             return None

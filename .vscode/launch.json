@@ -1,6 +1,7 @@
 {
     "version": "0.2.0",
     "configurations": [
+
         {
             "name": "Python Debugger: Current File",
             "type": "debugpy",
@@ -13,6 +14,28 @@
             "type": "debugpy",
             "request": "launch",
             "program": "P-pop/P-pop.py",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "integration.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "test/integration.py",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "hwo_run_multiple.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "run/hwo/hwo_run_multiple.py",
+            "console": "integratedTerminal"
+        },
+
+        {
+            "name": "lifesim_run_multiple.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "run/lifesim/lifesim_run_multiple.py",
             "console": "integratedTerminal"
         }
     ]

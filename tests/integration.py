@@ -8,7 +8,7 @@ import multiprocessing as mp
 from PPop.StarCatalogs import CrossfieldBrightSample, ExoCat_1, LTC_2, LTC_3
 
 from lifesim.core.hwo_data import HWOData
-from ppop_generator import PPop
+from run.ppop.ppop_generator import PPop
 from tools.paths import PPOP_DATA_DIR
 
 NRUNS = 1

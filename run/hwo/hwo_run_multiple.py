@@ -7,7 +7,7 @@ import multiprocessing as mp
 from PPop.StarCatalogs import CrossfieldBrightSample, ExoCat_1, LTC_2, LTC_3
 
 from lifesim.core.hwo_data import HWOData
-from ppop_generator import PPop
+from run.ppop.ppop_generator import PPop
 from tools.paths import PPOP_DATA_DIR
 
 NRUNS = 3
@@ -25,7 +25,7 @@ def run_single(i):
     elif STAR_CATALOG == 'LTC_3':
         PPopObj.StarCatalog = LTC_3
 
-    filename = f'test_runs_{i}'
+    filename = f'test_runs_hwo_{i}'
     data_path = os.path.join(PPOP_DATA_DIR, filename)
 
     df = PPopObj.run_ppop(seed=i, data_path=data_path)

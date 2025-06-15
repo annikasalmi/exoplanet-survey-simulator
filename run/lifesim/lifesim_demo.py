@@ -1,9 +1,7 @@
 import requests
 import os
 import lifesim
-
-### needs to be modified to run 500 cases
-# first tho just setting up dummy i 
+from run.ppop.ppop_generator import PPop
 
 i = 0
 

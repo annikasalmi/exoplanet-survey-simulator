@@ -228,7 +228,7 @@ class StarCatalog():
         
         # Print.
         text1 = len(SC_out)/float(Nin)*100.
-        # print('--> Including %.0f = %.2f%% stars' % (len(SC_out), text1))
+        print('--> Including %.0f = %.2f%% stars' % (len(SC_out), text1))
         text2 = np.unique(np.array(Stype))
         # if (Stypes is None):
         #     print('--> Including spectral types '+str(text2))

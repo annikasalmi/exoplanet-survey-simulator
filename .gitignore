@@ -2,10 +2,13 @@
 /__init__.py
 /lifesim/archive/
 /archive/
+/lifesim/data/*.yaml
+/lifesim/data/*.hdf5
 /lifesim/gui/Earth_Clear_R1000_10pc_Björn_Konrad.txt
 /lifesim/gui/data_creation/ppop_catalog.txt
 /lifesim/gui/data_creation/*.yaml
 /lifesim/gui/data_creation/*.hdf5
+/lifesim/instrument/__pycache__/*.pyc
 TestPlanetPopulation.txt
 /Figures/*
 /PPop/__pycache__/*

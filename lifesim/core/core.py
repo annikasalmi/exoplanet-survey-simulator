@@ -11,6 +11,7 @@ import git
 
 from lifesim.core.data import Data
 
+from tools.paths import LIFESIM_DATA_DIR
 
 class Module(ABC):
     """
@@ -474,7 +475,7 @@ class Bus(object):
 
     def build_from_config(self,
                           filename: str):
-        with open(filename) as file:
+        with open(os.path.join(LIFESIM_DATA_DIR,filename)) as file:
             config_dict = yaml.load(file, Loader=yaml.FullLoader)
 
         self.data.options.array = convert_to_np(config_dict['array'])

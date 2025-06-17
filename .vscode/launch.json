@@ -2,6 +2,7 @@
     "version": "0.2.0",
     "configurations": [
 
+
         {
             "name": "Python Debugger: Current File",
             "type": "debugpy",
@@ -24,20 +25,12 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "hwo_run_multiple.py",
+            "name": "run_sim.py",
             "type": "debugpy",
             "request": "launch",
-            "program": "run/hwo/hwo_run_multiple.py",
+            "program": "run/sun_sim.py",
             "console": "integratedTerminal"
         },
-
-        {
-            "name": "lifesim_run_multiple.py",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "run/lifesim/lifesim_run_multiple.py",
-            "console": "integratedTerminal"
-        }
     ]
 }
 //         {

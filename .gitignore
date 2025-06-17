@@ -24,6 +24,7 @@ TestPlanetPopulation.txt
 /PPop/StarCatalogs/__pycache__/*
 /PPop/Figures/
 /PPop/data/*
+/run/logging/*/*.txt
 __pycache__/*.pyc
 /lifesim/core/__pycache__/*.pyc
 /PPop/__pycache__/*.pyc

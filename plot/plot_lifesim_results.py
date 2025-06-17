@@ -5,16 +5,6 @@ import matplotlib.pyplot as plt
 
 from tools.paths import LIFESIM_DATA_DIR
 
-def assign_radius_bin(r, habitable):
-    if habitable and r <= 1.5:
-        return 'Rocky HZ'
-    elif not habitable and r <= 1.5:
-        return '<1.5'
-    elif 1.5 < r <= 3.0:
-        return '1.5–3.0'
-    elif 3.0 <= r < 6.0:
-        return '3.0–6.0'
-
 def plot(results, nruns, star_catalog='Gaia'):
     # Parameters
     nruns = len(results)  # List of DataFrames, one per run
@@ -26,7 +16,14 @@ def plot(results, nruns, star_catalog='Gaia'):
 
     for run_idx, df in enumerate(results):
         df_detected = df[df['detected'] == True].copy()
-        df_detected['radius_bin'] = assign_radius_bin(df_detected['radius_p'], df_detected['habitable'])
+        
+        bins = [0, 1.5, 3.0, 6.0]
+        labels = ['<1.5', '1.5–3.0', '3.0–6.0']
+        df_detected['radius_bin'] = pd.cut(df_detected['radius_p'], bins=bins, labels=labels, include_lowest=True)
+
+        # Add "Rocky HZ" bin
+        rocky_hz = df[(df['habitable'] == True) & (df['radius_p'] < 1.5)].copy()
+        rocky_hz['radius_bin'] = 'Rocky HZ'
 
         # Group by stype and radius bin
         grouped = df_detected.groupby(['stype', 'radius_bin']).size().reset_index(name='count')

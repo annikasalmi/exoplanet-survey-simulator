@@ -7,10 +7,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 
+
 from tools.paths import PPOP_DATA_DIR, LIFESIM_DATA_DIR
 from PPop.StarCatalogs import CrossfieldBrightSample, ExoCat_1, LTC_2, LTC_3
 
-NRUNS = 1  # or 500
 STAR_CATALOG = 'LTC_3'#ExoCat_1'  # or 'LTC_3'
 RUN_PPOP = False
 
@@ -77,17 +77,17 @@ def assign_radius_bin(r):
         return '3.0–6.0'
     else:
         return 'Rocky HZ'
-
-def main(parallel=False):
+    
+def main(parallel=True, nruns=1):
     start=time.time()
     if parallel:
         with mp.Pool(processes=mp.cpu_count()) as pool:
-            results = pool.map(run_lifesim_single, range(NRUNS))
+            results = pool.map(run_lifesim_single, range(nruns))
     else:
-        results = [run_lifesim_single(i) for i in range(NRUNS)]
+        results = [run_lifesim_single(i) for i in range(nruns)]
 
     # Parameters
-    n_runs = len(results)  # List of DataFrames, one per run
+    nruns = len(results)  # List of DataFrames, one per run
     star_order = ['F', 'G', 'K', 'M']
     bin_labels = ['<1.5', '1.5–3.0', '3.0–6.0', 'Rocky HZ']
 
@@ -153,12 +153,13 @@ def main(parallel=False):
     plt.tight_layout()
 
     # Save and show
-    plt.savefig(f"planets_hwo_nruns{n_runs}_{STAR_CATALOG}.png", dpi=300, bbox_inches='tight')
+    plt.savefig(f"planets_lifesim_nruns{nruns}_{STAR_CATALOG}.png", dpi=300, bbox_inches='tight')
     plt.show()
 
     print(f"Total time: {time.time() - start:.2f} seconds")
 
 if __name__ == '__main__':
+    
     mp.set_start_method('spawn')
     main()
 

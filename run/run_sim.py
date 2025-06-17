@@ -70,7 +70,7 @@ if __name__ == "__main__":
     NRUNS = 2
     PARALLEL = True  # Set to True if you want to run in parallel
     STAR_CATALOG = 'Gaia'  # or 'ExoCat_1'
-    SIM = 'lifesim'
+    SIM = 'hwo'
     if SIM == 'lifesim':
         main = main_lifesim
     elif SIM == 'hwo':

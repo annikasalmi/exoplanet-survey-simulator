@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-from tools.paths import LIFESIM_DATA_DIR
+from tools.paths import HWO_DATA_DIR
 
 def plot(results, nruns=1, star_catalog='Gaia'):
     # Combine all run results

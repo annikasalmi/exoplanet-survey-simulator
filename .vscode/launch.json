@@ -28,39 +28,8 @@
             "name": "run_sim.py",
             "type": "debugpy",
             "request": "launch",
-            "program": "run/sun_sim.py",
+            "program": "run/run_sim.py",
             "console": "integratedTerminal"
         },
     ]
 }
-//         {
-//             "name": "forward_model",
-//             "type": "debugpy",
-//             "request": "launch",
-//             "program": "venus_evolution/forward_model.py",
-//             "console": "integratedTerminal"
-//         },
-//         {
-//             "name": "mc_calc",
-//             "type": "debugpy",
-//             "request": "launch",
-//             "program": "venus_evolution/mc_calc.py",
-//             "console": "integratedTerminal"
-//         },
-//         {
-//             "name": "plot_mc",
-//             "type": "debugpy",
-//             "request": "launch",
-//             "program": "venus_evolution/plot_mc_output.py",
-//             "console": "integratedTerminal",
-//             "cwd": "${workspaceFolder}"
-//         },
-//         {
-//             "name": "run_prediction",
-//             "type": "debugpy",
-//             "request": "launch",
-//             "program": "run_prediction.py",
-//             "console": "integratedTerminal"
-//         }
-//     ]
-// }

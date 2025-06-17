@@ -19,7 +19,7 @@ def time_based_progress_bar(estimated_seconds, stop_event):
         pbar.n = estimated_seconds
         pbar.refresh()
 
-def run_with_progress(parallel, nruns=1):
+def run_with_progress(parallel, nruns=1, star_catalog='Gaia'):
     estimated_minutes = 12
     estimated_seconds = estimated_minutes * 60
 
@@ -32,7 +32,7 @@ def run_with_progress(parallel, nruns=1):
 
     try:
         # Run your actual function here
-        main(parallel= parallel,nruns=nruns)
+        main(parallel= parallel,nruns=nruns, star_catalog=star_catalog)
 
     finally:
         # Signal the progress thread to stop and wait for it
@@ -45,4 +45,5 @@ def run_with_progress(parallel, nruns=1):
 if __name__ == "__main__":
     NRUNS = 2
     PARALLEL = True  # Set to True if you want to run in parallel
-    run_with_progress(parallel=PARALLEL, nruns=NRUNS)
+    STAR_CATALOG = 'Gaia'  # or 'ExoCat_1'
+    run_with_progress(parallel=PARALLEL, nruns=NRUNS, star_catalog=STAR_CATALOG)

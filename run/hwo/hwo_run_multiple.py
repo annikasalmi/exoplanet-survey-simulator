@@ -4,29 +4,32 @@ import time
 import os
 import pandas as pd
 import multiprocessing as mp
-from PPop.StarCatalogs import CrossfieldBrightSample, ExoCat_1, LTC_2, LTC_3
+from functools import partial
 
+from PPop.StarCatalogs import CrossfieldBrightSample, ExoCat_1, LTC_2, LTC_3, gaia
 from lifesim.core.hwo_data import HWOData
 from run.ppop.ppop_generator import PPop
-from tools.paths import PPOP_DATA_DIR
+from tools.paths import HWO_DATA_DIR
 
-NRUNS = 3
-STAR_CATALOG = 'LTC_3'#ExoCat_1'  # or 'LTC_3'
-
-
-def run_single(i):
+def run_single(i, star_catalog='Gaia'):
     '''
     Runs a single instance of the PPop simulation and HWO data analysis.
     '''
     PPopObj = PPop(seed=i)
 
-    if STAR_CATALOG == 'ExoCat_1':
+    if star_catalog == 'CrossfieldBrightSample':
+        PPopObj.StarCatalog = CrossfieldBrightSample
+    elif star_catalog == 'ExoCat_1':
         PPopObj.StarCatalog = ExoCat_1
-    elif STAR_CATALOG == 'LTC_3':
+    elif star_catalog == 'LTC_3':
         PPopObj.StarCatalog = LTC_3
+    elif star_catalog == 'LTC_2':
+        PPopObj.StarCatalog = LTC_2
+    elif star_catalog == 'Gaia':
+        PPopObj.StarCatalog = gaia
 
     filename = f'test_runs_hwo_{i}'
-    data_path = os.path.join(PPOP_DATA_DIR, filename)
+    data_path = os.path.join(HWO_DATA_DIR, filename)
 
     df = PPopObj.run_ppop(seed=i, data_path=data_path)
     PPopObj.catalog_from_ppop(data_path, df=df)
@@ -54,19 +57,9 @@ def run_single(i):
 
     return grouped_df
 
-def main(parallel=False):
-    start = time.time()
-    n_runs = NRUNS
-
-    if parallel:
-        # Run in parallel
-        with mp.Pool(processes=mp.cpu_count()) as pool:
-            results = pool.map(run_single, range(n_runs))
-    else:
-        # Run sequentially
-        results = [run_single(i) for i in range(n_runs)]
+def plot(results, nruns=1, star_catalog='Gaia'):
     # Combine all run results
-    df_all = pd.concat(results, keys=range(n_runs)).reset_index(level=0).rename(columns={'level_0': 'run'})
+    df_all = pd.concat(results, keys=range(nruns)).reset_index(level=0).rename(columns={'level_0': 'run'})
 
     # Pivot to get one row per run, one column per (stype, radius_bin)
     df_pivot = df_all.pivot_table(index='run', columns=['stype', 'radius_bin'], values='count', fill_value=0)
@@ -95,7 +88,7 @@ def main(parallel=False):
     bar_width = 0.2
     x = np.arange(len(star_order))
 
-    fig, ax = plt.subplots(figsize=(10, 6))
+    _, ax = plt.subplots(figsize=(10, 6))
     for i, label in enumerate(bin_labels):
         heights = pivot_counts[label].tolist()
         errors = pivot_errors[label].tolist()
@@ -114,12 +107,28 @@ def main(parallel=False):
     ax.set_title('Detectable Planets by Star Type')
     ax.legend(title='Planet Radius')
     plt.tight_layout()
-    plt.savefig(f"planets_hwo_nruns{NRUNS}_{STAR_CATALOG}.png", dpi=300, bbox_inches='tight')
+
+    plt.savefig(os.path.join(HWO_DATA_DIR,f"planets_hwo_nruns{NRUNS}_{STAR_CATALOG}.png", 
+                             dpi=300, bbox_inches='tight'))
     plt.show()
 
+def main(parallel=False, nruns=1, star_catalog='Gaia'):
+    start = time.time()
+
+    runner = partial(run_single, star_catalog=star_catalog)
+    if parallel:
+        with mp.Pool(processes=mp.cpu_count()) as pool:
+            results = pool.map(runner, range(nruns))
+    else:
+        results = [run_single(i=i, star_catalog=star_catalog) for i in range(nruns)]
+
+    plot(results, nruns=nruns, star_catalog=star_catalog)
     print(f"Total time: {time.time() - start:.2f} seconds")
 
 
+
 if __name__ == '__main__':
+    NRUNS = 3
+    STAR_CATALOG = 'Gaia'#ExoCat_1'  # or 'LTC_3'
     mp.set_start_method('spawn')
-    main()
+    main(nruns=NRUNS, star_catalog=STAR_CATALOG, parallel=True)

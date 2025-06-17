@@ -6,23 +6,24 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import time
-
+from functools import partial
 
 from tools.paths import PPOP_DATA_DIR, LIFESIM_DATA_DIR
-from PPop.StarCatalogs import CrossfieldBrightSample, ExoCat_1, LTC_2, LTC_3
+from PPop.StarCatalogs import CrossfieldBrightSample, ExoCat_1, LTC_2, LTC_3, gaia
 
-STAR_CATALOG = 'LTC_3'#ExoCat_1'  # or 'LTC_3'
 RUN_PPOP = False
 
-def run_lifesim_single(i):
+def run_lifesim_single(i, star_catalog='Gaia'):
 
     # ----- Generate new planet population -----
     PPopObj = PPop(seed=i)
 
-    if STAR_CATALOG == 'ExoCat_1':
+    if star_catalog == 'ExoCat_1':
         PPopObj.StarCatalog = ExoCat_1
-    elif STAR_CATALOG == 'LTC_3':
+    elif star_catalog == 'LTC_3':
         PPopObj.StarCatalog = LTC_3
+    elif star_catalog == 'Gaia':
+        PPopObj.StarCatalog = gaia
 
     filename = f'test_runs_lifesim_{i}'
     data_path = os.path.join(PPOP_DATA_DIR, filename)
@@ -77,15 +78,8 @@ def assign_radius_bin(r):
         return '3.0–6.0'
     else:
         return 'Rocky HZ'
-    
-def main(parallel=True, nruns=1):
-    start=time.time()
-    if parallel:
-        with mp.Pool(processes=mp.cpu_count()) as pool:
-            results = pool.map(run_lifesim_single, range(nruns))
-    else:
-        results = [run_lifesim_single(i) for i in range(nruns)]
 
+def plot(results, nruns, star_catalog='Gaia'):
     # Parameters
     nruns = len(results)  # List of DataFrames, one per run
     star_order = ['F', 'G', 'K', 'M']
@@ -153,8 +147,20 @@ def main(parallel=True, nruns=1):
     plt.tight_layout()
 
     # Save and show
-    plt.savefig(f"planets_lifesim_nruns{nruns}_{STAR_CATALOG}.png", dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(LIFESIM_DATA_DIR,f"planets_lifesim_nruns{nruns}_{star_catalog}.png", 
+                             dpi=300, bbox_inches='tight'))
     plt.show()
+
+def main(parallel=True, nruns=1, star_catalog='Gaia'):
+    start=time.time()
+
+    runner = partial(run_lifesim_single, star_catalog=star_catalog)
+    if parallel:
+        with mp.Pool(processes=mp.cpu_count()) as pool:
+            results = pool.map(runner, range(nruns))
+    else:
+        results = [run_lifesim_single(i=i, star_catalog=star_catalog) for i in range(nruns)]
+    plot(results, nruns=nruns, star_catalog=star_catalog)
 
     print(f"Total time: {time.time() - start:.2f} seconds")
 

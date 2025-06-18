@@ -3,11 +3,12 @@ import lifesim
 from run.ppop.ppop_generator import PPop
 import multiprocessing as mp
 import time
+import pandas as pd
 from functools import partial
 
 from tools.paths import PPOP_DATA_DIR, LIFESIM_DATA_DIR
 from PPop.StarCatalogs import CrossfieldBrightSample, ExoCat_1, LTC_2, LTC_3, gaia
-from plot.plot_lifesim_results import plot
+from plot.plot import plot_by_star, plot_by_planet
 
 RUN_PPOP = False
 
@@ -78,7 +79,31 @@ def main(parallel=True, nruns=1, star_catalog='Gaia'):
         results = [run_lifesim_single(i=i, star_catalog=star_catalog) for i in range(nruns)]
     print(f"Finished {nruns} runs in {time.time() - start:.2f} seconds")
     print('Starting plotting...')
-    plot(results, nruns=nruns, star_catalog=star_catalog)
+
+    # Step 1: Process each run
+    processed_runs = []
+
+    for run_idx, df in enumerate(results):
+        df_detected = df[df['detected'] == True].copy()
+        
+        bins = [0, 1.5, 3.0, 6.0]
+        labels = ['<1.5', '1.5–3.0', '3.0–6.0']
+        df_detected['radius_bin'] = pd.cut(df_detected['radius_p'], bins=bins, labels=labels, include_lowest=True)
+
+        # Add "Rocky HZ" bin
+        rocky_hz = df[(df['habitable'] == True) & (df['radius_p'] < 1.5)].copy()
+        rocky_hz['radius_bin'] = 'Rocky HZ'
+
+        # Group by stype and radius bin
+        grouped = df_detected.groupby(['stype', 'radius_bin']).size().reset_index(name='count')
+        grouped['run'] = run_idx
+        processed_runs.append(grouped)
+
+    # Step 2: Combine all runs into one DataFrame
+    df_all = pd.concat(processed_runs, ignore_index=True)
+
+    plot_by_star(df_all, nruns=nruns, star_catalog=star_catalog)
+    plot_by_planet(df_all, nruns=nruns, star_catalog=star_catalog)
 
     print(f"Total time: {time.time() - start:.2f} seconds")
 

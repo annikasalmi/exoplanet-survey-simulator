@@ -1,5 +1,3 @@
-import matplotlib.pyplot as plt
-import numpy as np
 import time
 import os
 import pandas as pd
@@ -10,7 +8,7 @@ from PPop.StarCatalogs import CrossfieldBrightSample, ExoCat_1, LTC_2, LTC_3, ga
 from lifesim.core.hwo_data import HWOData
 from run.ppop.ppop_generator import PPop
 from tools.paths import HWO_DATA_DIR
-from plot.plot_hwo_results import plot
+from plot.plot import plot_by_star, plot_by_planet
 
 def run_single(i, star_catalog='Gaia'):
     '''
@@ -68,7 +66,10 @@ def main(parallel=False, nruns=1, star_catalog='Gaia'):
     else:
         results = [run_single(i=i, star_catalog=star_catalog) for i in range(nruns)]
 
-    plot(results, nruns=nruns, star_catalog=star_catalog)
+    df_all = pd.concat(results, keys=range(nruns)).reset_index(level=0).rename(columns={'level_0': 'run'})
+
+    plot_by_star(df_all, nruns=nruns, star_catalog=star_catalog)
+    plot_by_planet(df_all, nruns=nruns, star_catalog=star_catalog)
     print(f"Total time: {time.time() - start:.2f} seconds")
 
 

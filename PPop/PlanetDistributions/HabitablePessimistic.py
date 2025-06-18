@@ -101,12 +101,12 @@ class PlanetDistribution():
         # smaller than the drawn number because of clipping to the requested Rp
         # and Porb range.
         if (Nplanets is None):
-            Nplanets = np.random.poisson(tempF0)
+            Nplanets = self.rng.poisson(tempF0)
             for i in range(Nplanets):
                 
                 # Randomly select bin.
-                tempRp = np.exp(self.BinsRp[0]+(self.BinsRp[1]-self.BinsRp[0])*np.random.rand()) # Rearth
-                tempFp = np.exp(self.BinsFp[0]+(self.BinsFp[1]-self.BinsFp[0])*np.random.rand()) # Searth
+                tempRp = np.exp(self.BinsRp[0]+(self.BinsRp[1]-self.BinsRp[0])*self.rng.random()) # Rearth
+                tempFp = np.exp(self.BinsFp[0]+(self.BinsFp[1]-self.BinsFp[0])*self.rng.random()) # Searth
                 
                 tempPorb = self.FtoP(tempFp,
                                      Star)
@@ -120,8 +120,8 @@ class PlanetDistribution():
             while (len(Rp) < Nplanets):
                 
                 # Randomly select bin.
-                tempRp = np.exp(self.BinsRp[0]+(self.BinsRp[1]-self.BinsRp[0])*np.random.rand()) # Rearth
-                tempFp = np.exp(self.BinsFp[0]+(self.BinsFp[1]-self.BinsFp[0])*np.random.rand()) # Searth
+                tempRp = np.exp(self.BinsRp[0]+(self.BinsRp[1]-self.BinsRp[0])*self.rng.random()) # Rearth
+                tempFp = np.exp(self.BinsFp[0]+(self.BinsFp[1]-self.BinsFp[0])*self.rng.random()) # Searth
                 
                 tempPorb = self.FtoP(tempFp,
                                      Star)

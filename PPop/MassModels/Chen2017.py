@@ -53,7 +53,7 @@ class MassModel():
         else:
             
             # Forecast planet mass.
-            Mp = mr_forecast.Rpost2M(radius=Rp, unit='Earth', grid_size=1e3, classify='No') # Mearth
+            Mp = mr_forecast.Rpost2M(radius=Rp, unit='Earth', grid_size=1e3, classify='No', rng=self.rng) # Mearth
             return Mp
     
     def MassToRadius(self,
@@ -76,7 +76,7 @@ class MassModel():
         else:
             
             # Forecast planet radius.
-            Rp = mr_forecast.Mpost2R(mass=Mp, unit='Earth', classify='No') # Rearth
+            Rp = mr_forecast.Mpost2R(mass=Mp, unit='Earth', classify='No', rng=self.rng) # Rearth
             return Rp
     
     def SummaryPlot(self,

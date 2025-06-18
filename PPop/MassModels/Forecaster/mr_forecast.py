@@ -28,7 +28,7 @@ from PPop.MassModels.Forecaster.func import piece_linear, ProbRGivenM, classific
 
 ##############################################
 
-def Mpost2R(mass, unit='Earth', classify='No', rng=None):
+def Mpost2R(mass, unit='Earth', classify='No', rng=np.random.default_rng()):
 	"""
 	Forecast the Radius distribution given the mass distribution.
 
@@ -69,10 +69,10 @@ def Mpost2R(mass, unit='Earth', classify='No', rng=None):
 	## convert to radius
 	sample_size = len(mass)
 	logm = np.log10(mass)
-	prob = np.random.random(sample_size)
+	prob = rng.random(sample_size)
 	logr = np.ones_like(logm)
 
-	hyper_ind = np.random.randint(low = 0, high = np.shape(all_hyper)[0], size = sample_size)	
+	hyper_ind = rng.integers(low = 0, high = np.shape(all_hyper)[0], size = sample_size)	
 	hyper = all_hyper[hyper_ind,:]
 
 	if classify == 'Yes':
@@ -94,7 +94,7 @@ def Mpost2R(mass, unit='Earth', classify='No', rng=None):
 
 
 
-def Mstat2R(mean, std, unit='Earth', sample_size=1000, classify = 'No'):	
+def Mstat2R(mean, std, unit='Earth', sample_size=1000, classify = 'No', rng=np.random.default_rng()):	
 	"""
 	Forecast the mean and standard deviation of radius given the mena and standard deviation of the mass.
 	Assuming normal distribution with the mean and standard deviation truncated at the mass range limit of the model.
@@ -129,9 +129,9 @@ def Mstat2R(mean, std, unit='Earth', sample_size=1000, classify = 'No'):
 	# draw samples
 	mass = truncnorm.rvs( (mlower-mean)/std, (mupper-mean)/std, loc=mean, scale=std, size=sample_size)	
 	if classify == 'Yes':	
-		radius = Mpost2R(mass, unit='Earth', classify='Yes')
+		radius = Mpost2R(mass, unit='Earth', classify='Yes', rng=rng)
 	else:
-		radius = Mpost2R(mass, unit='Earth')
+		radius = Mpost2R(mass, unit='Earth', rng=rng)
 
 	if unit == 'Jupiter':
 		radius = radius / rearth2rjup
@@ -145,7 +145,7 @@ def Mstat2R(mean, std, unit='Earth', sample_size=1000, classify = 'No'):
 
 
 
-def Rpost2M(radius, unit='Earth', grid_size = 1e3, classify = 'No', rng=None):
+def Rpost2M(radius, unit='Earth', grid_size = 1e3, classify = 'No', rng=np.random.default_rng()):
 	"""
 	Forecast the mass distribution given the radius distribution.
 
@@ -194,14 +194,14 @@ def Rpost2M(radius, unit='Earth', grid_size = 1e3, classify = 'No', rng=None):
 	logr = np.log10(radius)
 	logm = np.ones_like(logr)
 
-	hyper_ind = np.random.randint(low = 0, high = np.shape(all_hyper)[0], size = sample_size)	
+	hyper_ind = rng.integers(low = 0, high = np.shape(all_hyper)[0], size = sample_size)	
 	hyper = all_hyper[hyper_ind,:]
 
 	logm_grid = np.linspace(-3.522, 5.477, int(grid_size))
 
 	for i in range(sample_size):
 		prob = ProbRGivenM(logr[i], logm_grid, hyper[i,:])
-		logm[i] = np.random.choice(logm_grid, size=1, p = prob)
+		logm[i] = rng.choice(logm_grid, size=1, p = prob)
 
 	mass_sample = 10.** logm
 
@@ -218,7 +218,7 @@ def Rpost2M(radius, unit='Earth', grid_size = 1e3, classify = 'No', rng=None):
 
 
 
-def Rstat2M(mean, std, unit='Earth', sample_size=1e3, grid_size=1e3, classify = 'No'):	
+def Rstat2M(mean, std, unit='Earth', sample_size=1e3, grid_size=1e3, classify = 'No', rng=np.random.default_rng()):	
 	"""
 	Forecast the mean and standard deviation of mass given the mean and standard deviation of the radius.
 
@@ -254,9 +254,9 @@ def Rstat2M(mean, std, unit='Earth', sample_size=1e3, grid_size=1e3, classify = 
 	# draw samples
 	radius = truncnorm.rvs( (0.-mean)/std, np.inf, loc=mean, scale=std, size=sample_size)	
 	if classify == 'Yes':
-		mass = Rpost2M(radius, 'Earth', grid_size, classify='Yes')
+		mass = Rpost2M(radius, 'Earth', grid_size, classify='Yes', rng=rng)
 	else:
-		mass = Rpost2M(radius, 'Earth', grid_size)
+		mass = Rpost2M(radius, 'Earth', grid_size, rng=rng)
 
 	if mass is None:
 		return None

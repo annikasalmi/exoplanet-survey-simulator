@@ -9,7 +9,6 @@ from functools import partial
 
 from tools.paths import PPOP_DATA_DIR, LIFESIM_DATA_DIR
 from PPop.StarCatalogs import CrossfieldBrightSample, ExoCat_1, LTC_2, LTC_3, gaia
-from plot.plot import plot_by_star, plot_by_planet
 
 RUN_PPOP = False
 
@@ -31,7 +30,7 @@ def run_lifesim_single(i, star_catalog='Gaia'):
     df = PPopObj.run_ppop(data_path=data_path)
     PPopObj.catalog_from_ppop(data_path, df=df)
     PPopObj.catalog_remove_distance(stype='A', mode='larger', dist=0.0)
-    PPopObj.catalog_remove_distance(stype='M', mode='larger', dist=10.0)
+    # PPopObj.catalog_remove_distance(stype='M', mode='larger', dist=10.0)
 
     # ----- Run LIFEsim with this catalog -----
     bus = lifesim.Bus()
@@ -83,9 +82,6 @@ def main(parallel=True, nruns=1, star_catalog='Gaia'):
 
     # Step 2: Combine all runs into one DataFrame
     df_concat = pd.concat(results, ignore_index=True)
-
-    plot_by_star(df_concat, nruns=nruns, star_catalog=star_catalog, name='lifesim')
-    plot_by_planet(df_concat, nruns=nruns, star_catalog=star_catalog, name='lifesim')
 
     print(f"Total time: {time.time() - start:.2f} seconds")
 

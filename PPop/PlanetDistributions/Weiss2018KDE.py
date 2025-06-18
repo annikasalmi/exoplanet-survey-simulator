@@ -235,17 +235,17 @@ class PlanetDistribution():
         # smaller than the drawn number because of clipping to the requested Rp
         # and Porb range.
         if (Nplanets is None):
-            Nplanets = np.random.poisson(np.sum(tempF0))
+            Nplanets = self.rng.poisson(np.sum(tempF0))
             for i in range(Nplanets):
                 
                 # Randomly select whether Rp < Rbrk or Rp > Rbrk.
-                temp = np.random.choice(len(tempF0), p=tempF0/np.sum(tempF0))
+                temp = self.rng.choice(len(tempF0), p=tempF0/np.sum(tempF0))
                 if (temp == 0):
-                    tempRp = self.iCDF_R0(np.random.rand()) # Rearth
-                    tempPorb = self.iCDF_P0(np.random.rand())*self.ytod # d
+                    tempRp = self.iCDF_R0(self.rng.random()) # Rearth
+                    tempPorb = self.iCDF_P0(self.rng.random())*self.ytod # d
                 elif (temp == 1):
-                    tempRp = self.iCDF_R1(np.random.rand()) # Rearth
-                    tempPorb = self.iCDF_P1(np.random.rand())*self.ytod # d
+                    tempRp = self.iCDF_R1(self.rng.random()) # Rearth
+                    tempPorb = self.iCDF_P1(self.rng.random())*self.ytod # d
                 if (Rp_range[0] <= tempRp <= Rp_range[1] and Porb_range[0] <= tempPorb <= Porb_range[1]):
                     Rp += [tempRp] # Rearth
                     Porb += [tempPorb] # d
@@ -256,13 +256,13 @@ class PlanetDistribution():
             while (len(Rp) < Nplanets):
                 
                 # Randomly select whether Rp < Rbrk or Rp > Rbrk.
-                temp = np.random.choice(len(tempF0), p=tempF0/np.sum(tempF0))
+                temp = self.rng.choice(len(tempF0), p=tempF0/np.sum(tempF0))
                 if (temp == 0):
-                    tempRp = self.iCDF_R0(np.random.rand()) # Rearth
-                    tempPorb = self.iCDF_P0(np.random.rand())*self.ytod # d
+                    tempRp = self.iCDF_R0(self.rng.random()) # Rearth
+                    tempPorb = self.iCDF_P0(self.rng.random())*self.ytod # d
                 elif (temp == 1):
-                    tempRp = self.iCDF_R1(np.random.rand()) # Rearth
-                    tempPorb = self.iCDF_P1(np.random.rand())*self.ytod # d
+                    tempRp = self.iCDF_R1(self.rng.random()) # Rearth
+                    tempPorb = self.iCDF_P1(self.rng.random())*self.ytod # d
                 if (Rp_range[0] <= tempRp <= Rp_range[1] and Porb_range[0] <= tempPorb <= Porb_range[1]):
                     Rp += [tempRp] # Rearth
                     Porb += [tempPorb] # d

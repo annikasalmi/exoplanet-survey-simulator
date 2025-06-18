@@ -86,5 +86,5 @@ class HWOData():
         flux_condition = self.flux_ratio >= const.planet_flux_star_ratio
         min_flux_condition = self.calc_planet_flux() >= const.min_flux
         total_condition = iwa_condition & flux_condition & min_flux_condition
-        self.catalog['hwo_detectable'] = total_condition
-        return self.catalog.hwo_detectable
+        self.catalog['detectable'] = total_condition
+        return self.catalog.detectable

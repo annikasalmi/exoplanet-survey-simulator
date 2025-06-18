@@ -52,14 +52,14 @@ class OrbitModel():
         # Inclination distributed uniformly on the sphere, either fixed or
         # independent for all drawn planets.
         if (fixi == True):
-            ip = np.array([np.arccos(2.*np.random.rand()-1.)]*len(ep)) # rad
+            ip = np.array([np.arccos(2.*self.rng.random()-1.)]*len(ep)) # rad
         else:
-            ip = np.arccos(2.*np.random.rand(len(ep))-1.) # rad
+            ip = np.arccos(2.*self.rng.random(len(ep))-1.) # rad
         
         # Longitude of the ascending node and argument of periapsis distributed
         # uniformly on the sphere.
-        Omegap = 2.*np.pi*np.random.rand(len(ep)) # rad
-        omegap = 2.*np.pi*np.random.rand(len(ep)) # rad
+        Omegap = 2.*np.pi*self.rng.random(len(ep)) # rad
+        omegap = 2.*np.pi*self.rng.random(len(ep)) # rad
         
         # True anomaly distributed randomly according to eccentricity of drawn
         # planets.
@@ -85,7 +85,7 @@ class OrbitModel():
         for i in range(len(ep)):
             
             # Draw uniformly distributed mean anomaly.
-            M = 2.*np.pi*np.random.rand() # rad
+            M = 2.*np.pi*self.rng.random() # rad
             
             # Calculate eccentric anomaly.
             func = lambda x: x-ep[i]*np.sin(x)-M

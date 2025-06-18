@@ -32,7 +32,7 @@ class System():
                  Nstar=0,
                  Nuniverse=0,
                  Scale=1.,
-                 rng=None):
+                 rng=np.random.default_rng()):
         """
         Parameters
         ----------

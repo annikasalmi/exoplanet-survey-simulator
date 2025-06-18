@@ -3,27 +3,17 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-from tools.paths import HWO_DATA_DIR
+from tools.paths import HWO_DATA_DIR, LIFESIM_DATA_DIR
 
 def plot_by_star(df, nruns=1, star_catalog='Gaia', name='hwo'):
-
-    # Bin by radius
-    bins = [0, 1.5, 3.0, 6.0]
-    labels = ['<1.5', '1.5–3.0', '3.0–6.0']
-    df['radius_bin'] = pd.cut(df['radius_p'], bins=bins, labels=labels, include_lowest=True)
-
-    # Add "Rocky HZ" bin
-    rocky_hz = df[(df['habitable'] == True) & (df['radius_p'] < 1.5)].copy()
-    rocky_hz['radius_bin'] = 'Rocky HZ'
-
-    # Combine all rows
-    df_all = pd.concat([df, rocky_hz], ignore_index=True)
-
+    '''
+    Plots the number of detectable planets by star type and radius bin.
+    '''
     # Group by run, stype, radius_bin
-    df_all = df_all.groupby(['run', 'stype', 'radius_bin']).size().reset_index(name='count')
+    df = df.groupby(['run', 'stype', 'radius_bin']).size().reset_index(name='count')
 
     # Pivot to have runs as index and (stype, radius_bin) as columns
-    df_pivot = df_all.pivot_table(index='run', columns=['stype', 'radius_bin'], values='count', fill_value=0)
+    df_pivot = df.pivot_table(index='run', columns=['stype', 'radius_bin'], values='count', fill_value=0)
 
     # Compute mean and std across runs
     df_mean = df_pivot.mean(axis=0)
@@ -67,13 +57,21 @@ def plot_by_star(df, nruns=1, star_catalog='Gaia', name='hwo'):
     ax.set_ylabel('Detectable Planets')
     ax.set_title(f'Detectable Planets by Star Type for {name} for {nruns} Runs\nStar Catalog: {star_catalog}')
     ax.legend(title='Planet Radius')
-    plt.tight_layout()
 
-    plt.savefig(os.path.join(HWO_DATA_DIR, f"planets_stellar_type_{name}_nruns{nruns}_{star_catalog}.png"), 
+    plt.tight_layout()
+    if name == 'hwo':
+        name = 'HWO'
+        data_dir = HWO_DATA_DIR
+    if name == 'lifesim':
+        name = 'LIFEsim'
+        data_dir = LIFESIM_DATA_DIR
+
+    plt.savefig(os.path.join(data_dir, f"stellar_type_{name}_nruns{nruns}_{star_catalog}.png"), 
                              dpi=300, bbox_inches='tight')
-    # plt.show()
 
 def temp_zone(temp):
+    '''
+    Assigns a temperature zone based on the temperature value.'''
     if temp > 600:
         return 'hot'
     elif temp > 300:
@@ -82,6 +80,8 @@ def temp_zone(temp):
         return 'cold'
 
 def assign_category(row):
+    '''
+    Assigns a category based on the planet's radius, habitability, and star type.'''
     r = row['radius_p']
     hab = row['habitable']
     stype = row['stype']
@@ -100,6 +100,9 @@ def assign_category(row):
         return None
     
 def plot_by_planet(df, nruns=1, star_catalog='Gaia', name='hwo'):
+    '''
+    Plots the number of detectable planets by planet type and temperature zone.
+    '''
     df['temp_zone'] = df['temp_p'].apply(temp_zone)
     df['category'] = df.apply(assign_category, axis=1)
     df = df.dropna(subset=['category'])
@@ -145,7 +148,108 @@ def plot_by_planet(df, nruns=1, star_catalog='Gaia', name='hwo'):
             verticalalignment='top', horizontalalignment='right', bbox=props)
 
     plt.tight_layout()
+    if name == 'hwo':
+        name = 'HWO'
+        data_dir = HWO_DATA_DIR
+    if name == 'lifesim':
+        name = 'LIFEsim'
+        data_dir = LIFESIM_DATA_DIR
 
-    plt.savefig(os.path.join(HWO_DATA_DIR, f"planets_planet_type_{name}_nruns{nruns}_{star_catalog}.png"), 
+    plt.savefig(os.path.join(data_dir, f"planet_type_{name}_nruns{nruns}_{star_catalog}.png"), 
                              dpi=300, bbox_inches='tight')
-    # plt.show()
+    
+def plot_distances(df, nruns=1, star_catalog='Gaia', name='hwo'):
+    '''
+    Plots the number of detectable planets by distance bins.
+    '''
+    bins = [0, 3, 5, 7, 9, 11, 13, 15, np.inf]
+    labels = ['< 3', '3 - 5', '5 - 7', '7 - 9', '9 - 11', '11 - 13', '13 - 15', '> 15']
+    df['distance_bin'] = pd.cut(df['distance_s'], bins=bins, labels=labels, right=False)
+
+    # Count and uncertainty (Poisson: sqrt(N))
+    counts = df['distance_bin'].value_counts().reindex(labels, fill_value=0)
+    errors = np.sqrt(counts)
+
+    # Plotting
+    x = np.arange(len(labels))
+    bar_width = 0.6
+    color = '#66c2a5'  # Soft green like in your image
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    bars = ax.bar(x, counts, width=bar_width, yerr=errors,
+                capsize=4, color=color, hatch='//', edgecolor='black')
+
+    # Add count ± error text
+    for i, (val, err) in enumerate(zip(counts, errors)):
+        ax.text(i, val + 3, f"{int(val)}±{int(err)}", ha='center', va='bottom', fontsize=10)
+
+    # Labels and formatting
+    ax.set_ylabel("Detectable planets", fontsize=12)
+    ax.set_xlabel("Distance [pc]", fontsize=12)
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels)
+    ax.set_ylim(0, max(counts + errors) * 1.2)
+    ax.set_title(f'Detectable Planets by Distance for {name} for {nruns} Runs\nStar Catalog: {star_catalog}')
+
+    plt.tight_layout()
+    if name == 'hwo':
+        name = 'HWO'
+        data_dir = HWO_DATA_DIR
+    if name == 'lifesim':
+        name = 'LIFEsim'
+        data_dir = LIFESIM_DATA_DIR
+
+    plt.savefig(os.path.join(data_dir, f"planet_distance_{name}_nruns{nruns}_{star_catalog}.png"), 
+                             dpi=300, bbox_inches='tight')
+    
+def plot_efficiency(df, nruns=1, star_catalog='Gaia', name='hwo'):
+
+    # Filter only rocky eHZ planets
+    rocky_ehz = df[df['radius_bin'] == 'Rocky HZ']
+
+    # Bin edges
+    bins = np.linspace(125, 305, 40)  # ~4.6 K per bin
+    bin_centers = 0.5 * (bins[:-1] + bins[1:])
+
+    # Histogram of all and detected
+    total_counts, _ = np.histogram(rocky_ehz['temp_p'], bins=bins)
+    detected_counts, _ = np.histogram(rocky_ehz[rocky_ehz['detectable'] == True]['temp_p'], bins=bins)
+
+    # Avoid divide-by-zero
+    with np.errstate(divide='ignore', invalid='ignore'):
+        efficiency = np.true_divide(detected_counts, total_counts)
+        efficiency[np.isnan(efficiency)] = 0.0
+
+    # === Plot ===
+    fig, ax1 = plt.subplots(figsize=(10, 6))
+
+    # Bar plots
+    ax1.bar(bin_centers, total_counts, width=np.diff(bins), align='center', color='lightgrey', label='Rocky, eHZ planets present')
+    ax1.bar(bin_centers, detected_counts, width=np.diff(bins), align='center', color='green', label='Rocky, eHZ planets detectable')
+
+    ax1.set_ylabel("Number of rocky, eHZ planets")
+    ax1.set_xlabel("Temperature [K]")
+    ax1.set_xlim(bins[0], bins[-1])
+
+    # Secondary axis for detection efficiency
+    ax2 = ax1.twinx()
+    ax2.plot(bin_centers, efficiency, 'r--', linewidth=2, label='Detection efficiency')
+    ax2.set_ylabel("Detection efficiency")
+    ax2.set_ylim(0, 1.0)
+
+    # Legends
+    h1, l1 = ax1.get_legend_handles_labels()
+    h2, l2 = ax2.get_legend_handles_labels()
+    ax1.legend(h1 + h2, l1 + l2, loc='upper left')
+
+    plt.tight_layout()
+    if name == 'hwo':
+        name = 'HWO'
+        data_dir = HWO_DATA_DIR
+    if name == 'lifesim':
+        name = 'LIFEsim'
+        data_dir = LIFESIM_DATA_DIR
+
+    plt.savefig(os.path.join(data_dir, f"detection_efficiency_{name}_nruns{nruns}_{star_catalog}.png"), 
+                             dpi=300, bbox_inches='tight')

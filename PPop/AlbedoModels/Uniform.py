@@ -39,7 +39,7 @@ class AlbedoModel():
             Bond albedo of drawn planets.
         """
         
-        return 0.8*np.random.rand(len(Rp))
+        return 0.8*self.rng.random(len(Rp))
     
     def getAgeomVIS(self,
                     Rp): # Rearth
@@ -55,7 +55,7 @@ class AlbedoModel():
             Geometric albedo in the visible of drawn planets.
         """
         
-        return 0.6*np.random.rand(len(Rp))
+        return 0.6*self.rng.random(len(Rp))
     
     def getAgeomMIR(self,
                     Rp): # Rearth
@@ -71,7 +71,7 @@ class AlbedoModel():
             Geometric albedo in the mid-infrared of drawn planets.
         """
         
-        return 0.1*np.random.rand(len(Rp))
+        return 0.1*self.rng.random(len(Rp))
     
     def SummaryPlot(self,
                     Ntest=100000,

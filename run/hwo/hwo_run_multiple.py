@@ -9,7 +9,6 @@ from PPop.StarCatalogs import CrossfieldBrightSample, ExoCat_1, LTC_2, LTC_3, ga
 from lifesim.core.hwo_data import HWOData
 from run.ppop.ppop_generator import PPop
 from tools.paths import HWO_DATA_DIR
-from plot.plot import plot_by_star, plot_by_planet
 
 def run_single(i, star_catalog='Gaia'):
     '''
@@ -35,7 +34,7 @@ def run_single(i, star_catalog='Gaia'):
     df = PPopObj.run_ppop(data_path=data_path)
     PPopObj.catalog_from_ppop(data_path, df=df)
     PPopObj.catalog_remove_distance(stype='A', mode='larger', dist=0.0)
-    PPopObj.catalog_remove_distance(stype='M', mode='larger', dist=10.0)
+    # PPopObj.catalog_remove_distance(stype='M', mode='larger', dist=10.0)
 
     hwo_data = HWOData(PPopObj.catalog)
     hwo_data.determine_detectable()
@@ -55,10 +54,9 @@ def main(parallel=False, nruns=1, star_catalog='Gaia'):
         results = [run_single(i=i, star_catalog=star_catalog) for i in range(nruns)]
 
     df_concat = pd.concat(results, keys=range(nruns)).reset_index(level=0).rename(columns={'level_0': 'run'})
-
-    plot_by_star(df_concat, nruns=nruns, star_catalog=star_catalog, name='hwo')
-    plot_by_planet(df_concat, nruns=nruns, star_catalog=star_catalog, name='hwo')
     print(f"Total time: {time.time() - start:.2f} seconds")
+
+    return df_concat
 
 
 if __name__ == '__main__':

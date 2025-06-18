@@ -49,7 +49,7 @@ class ExozodiModel():
         # Clean stars.
 #        mu = np.log(13.); zeta = 1.5
         
-        return np.random.lognormal(mean=mu, sigma=zeta)
+        return self.rng.lognormal(mean=mu, sigma=zeta)
     
     def SummaryPlot(self,
                     Ntest=100000,

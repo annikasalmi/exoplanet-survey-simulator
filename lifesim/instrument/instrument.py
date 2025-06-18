@@ -751,7 +751,7 @@ class Instrument(InstrumentModule):
         noise = (noise_bg[:, np.newaxis] + noise_planet)
 
         # draw noise
-        noise_drawn = np.random.poisson(lam=noise) - np.random.poisson(lam=noise)
+        noise_drawn = self.rng.poisson(lam=noise) - self.rng.poisson(lam=noise)
 
         # add up to noisy signal
         signal = flux_planet + noise_drawn

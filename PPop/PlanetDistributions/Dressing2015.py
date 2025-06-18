@@ -147,8 +147,8 @@ class PlanetDistribution():
                 # Randomly select bin.
                 temp = self.rng.choice(len(tempRates_extrap.flatten()), p=tempRates_extrap.flatten()/tempF0)
                 ww = np.unravel_index(temp, tempRates_extrap.shape)
-                tempRp = np.exp(self.BinsRp[ww[0]]+(self.BinsRp[ww[0]+1]-self.BinsRp[ww[0]])*self.rng.rand()) # Rearth
-                tempPorb = np.exp(self.BinsPorb[ww[1]]+(self.BinsPorb[ww[1]+1]-self.BinsPorb[ww[1]])*self.rng.rand()) # d
+                tempRp = np.exp(self.BinsRp[ww[0]]+(self.BinsRp[ww[0]+1]-self.BinsRp[ww[0]])*self.rng.random()) # Rearth
+                tempPorb = np.exp(self.BinsPorb[ww[1]]+(self.BinsPorb[ww[1]+1]-self.BinsPorb[ww[1]])*self.rng.random()) # d
                 if (Rp_range[0] <= tempRp <= Rp_range[1] and Porb_range[0] <= tempPorb <= Porb_range[1]):
                     Rp += [tempRp] # Rearth
                     Porb += [tempPorb] # d
@@ -161,8 +161,8 @@ class PlanetDistribution():
                 # Randomly select bin
                 temp = self.rng.choice(len(tempRates_extrap.flatten()), p=tempRates_extrap.flatten()/tempF0)
                 ww = np.unravel_index(temp, tempRates_extrap.shape)
-                tempRp = np.exp(self.BinsRp[ww[0]]+(self.BinsRp[ww[0]+1]-self.BinsRp[ww[0]])*self.rng.rand()) # Rearth
-                tempPorb = np.exp(self.BinsPorb[ww[1]]+(self.BinsPorb[ww[1]+1]-self.BinsPorb[ww[1]])*self.rng.rand()) # d
+                tempRp = np.exp(self.BinsRp[ww[0]]+(self.BinsRp[ww[0]+1]-self.BinsRp[ww[0]])*self.rng.random()) # Rearth
+                tempPorb = np.exp(self.BinsPorb[ww[1]]+(self.BinsPorb[ww[1]+1]-self.BinsPorb[ww[1]])*self.rng.random()) # d
                 if (Rp_range[0] <= tempRp <= Rp_range[1] and Porb_range[0] <= tempPorb <= Porb_range[1]):
                     Rp += [tempRp] # Rearth
                     Porb += [tempPorb] # d

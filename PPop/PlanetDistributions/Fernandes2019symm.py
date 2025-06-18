@@ -171,11 +171,11 @@ class PlanetDistribution():
                 # Randomly select whether Porb < Pbrk or Porb > Pbrk.
                 temp = self.rng.choice(len(tempF0), p=tempF0/np.sum(tempF0))
                 if (temp == 0):
-                    tempMp = self.iCDF_M(self.rng.rand()) # Mearth
-                    tempPorb = self.iCDF_P1(self.rng.rand()) # d
+                    tempMp = self.iCDF_M(self.rng.random()) # Mearth
+                    tempPorb = self.iCDF_P1(self.rng.random()) # d
                 elif (temp == 1):
-                    tempMp = self.iCDF_M(self.rng.rand()) # Mearth
-                    tempPorb = self.iCDF_P2(self.rng.rand()) # d
+                    tempMp = self.iCDF_M(self.rng.random()) # Mearth
+                    tempPorb = self.iCDF_P2(self.rng.random()) # d
                 if (Mp_range[0] <= tempMp <= Mp_range[1] and Porb_range[0] <= tempPorb <= Porb_range[1]):
                     Mp += [tempMp] # Mearth
                     Porb += [tempPorb] # d
@@ -188,11 +188,11 @@ class PlanetDistribution():
                 # Randomly select whether Rp < Rbrk or Rp > Rbrk.
                 temp = self.rng.choice(len(tempF0), p=tempF0/np.sum(tempF0))
                 if (temp == 0):
-                    tempMp = self.iCDF_M(self.rng.rand()) # Mearth
-                    tempPorb = self.iCDF_P1(self.rng.rand()) # d
+                    tempMp = self.iCDF_M(self.rng.random()) # Mearth
+                    tempPorb = self.iCDF_P1(self.rng.random()) # d
                 elif (temp == 1):
-                    tempMp = self.iCDF_M(self.rng.rand()) # Mearth
-                    tempPorb = self.iCDF_P2(self.rng.rand()) # d
+                    tempMp = self.iCDF_M(self.rng.random()) # Mearth
+                    tempPorb = self.iCDF_P2(self.rng.random()) # d
                 if (Mp_range[0] <= tempMp <= Mp_range[1] and Porb_range[0] <= tempPorb <= Porb_range[1]):
                     Mp += [tempMp] # Mearth
                     Porb += [tempPorb] # d

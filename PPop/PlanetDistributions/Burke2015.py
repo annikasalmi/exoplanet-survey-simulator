@@ -154,8 +154,8 @@ class PlanetDistribution():
         if (Nplanets is None):
             Nplanets = self.rng.poisson(tempF0)
             for i in range(Nplanets):
-                tempRp = self.iCDF_R(self.rng.rand()) # Rearth
-                tempPorb = self.iCDF_P(self.rng.rand()) # d
+                tempRp = self.iCDF_R(self.rng.random()) # Rearth
+                tempPorb = self.iCDF_P(self.rng.random()) # d
                 if (Rp_range[0] <= tempRp <= Rp_range[1] and Porb_range[0] <= tempPorb <= Porb_range[1]):
                     Rp += [tempRp] # Rearth
                     Porb += [tempPorb] # d
@@ -164,8 +164,8 @@ class PlanetDistribution():
         # planets in the requested Rp and Porb range.
         else:
             while (len(Rp) < Nplanets):
-                tempRp = self.iCDF_R(self.rng.rand()) # Rearth
-                tempPorb = self.iCDF_P(self.rng.rand()) # d
+                tempRp = self.iCDF_R(self.rng.random()) # Rearth
+                tempPorb = self.iCDF_P(self.rng.random()) # d
                 if (Rp_range[0] <= tempRp <= Rp_range[1] and Porb_range[0] <= tempPorb <= Porb_range[1]):
                     Rp += [tempRp] # Rearth
                     Porb += [tempPorb] # d

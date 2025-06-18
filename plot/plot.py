@@ -5,8 +5,24 @@ import matplotlib.pyplot as plt
 
 from tools.paths import HWO_DATA_DIR
 
-def plot_by_star(df_all, nruns=1, star_catalog='Gaia'):
-    # Pivot to get one row per run, one column per (stype, radius_bin)
+def plot_by_star(df, nruns=1, star_catalog='Gaia'):
+
+    # Bin by radius
+    bins = [0, 1.5, 3.0, 6.0]
+    labels = ['<1.5', '1.5–3.0', '3.0–6.0']
+    df['radius_bin'] = pd.cut(df['radius_p'], bins=bins, labels=labels, include_lowest=True)
+
+    # Add "Rocky HZ" bin
+    rocky_hz = df[(df['habitable'] == True) & (df['radius_p'] < 1.5)].copy()
+    rocky_hz['radius_bin'] = 'Rocky HZ'
+
+    # Combine all rows
+    df_all = pd.concat([df, rocky_hz], ignore_index=True)
+
+    # Group by run, stype, radius_bin
+    df_all = df_all.groupby(['run', 'stype', 'radius_bin']).size().reset_index(name='count')
+
+    # Pivot to have runs as index and (stype, radius_bin) as columns
     df_pivot = df_all.pivot_table(index='run', columns=['stype', 'radius_bin'], values='count', fill_value=0)
 
     # Compute mean and std across runs
@@ -49,11 +65,11 @@ def plot_by_star(df_all, nruns=1, star_catalog='Gaia'):
     ax.set_xticks(x + 1.5 * bar_width)
     ax.set_xticklabels(star_order)
     ax.set_ylabel('Detectable Planets')
-    ax.set_title('Detectable Planets by Star Type')
+    ax.set_title(f'Detectable Planets by Star Type for {nruns} Runs\nStar Catalog: {star_catalog}')
     ax.legend(title='Planet Radius')
     plt.tight_layout()
 
-    plt.savefig(os.path.join(HWO_DATA_DIR,f"planets_stellar_type_hwo_nruns{nruns}_{star_catalog}.png"), 
+    plt.savefig(os.path.join(HWO_DATA_DIR, f"planets_stellar_type_hwo_nruns{nruns}_{star_catalog}.png"), 
                              dpi=300, bbox_inches='tight')
     plt.show()
 
@@ -66,9 +82,9 @@ def temp_zone(temp):
         return 'cold'
 
 def assign_category(row):
-    r = row['radius']
+    r = row['radius_p']
     hab = row['habitable']
-    stype = row['star_type']
+    stype = row['stype']
 
     if r < 1.5 and hab:
         return 'Rocky eHZ'
@@ -82,10 +98,8 @@ def assign_category(row):
         return 'Sub-Jovians'
     else:
         return None
-
-def plot_by_planet(df, nruns=1, star_catalog='Gaia'):
-    # Apply binning
-    df['temp_zone'] = df['temperature'].apply(temp_zone)
+def plot_by_planet_type(df, nruns=1, star_catalog='Gaia'):
+    df['temp_zone'] = df['temp_p'].apply(temp_zone)
     df['category'] = df.apply(assign_category, axis=1)
     df = df.dropna(subset=['category'])
 
@@ -99,26 +113,29 @@ def plot_by_planet(df, nruns=1, star_catalog='Gaia'):
 
     # Plot
     x = np.arange(len(categories))
-    bar_width = 0.6
+    bar_width = 0.2  # Smaller width for grouping
+    offsets = [-bar_width, 0, bar_width]  # for 'hot', 'warm', 'cold'
 
-    hot_vals = grouped['hot'].values
-    warm_vals = grouped['warm'].values
-    cold_vals = grouped['cold'].values
+    fig, ax = plt.subplots(figsize=(10, 6))
 
-    fig, ax = plt.subplots(figsize=(9, 6))
+    colors = ['red', 'gold', 'blue']
+    hatches = ['//', '--', '\\\\']
+    labels = ['hot', 'warm', 'cold']
 
-    p1 = ax.bar(x, hot_vals, bar_width, label='hot', color='red', hatch='//', edgecolor='black')
-    p2 = ax.bar(x, warm_vals, bar_width, bottom=hot_vals, label='warm', color='gold', hatch='--', edgecolor='black')
-    p3 = ax.bar(x, cold_vals, bar_width, bottom=hot_vals + warm_vals, label='cold', color='blue', hatch='\\\\', edgecolor='black')
+    for i, (zone, offset) in enumerate(zip(temp_zones, offsets)):
+        values = grouped[zone].values
+        ax.bar(x + offset, values, bar_width, label=labels[i],
+               color=colors[i], hatch=hatches[i], edgecolor='black')
 
-    totals = hot_vals + warm_vals + cold_vals
-    for i, val in enumerate(totals):
-        ax.text(x[i], val + 2, str(val), ha='center', va='bottom', fontsize=10)
+        # Add text annotations
+        for j, val in enumerate(values):
+            ax.text(x[j] + offset, val + 1, str(val), ha='center', va='bottom', fontsize=8)
 
-    ax.set_ylabel("Detectable planets")
+    ax.set_ylabel("Detectable Planets")
     ax.set_xticks(x)
-    ax.set_xticklabels(categories)
-    ax.legend(loc='upper left')
+    ax.set_xticklabels(categories, rotation=15, ha='right')
+    ax.legend(title='Temp Zone')
+    ax.set_title(f'Detectable Planets by Planet Type for {nruns} Runs\nStar Catalog: {star_catalog}')
 
     # Optional: annotation box
     textstr = 'D = 2.0 m\nScenario 1'
@@ -128,6 +145,6 @@ def plot_by_planet(df, nruns=1, star_catalog='Gaia'):
 
     plt.tight_layout()
 
-    plt.savefig(os.path.join(HWO_DATA_DIR,f"planets_planet_type_hwo_nruns{nruns}_{star_catalog}.png"), 
+    plt.savefig(os.path.join(HWO_DATA_DIR, f"planets_planet_type_hwo_nruns{nruns}_{star_catalog}.png"), 
                              dpi=300, bbox_inches='tight')
     plt.show()

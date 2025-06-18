@@ -81,30 +81,11 @@ def main(parallel=True, nruns=1, star_catalog='Gaia'):
     print(f"Finished {nruns} runs in {time.time() - start:.2f} seconds")
     print('Starting plotting...')
 
-    # Step 1: Process each run
-    processed_runs = []
-
-    for run_idx, df in enumerate(results):
-        df_detected = df[df['detected'] == True].copy()
-        
-        bins = [0, 1.5, 3.0, 6.0]
-        labels = ['<1.5', '1.5–3.0', '3.0–6.0']
-        df_detected['radius_bin'] = pd.cut(df_detected['radius_p'], bins=bins, labels=labels, include_lowest=True)
-
-        # Add "Rocky HZ" bin
-        rocky_hz = df[(df['habitable'] == True) & (df['radius_p'] < 1.5)].copy()
-        rocky_hz['radius_bin'] = 'Rocky HZ'
-
-        # Group by stype and radius bin
-        grouped = df_detected.groupby(['stype', 'radius_bin']).size().reset_index(name='count')
-        grouped['run'] = run_idx
-        processed_runs.append(grouped)
-
     # Step 2: Combine all runs into one DataFrame
-    df_all = pd.concat(processed_runs, ignore_index=True)
+    df_concat = pd.concat(results, ignore_index=True)
 
-    plot_by_star(df_all, nruns=nruns, star_catalog=star_catalog)
-    plot_by_planet(df_all, nruns=nruns, star_catalog=star_catalog)
+    plot_by_star(df_concat, nruns=nruns, star_catalog=star_catalog)
+    plot_by_planet(df_concat, nruns=nruns, star_catalog=star_catalog)
 
     print(f"Total time: {time.time() - start:.2f} seconds")
 

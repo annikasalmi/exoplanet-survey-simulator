@@ -41,22 +41,8 @@ def run_single(i, star_catalog='Gaia'):
     hwo_data.determine_detectable()
 
     df = hwo_data.catalog
-    
-    bins = [0, 1.5, 3.0, 6.0]
-    labels = ['<1.5', '1.5–3.0', '3.0–6.0']
-    df['radius_bin'] = pd.cut(df['radius_p'], bins=bins, labels=labels, include_lowest=True)
 
-    # Add "Rocky HZ" bin
-    rocky_hz = df[(df['habitable'] == True) & (df['radius_p'] < 1.5)].copy()
-    rocky_hz['radius_bin'] = 'Rocky HZ'
-
-    # Combine all rows
-    df_all = pd.concat([df, rocky_hz], ignore_index=True)
-
-    # Group by star type and radius bin
-    grouped_df = df_all.groupby(['stype', 'radius_bin']).size().reset_index(name='count')
-
-    return grouped_df
+    return df
 
 def main(parallel=False, nruns=1, star_catalog='Gaia'):
     start = time.time()
@@ -68,10 +54,10 @@ def main(parallel=False, nruns=1, star_catalog='Gaia'):
     else:
         results = [run_single(i=i, star_catalog=star_catalog) for i in range(nruns)]
 
-    df_all = pd.concat(results, keys=range(nruns)).reset_index(level=0).rename(columns={'level_0': 'run'})
+    df_concat = pd.concat(results, keys=range(nruns)).reset_index(level=0).rename(columns={'level_0': 'run'})
 
-    plot_by_star(df_all, nruns=nruns, star_catalog=star_catalog)
-    plot_by_planet(df_all, nruns=nruns, star_catalog=star_catalog)
+    plot_by_star(df_concat, nruns=nruns, star_catalog=star_catalog)
+    plot_by_planet(df_concat, nruns=nruns, star_catalog=star_catalog)
     print(f"Total time: {time.time() - start:.2f} seconds")
 
 

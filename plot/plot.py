@@ -3,7 +3,12 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-from tools.paths import HWO_PLOTS_DIR, LIFESIM_DATA_DIR
+from tools.paths import LIFESIM_OUTER_DIR
+
+def make_output_dir(name, nruns, star_catalog):
+    out_dir = os.path.join(LIFESIM_OUTER_DIR, str(name)+'_'+str(nruns)+'_'+str(star_catalog))
+    os.makedirs(out_dir, exist_ok=True)
+    return out_dir
 
 def plot_by_star(df, nruns=1, star_catalog='Gaia', name='hwo'):
     '''
@@ -59,12 +64,7 @@ def plot_by_star(df, nruns=1, star_catalog='Gaia', name='hwo'):
     ax.legend(title='Planet Radius')
 
     plt.tight_layout()
-    if name == 'hwo':
-        name = 'HWO'
-        data_dir = HWO_PLOTS_DIR
-    if name == 'lifesim':
-        name = 'LIFEsim'
-        data_dir = LIFESIM_DATA_DIR
+    data_dir = make_output_dir(name, nruns, star_catalog)
 
     plt.savefig(os.path.join(data_dir, f"stellar_type_{name}_nruns{nruns}_{star_catalog}.png"), 
                              dpi=300, bbox_inches='tight')
@@ -148,12 +148,8 @@ def plot_by_planet(df, nruns=1, star_catalog='Gaia', name='hwo'):
             verticalalignment='top', horizontalalignment='right', bbox=props)
 
     plt.tight_layout()
-    if name == 'hwo':
-        name = 'HWO'
-        data_dir = HWO_PLOTS_DIR
-    if name == 'lifesim':
-        name = 'LIFEsim'
-        data_dir = LIFESIM_DATA_DIR
+    data_dir = make_output_dir(name, nruns, star_catalog)
+
 
     plt.savefig(os.path.join(data_dir, f"planet_type_{name}_nruns{nruns}_{star_catalog}.png"), 
                              dpi=300, bbox_inches='tight')
@@ -193,12 +189,7 @@ def plot_distances(df, nruns=1, star_catalog='Gaia', name='hwo'):
     ax.set_title(f'Detectable Planets by Distance for {name} for {nruns} Runs\nStar Catalog: {star_catalog}')
 
     plt.tight_layout()
-    if name == 'hwo':
-        name = 'HWO'
-        data_dir = HWO_PLOTS_DIR
-    if name == 'lifesim':
-        name = 'LIFEsim'
-        data_dir = LIFESIM_DATA_DIR
+    data_dir = make_output_dir(name, nruns, star_catalog)
 
     plt.savefig(os.path.join(data_dir, f"planet_distance_{name}_nruns{nruns}_{star_catalog}.png"), 
                              dpi=300, bbox_inches='tight')
@@ -254,12 +245,7 @@ def plot_efficiency(df, nruns=1, star_catalog='Gaia', name='hwo'):
     ax1.set_title(f'Efficiency in Detecting Planets for {name} for {nruns} Runs\nStar Catalog: {star_catalog}')
 
     plt.tight_layout()
-    if name == 'hwo':
-        name = 'HWO'
-        data_dir = HWO_PLOTS_DIR
-    if name == 'lifesim':
-        name = 'LIFEsim'
-        data_dir = LIFESIM_DATA_DIR
+    data_dir = make_output_dir(name, nruns, star_catalog)
 
     plt.savefig(os.path.join(data_dir, f"detection_efficiency_{name}_nruns{nruns}_{star_catalog}.png"), 
                              dpi=300, bbox_inches='tight')
@@ -277,8 +263,8 @@ def get_rejection_reason(row):
 
 def plot_individual_failures(df, nruns=1, star_catalog='Gaia',name='hwo'):
      # Step 1: Determine rejection reasons
-
-    catalog = catalog.copy()
+ 
+    catalog = df.copy()
     catalog['rejection_reason'] = catalog.apply(get_rejection_reason, axis=1)
 
     # Step 2: Count reasons
@@ -291,17 +277,18 @@ def plot_individual_failures(df, nruns=1, star_catalog='Gaia',name='hwo'):
     plt.title(f"{name}\nTotal planets: {len(catalog)}")
     plt.axis('equal')  # Equal aspect ratio ensures the pie is circular
     plt.tight_layout()
-    if name == 'hwo':
-        name = 'HWO'
-        data_dir = HWO_PLOTS_DIR
-    if name == 'lifesim':
-        name = 'LIFEsim'
-        data_dir = LIFESIM_DATA_DIR
 
-    plt.savefig(os.path.join(data_dir, f"detection_efficiency_{name}_nruns{nruns}_{star_catalog}.png"), 
+    data_dir = make_output_dir(name, nruns, star_catalog)
+
+    plt.savefig(os.path.join(data_dir, f"failure_detected_{name}_nruns{nruns}_{star_catalog}.png"), 
                              dpi=300, bbox_inches='tight')
 
-def plot_all(df, nruns=1, star_catalog='Gaia', name='hwo'):
+def plot_all(df, nruns=1, star_catalog='Gaia', sim_name='hwo'):
+
+    if sim_name == 'hwo':
+        name = 'HWO'
+    elif sim_name == 'lifesim':
+        name = 'LIFEsim'
 
     plot_by_star(df=df, name=name, nruns=nruns, star_catalog=star_catalog)
     plot_by_planet(df=df, name=name, nruns=nruns, star_catalog=star_catalog)

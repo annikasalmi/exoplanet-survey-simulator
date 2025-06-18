@@ -11,6 +11,7 @@
 /lifesim/instrument/__pycache__/*.pyc
 TestPlanetPopulation.txt
 /Figures/*
+/plot/*/*.png
 /PPop/__pycache__/*
 /PPop/AlbedoModels/__pycache__/*.pyc
 /PPop/EccentricityModels/__pycache__/*
@@ -27,9 +28,10 @@ TestPlanetPopulation.txt
 /run/logging/*/*.txt
 /run/lifesim/data/*.hdf5
 /run/lifesim/data/*.yaml
-/run/lifesim/plots/*.png
+/run/lifesim/data/*/*.hdf5
+/run/lifesim/data/*/*.yaml
 /run/hwo/data/*.csv
-/run/hwo/plots/*.png
+/run/hwo/data/*/*.csv
 /run/hwo/__pycache__/*.pyc
 /run/lifesim/__pycache__/*.pyc
 /plot/__pycache__/*.pyc

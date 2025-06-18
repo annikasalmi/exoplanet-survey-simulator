@@ -13,6 +13,7 @@ from PPop.StarCatalogs import CrossfieldBrightSample, ExoCat_1, LTC_2, LTC_3, ga
 RUN_PPOP = False
 
 def run_lifesim_single(i, star_catalog='Gaia'):
+    print(f"Running LIFEsim for run {i} with star catalog {star_catalog}")
     rng = np.random.default_rng(i)
     # ----- Generate new planet population -----
     PPopObj = PPop(rng=rng)
@@ -36,7 +37,7 @@ def run_lifesim_single(i, star_catalog='Gaia'):
     bus = lifesim.Bus()
     bus.data.options.set_scenario('baseline')
     bus.data.options.set_manual(diameter=4.0)
-    bus.data.options.set_manual(output_path=LIFESIM_DATA_DIR)
+    bus.data.options.set_manual(output_path=os.path.join(LIFESIM_DATA_DIR, star_catalog))
     bus.data.options.set_manual(output_filename=f'/test_runs_{i}')
     bus.data.catalog_from_ppop(data_path, df=df)
 
@@ -79,7 +80,7 @@ def run_lifesim_import_catalog(i, star_catalog='Gaia'):
     bus.data.options.set_manual(output_path=LIFESIM_DATA_DIR)
     bus.data.options.set_manual(output_filename=f'/test_runs_{i}')
 
-    bus.data.import_catalog(input_path=os.path.join(LIFESIM_DATA_DIR, f'test_runs_{i}_catalog.hdf5'))
+    bus.data.import_catalog(input_path=os.path.join(LIFESIM_DATA_DIR, star_catalog, f'test_runs_{i}_catalog.hdf5'))
 
     return bus.data.catalog
 

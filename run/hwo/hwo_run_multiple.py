@@ -14,6 +14,7 @@ def run_single(i, star_catalog='Gaia'):
     '''
     Runs a single instance of the PPop simulation and HWO data analysis.
     '''
+    print(f"Running HWO for run {i} with star catalog {star_catalog}")
     rng = np.random.default_rng(i)
     PPopObj = PPop(rng=rng)
 
@@ -40,12 +41,12 @@ def run_single(i, star_catalog='Gaia'):
     hwo_data.determine_detectable()
 
     df = hwo_data.catalog
-    df.to_csv(os.path.join(HWO_DATA_DIR, f'hwo_catalog_{i}.csv'), index=False)
+    df.to_csv(os.path.join(HWO_DATA_DIR, star_catalog, f'hwo_catalog_{i}.csv'), index=False)
 
     return df
 
-def run_hwo_import_catalog(i):
-    df = pd.read_csv(os.path.join(HWO_DATA_DIR, f'hwo_catalog_{i}.csv'))
+def run_hwo_import_catalog(i, star_catalog):
+    df = pd.read_csv(os.path.join(HWO_DATA_DIR, star_catalog, f'hwo_catalog_{i}.csv'))
     return df
 
 def main(parallel=False, nruns=1, star_catalog='Gaia', run_anew=True):
@@ -64,7 +65,7 @@ def main(parallel=False, nruns=1, star_catalog='Gaia', run_anew=True):
             with mp.Pool(processes=mp.cpu_count()) as pool:
                 results = pool.map(runner, range(nruns))
         else:
-            results = [run_hwo_import_catalog(i=i) for i in range(nruns)]
+            results = [run_hwo_import_catalog(i=i, star_catalog=star_catalog) for i in range(nruns)]
 
     df_concat = pd.concat(results, keys=range(nruns)).reset_index(level=0).rename(columns={'level_0': 'run'})
     print(f"Total time: {time.time() - start:.2f} seconds")

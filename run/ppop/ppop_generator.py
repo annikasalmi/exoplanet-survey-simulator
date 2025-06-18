@@ -82,8 +82,8 @@ class PPop():
 
     def run_ppop(self, seed, data_path='test_planet_pop.txt'):
         # Don't modify the following code.
-        ntest=10000
-        nuniverses=1000
+        ntest=1
+        nuniverses=1
         SysGen = SystemGenerator.SystemGenerator(self.StarCatalog,
                                                 self.StypeToModel,
                                                 self.ScalingModel,

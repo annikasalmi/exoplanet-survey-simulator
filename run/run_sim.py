@@ -2,17 +2,15 @@ import time
 import threading
 import os
 from tqdm import tqdm
+import logging
 import pandas as pd
 from datetime import datetime
+
 from tools.paths import LOGGING
 from run.lifesim.lifesim_run_multiple import main as main_lifesim
 from run.hwo.hwo_run_multiple import main as main_hwo
-from plot.plot import plot_by_star, plot_by_planet, plot_distances
+from plot.plot import plot_all
 
-import time
-import threading
-import logging
-from tqdm import tqdm
 
 def time_based_progress_bar(estimated_seconds, stop_event, log_func=None):
     '''
@@ -87,7 +85,7 @@ def run_sim(func, name, parallel, nruns, star_catalog, run_anew=True):
         run_anew=run_anew
     )
 
-        # Bin by radius
+    # Bin by radius
     bins = [0, 1.5, 3.0, 6.0]
     labels = ['<1.5', '1.5–3.0', '3.0–6.0']
     df_concat['radius_bin'] = pd.cut(df_concat['radius_p'], bins=bins, labels=labels, include_lowest=True)
@@ -99,10 +97,7 @@ def run_sim(func, name, parallel, nruns, star_catalog, run_anew=True):
     # Combine all rows
     df_concat = pd.concat([df_concat, rocky_hz], ignore_index=True)
 
-
-    plot_by_star(df=df_concat, name=name, nruns=nruns, star_catalog=star_catalog)
-    plot_by_planet(df=df_concat, name=name, nruns=nruns, star_catalog=star_catalog)
-    plot_distances(df=df_concat, name=name, nruns=nruns, star_catalog=star_catalog)
+    plot_all(df=df_concat, name=name, nruns=nruns, star_catalog=star_catalog)
 
 # Run the whole thing
 if __name__ == "__main__":
@@ -112,10 +107,9 @@ if __name__ == "__main__":
     
     # running 10 case
     # run_sim(func=main_hwo, name = 'hwo', parallel=PARALLEL, nruns=NRUNS, star_catalog=STAR_CATALOG)
-    run_sim(func=main_lifesim, name = 'lifesim', parallel=True, nruns=1, star_catalog=STAR_CATALOG, run_anew=False)
+    # run_sim(func=main_lifesim, name = 'lifesim', parallel=True, nruns=1, star_catalog=STAR_CATALOG, run_anew=False)
     
-    print('now running 50 case....')
     NRUNS = 49
-    # run_sim(func=main_hwo, name = 'hwo', parallel=PARALLEL, nruns=NRUNS, star_catalog=STAR_CATALOG)
+    run_sim(func=main_hwo, name = 'hwo', parallel=PARALLEL, nruns=NRUNS, star_catalog=STAR_CATALOG, run_anew=True)
     run_sim(func=main_lifesim, name='lifesim',parallel=PARALLEL, nruns=NRUNS, star_catalog=STAR_CATALOG, run_anew=False)
     print('done')

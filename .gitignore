@@ -25,10 +25,11 @@ TestPlanetPopulation.txt
 /PPop/Figures/
 /PPop/data/*
 /run/logging/*/*.txt
-/run/lifesim/data/*
-/run/lifesim/plots/*
-/run/hwo/data/*
-/run/hwo/plots/*
+/run/lifesim/data/*.hdf5
+/run/lifesim/data/*.yaml
+/run/lifesim/plots/*.png
+/run/hwo/data/*.csv
+/run/hwo/plots/*.png
 /run/hwo/__pycache__/*.pyc
 /run/lifesim/__pycache__/*.pyc
 /plot/__pycache__/*.pyc

@@ -82,9 +82,17 @@ class HWOData():
         return iwa_constraint
     
     def determine_detectable(self):
+        # Evaluate individual constraints
         iwa_condition = self.iwa_constraint >= const.iwa
         flux_condition = self.flux_ratio >= const.planet_flux_star_ratio
         min_flux_condition = self.calc_planet_flux() >= const.min_flux
+
+        # Store individual condition results
+        self.catalog['iwa_pass'] = iwa_condition
+        self.catalog['flux_pass'] = flux_condition
+        self.catalog['min_flux_pass'] = min_flux_condition
+
+        # Total combined detection condition
         total_condition = iwa_condition & flux_condition & min_flux_condition
-        self.catalog['detectable'] = total_condition
-        return self.catalog.detectable
+        self.catalog['detected'] = total_condition
+        return self.catalog.detected

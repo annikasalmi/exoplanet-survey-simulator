@@ -214,7 +214,15 @@ def plot_efficiency(df, nruns=1, star_catalog='Gaia', name='hwo'):
 
     # Histogram of all and detected
     total_counts, _ = np.histogram(rocky_ehz['temp_p'], bins=bins)
-    detected_counts, _ = np.histogram(rocky_ehz[rocky_ehz['detectable'] == True]['temp_p'], bins=bins)
+    try:
+        mask = rocky_ehz['detected']
+    except KeyError:
+        mask = rocky_ehz['detectable']
+
+    detected_counts, _ = np.histogram(
+        rocky_ehz[mask]['temp_p'],
+        bins=bins
+    )
 
     # Avoid divide-by-zero
     with np.errstate(divide='ignore', invalid='ignore'):
@@ -243,6 +251,8 @@ def plot_efficiency(df, nruns=1, star_catalog='Gaia', name='hwo'):
     h2, l2 = ax2.get_legend_handles_labels()
     ax1.legend(h1 + h2, l1 + l2, loc='upper left')
 
+    ax1.set_title(f'Efficiency in Detecting Planets for {name} for {nruns} Runs\nStar Catalog: {star_catalog}')
+
     plt.tight_layout()
     if name == 'hwo':
         name = 'HWO'
@@ -254,4 +264,48 @@ def plot_efficiency(df, nruns=1, star_catalog='Gaia', name='hwo'):
     plt.savefig(os.path.join(data_dir, f"detection_efficiency_{name}_nruns{nruns}_{star_catalog}.png"), 
                              dpi=300, bbox_inches='tight')
     
-def plot_
+
+def get_rejection_reason(row):
+    if not row['iwa_pass']:
+        return 'IWA'
+    elif not row['flux_pass']:
+        return 'Flux Ratio'
+    elif not row['min_flux_pass']:
+        return 'Min Flux'
+    else:
+        return 'Detected'
+
+def plot_individual_failures(df, nruns=1, star_catalog='Gaia',name='hwo'):
+     # Step 1: Determine rejection reasons
+
+    catalog = catalog.copy()
+    catalog['rejection_reason'] = catalog.apply(get_rejection_reason, axis=1)
+
+    # Step 2: Count reasons
+    counts = catalog['rejection_reason'].value_counts()
+
+    # Step 3: Plot pie chart
+    colors = ['#d62728', '#ff7f0e', '#1f77b4', '#2ca02c']  # red, orange, blue, green
+    plt.figure(figsize=(6, 6))
+    plt.pie(counts, labels=counts.index, autopct='%1.1f%%', startangle=140, colors=colors[:len(counts)])
+    plt.title(f"{name}\nTotal planets: {len(catalog)}")
+    plt.axis('equal')  # Equal aspect ratio ensures the pie is circular
+    plt.tight_layout()
+    if name == 'hwo':
+        name = 'HWO'
+        data_dir = HWO_PLOTS_DIR
+    if name == 'lifesim':
+        name = 'LIFEsim'
+        data_dir = LIFESIM_DATA_DIR
+
+    plt.savefig(os.path.join(data_dir, f"detection_efficiency_{name}_nruns{nruns}_{star_catalog}.png"), 
+                             dpi=300, bbox_inches='tight')
+
+def plot_all(df, nruns=1, star_catalog='Gaia', name='hwo'):
+
+    plot_by_star(df=df, name=name, nruns=nruns, star_catalog=star_catalog)
+    plot_by_planet(df=df, name=name, nruns=nruns, star_catalog=star_catalog)
+    plot_distances(df=df, name=name, nruns=nruns, star_catalog=star_catalog)
+    plot_efficiency(df=df, name=name, nruns=nruns, star_catalog=star_catalog)
+    if name == 'hwo':
+        plot_individual_failures(df)

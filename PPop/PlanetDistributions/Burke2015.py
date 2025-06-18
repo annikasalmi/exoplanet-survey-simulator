@@ -24,18 +24,15 @@ class PlanetDistribution():
     """
     
     def __init__(self,
-                 Scenario, seed):
+                 Scenario, rng):
         """
         Parameters
         ----------
         Scenario: 'baseline', 'pessimistic', 'optimistic'
             Scenario for planet occurrence rates.
         """
-        self.seed=seed
+        self.rng=rng
 
-        
-        # Set random seed.
-        np.random.seed(self.seed)
         # Print.
         print('--> Initializing Burke2015 planet distribution')
         
@@ -155,10 +152,10 @@ class PlanetDistribution():
         # smaller than the drawn number because of clipping to the requested Rp
         # and Porb range.
         if (Nplanets is None):
-            Nplanets = np.random.poisson(tempF0)
+            Nplanets = self.rng.poisson(tempF0)
             for i in range(Nplanets):
-                tempRp = self.iCDF_R(np.random.rand()) # Rearth
-                tempPorb = self.iCDF_P(np.random.rand()) # d
+                tempRp = self.iCDF_R(self.rng.rand()) # Rearth
+                tempPorb = self.iCDF_P(self.rng.rand()) # d
                 if (Rp_range[0] <= tempRp <= Rp_range[1] and Porb_range[0] <= tempPorb <= Porb_range[1]):
                     Rp += [tempRp] # Rearth
                     Porb += [tempPorb] # d
@@ -167,8 +164,8 @@ class PlanetDistribution():
         # planets in the requested Rp and Porb range.
         else:
             while (len(Rp) < Nplanets):
-                tempRp = self.iCDF_R(np.random.rand()) # Rearth
-                tempPorb = self.iCDF_P(np.random.rand()) # d
+                tempRp = self.iCDF_R(self.rng.rand()) # Rearth
+                tempPorb = self.iCDF_P(self.rng.rand()) # d
                 if (Rp_range[0] <= tempRp <= Rp_range[1] and Porb_range[0] <= tempPorb <= Porb_range[1]):
                     Rp += [tempRp] # Rearth
                     Porb += [tempPorb] # d

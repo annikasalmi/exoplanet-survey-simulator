@@ -1,5 +1,6 @@
 import os
 import lifesim
+import numpy as np
 from run.ppop.ppop_generator import PPop
 import multiprocessing as mp
 import time
@@ -13,9 +14,9 @@ from plot.plot import plot_by_star, plot_by_planet
 RUN_PPOP = False
 
 def run_lifesim_single(i, star_catalog='Gaia'):
-
+    rng = np.random.default_rng()
     # ----- Generate new planet population -----
-    PPopObj = PPop(seed=i)
+    PPopObj = PPop(rng=i)
 
     if star_catalog == 'ExoCat_1':
         PPopObj.StarCatalog = ExoCat_1
@@ -27,7 +28,7 @@ def run_lifesim_single(i, star_catalog='Gaia'):
     filename = f'test_runs_lifesim_{i}'
     data_path = os.path.join(PPOP_DATA_DIR, filename)
 
-    df = PPopObj.run_ppop(seed=i, data_path=data_path)
+    df = PPopObj.run_ppop(data_path=data_path)
     PPopObj.catalog_from_ppop(data_path, df=df)
     PPopObj.catalog_remove_distance(stype='A', mode='larger', dist=0.0)
     PPopObj.catalog_remove_distance(stype='M', mode='larger', dist=10.0)
@@ -41,7 +42,7 @@ def run_lifesim_single(i, star_catalog='Gaia'):
     bus.data.catalog_from_ppop(data_path, df=df)
 
     # ----- Instrument and Modules -----
-    instrument = lifesim.Instrument(name='inst', seed=i)
+    instrument = lifesim.Instrument(name='inst', rng=i)
     bus.add_module(instrument)
     bus.add_module(lifesim.TransmissionMap(name='transm'))
     bus.add_module(lifesim.PhotonNoiseExozodi(name='exo'))

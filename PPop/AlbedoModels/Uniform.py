@@ -20,10 +20,9 @@ import numpy as np
 
 class AlbedoModel():
     
-    def __init__(self, seed):
-        self.seed = seed
-        # Set random seed.
-        np.random.seed(self.seed)
+    def __init__(self, rng):
+        self.rng = rng
+
         pass
     
     def getAbond(self,

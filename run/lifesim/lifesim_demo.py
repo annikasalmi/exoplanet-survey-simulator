@@ -1,9 +1,11 @@
 import requests
 import os
 import lifesim
+import numpy as np
 from run.ppop.ppop_generator import PPop
 
 i = 0
+rng = np.random.default_rng()
 
 # ---------- Set-Up ----------
 
@@ -42,7 +44,7 @@ bus.data.catalog_remove_distance(stype='M', mode='larger', dist=10.)  # remove M
 # ---------- Creating the Instrument ----------
 
 # create modules and add to bus
-instrument = lifesim.Instrument(name='inst', seed = i)
+instrument = lifesim.Instrument(name='inst', rng = i)
 bus.add_module(instrument)
 
 transm = lifesim.TransmissionMap(name='transm')

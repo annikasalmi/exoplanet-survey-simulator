@@ -28,12 +28,9 @@ class MassModel():
     https://ui.adsabs.harvard.edu/abs/2017ApJ...834...17C/abstract
     """
     
-    def __init__(self, seed):
-        self.seed = seed
+    def __init__(self, rng):
+        self.rng = rng
 
-        
-        # Set random seed.
-        np.random.seed(self.seed)
         pass
     
     def RadiusToMass(self,

@@ -25,16 +25,14 @@ class PlanetDistribution():
     """
     
     def __init__(self,
-                 Scenario, seed):
+                 Scenario, rng):
         """
         Parameters
         ----------
         Scenario: 'baseline', 'pessimistic', 'optimistic'
             Scenario for planet occurrence rates.
         """
-        self.seed = seed
-        # Set random seed.
-        np.random.seed(self.seed)
+        self.rng = rng
         
         # Print.
         print('--> Initializing Weiss2018KDE planet distribution')

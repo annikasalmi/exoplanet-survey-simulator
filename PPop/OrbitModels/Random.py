@@ -21,12 +21,9 @@ import scipy.optimize as so
 
 class OrbitModel():
     
-    def __init__(self, seed):
-        self.seed = seed
+    def __init__(self, rng):
+        self.rng = rng
 
-        
-        # Set random seed.
-        np.random.seed(self.seed)
         pass
     
     def getOrbit(self,

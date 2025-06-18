@@ -43,7 +43,7 @@ class SystemGenerator():
                  Ntest,
                  FigDir,
                  block,
-                 seed):
+                 rng):
         """
         Parameters
         ----------
@@ -82,12 +82,10 @@ class SystemGenerator():
             Directory to which summary plots are saved.
         block: bool
             If True, blocks plots when showing.
-        seed: int
-            Seed for random number generator.
+        rng: int
+            Rng for random number generator.
         """
-        self.seed = seed
-        # Set random seed.
-        np.random.seed(self.seed)
+        self.rng = rng
 
         # Create directory to which summary plots are saved
         if (FigDir is not None and not os.path.exists(FigDir)):
@@ -216,7 +214,7 @@ class SystemGenerator():
         PlanetDistributions = {}
         for i, key_i in enumerate(StypeToModel):
             if (i == 0):
-                PlanetDistributions[key_i] = StypeToModel[key_i].PlanetDistribution(Scenario, seed=self.seed)
+                PlanetDistributions[key_i] = StypeToModel[key_i].PlanetDistribution(Scenario, rng=self.rng)
             else:
                 isnew = True
                 for j, key_j in enumerate(StypeToModel):
@@ -224,7 +222,7 @@ class SystemGenerator():
                         PlanetDistributions[key_i] = PlanetDistributions[key_j]
                         isnew = False
                 if (isnew == True):
-                    PlanetDistributions[key_i] = StypeToModel[key_i].PlanetDistribution(Scenario, seed=self.seed)
+                    PlanetDistributions[key_i] = StypeToModel[key_i].PlanetDistribution(Scenario, rng=self.rng)
         
         return PlanetDistributions
     
@@ -245,7 +243,7 @@ class SystemGenerator():
         if (ScalingModel is None):
             return None
         else:
-            return ScalingModel.ScalingModel(seed=self.seed)
+            return ScalingModel.ScalingModel(rng=self.rng)
     
     def getMassModel(self,
                      MassModel):
@@ -261,7 +259,7 @@ class SystemGenerator():
             Instance of class MassModel.
         """
         
-        return MassModel.MassModel(seed=self.seed)
+        return MassModel.MassModel(rng=self.rng)
     
     def getEccentricityModel(self,
                              EccentricityModel):
@@ -277,7 +275,7 @@ class SystemGenerator():
             Instance of class EccentricityModel.
         """
         
-        return EccentricityModel.EccentricityModel(seed=self.seed)
+        return EccentricityModel.EccentricityModel(rng=self.rng)
     
     def getStabilityModel(self,
                           StabilityModel):
@@ -296,7 +294,7 @@ class SystemGenerator():
         if (StabilityModel is None):
             return None
         else:
-            return StabilityModel.StabilityModel(seed=self.seed)
+            return StabilityModel.StabilityModel(rng=self.rng)
     
     def getOrbitModel(self,
                       OrbitModel):
@@ -312,7 +310,7 @@ class SystemGenerator():
             Instance of class OrbitModel.
         """
         
-        return OrbitModel.OrbitModel(seed=self.seed)
+        return OrbitModel.OrbitModel(rng=self.rng)
     
     def getAlbedoModel(self,
                        AlbedoModel):
@@ -328,7 +326,7 @@ class SystemGenerator():
             Instance of class AlbedoModel.
         """
         
-        return AlbedoModel.AlbedoModel(seed=self.seed)
+        return AlbedoModel.AlbedoModel(rng=self.rng)
     
     def getExozodiModel(self,
                        ExozodiModel,
@@ -347,7 +345,7 @@ class SystemGenerator():
             Instance of class ExozodiModel.
         """
         
-        return ExozodiModel.ExozodiModel(Scenario, seed=self.seed)
+        return ExozodiModel.ExozodiModel(Scenario, rng=self.rng)
     
     def SimulateUniverses(self,
                           Name,
@@ -520,6 +518,6 @@ class SystemGenerator():
                                  Nstar,
                                  Nuniverse,
                                  Scale,
-                                 self.seed)
+                                 self.rng)
         else:
             return None

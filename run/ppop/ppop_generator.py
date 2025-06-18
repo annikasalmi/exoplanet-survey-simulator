@@ -34,14 +34,12 @@ class PPop():
     '''
     This class sets up the parameters for the planet population generator.
     '''
-    def __init__(self, seed):
+    def __init__(self, rng):
         '''
         This function sets up the parameters for the planet population generator.
         '''
-        self.seed=seed
+        self.rng=rng
 
-        # Set random seed.
-        np.random.seed(self.seed)
         #StarCatalog = ExoCat_1 # used by NASA
         self.StarCatalog = LTC_3 # LIFE Target Catalog (version 3)
         self.Stypes = ['A', 'F', 'G', 'K', 'M'] # list of str
@@ -80,7 +78,7 @@ class PPop():
         # self.options.set_manual(output_path='data')
         # self.options.set_manual(output_filename=self.Name)    
 
-    def run_ppop(self, seed, data_path='test_planet_pop.txt'):
+    def run_ppop(self, data_path='test_planet_pop.txt'):
         # Don't modify the following code.
         ntest=1
         nuniverses=1
@@ -101,7 +99,7 @@ class PPop():
                                                 ntest,
                                                 self.FigDir,
                                                 self.block,
-                                                seed=seed)
+                                                rng=self.rng)
         df = SysGen.SimulateUniverses(data_path,
                                 nuniverses)
         return df

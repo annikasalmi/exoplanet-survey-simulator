@@ -28,7 +28,7 @@ from PPop.MassModels.Forecaster.func import piece_linear, ProbRGivenM, classific
 
 ##############################################
 
-def Mpost2R(mass, unit='Earth', classify='No', seed=663):
+def Mpost2R(mass, unit='Earth', classify='No', rng=None):
 	"""
 	Forecast the Radius distribution given the mass distribution.
 
@@ -49,8 +49,6 @@ def Mpost2R(mass, unit='Earth', classify='No', seed=663):
 	radius: one dimensional array
 		Predicted radius distribution in the input unit.
 	"""    
-	# Set random seed.
-	np.random.seed(seed)
 	# mass input
 	mass = np.array(mass)
 	assert len(mass.shape) == 1, "Input mass must be 1-D."
@@ -147,7 +145,7 @@ def Mstat2R(mean, std, unit='Earth', sample_size=1000, classify = 'No'):
 
 
 
-def Rpost2M(radius, unit='Earth', grid_size = 1e3, classify = 'No', seed=663):
+def Rpost2M(radius, unit='Earth', grid_size = 1e3, classify = 'No', rng=None):
 	"""
 	Forecast the mass distribution given the radius distribution.
 
@@ -170,9 +168,6 @@ def Rpost2M(radius, unit='Earth', grid_size = 1e3, classify = 'No', seed=663):
 	mass: one dimensional array
 		Predicted mass distribution in the input unit.
 	"""
-	# Set random seed.
-	np.random.seed(seed)
-
 	# unit
 	if unit == 'Earth':
 		pass

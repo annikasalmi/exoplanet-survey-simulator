@@ -24,17 +24,15 @@ class PlanetDistribution():
     """
     
     def __init__(self,
-                 Scenario, seed):
+                 Scenario, rng):
         """
         Parameters
         ----------
         Scenario: 'baseline', 'pessimistic', 'optimistic'
             Scenario for planet occurrence rates.
         """
-        self.seed = seed
+        self.rng = rng
         
-        # Set random seed.
-        np.random.seed(self.seed)
         # Print.
         print('--> Initializing Fernandes2019symm planet distribution')
         
@@ -167,17 +165,17 @@ class PlanetDistribution():
         # smaller than the drawn number because of clipping to the requested Rp
         # and Porb range.
         if (Nplanets is None):
-            Nplanets = np.random.poisson(np.sum(tempF0))
+            Nplanets = self.rng.poisson(np.sum(tempF0))
             for i in range(Nplanets):
                 
                 # Randomly select whether Porb < Pbrk or Porb > Pbrk.
-                temp = np.random.choice(len(tempF0), p=tempF0/np.sum(tempF0))
+                temp = self.rng.choice(len(tempF0), p=tempF0/np.sum(tempF0))
                 if (temp == 0):
-                    tempMp = self.iCDF_M(np.random.rand()) # Mearth
-                    tempPorb = self.iCDF_P1(np.random.rand()) # d
+                    tempMp = self.iCDF_M(self.rng.rand()) # Mearth
+                    tempPorb = self.iCDF_P1(self.rng.rand()) # d
                 elif (temp == 1):
-                    tempMp = self.iCDF_M(np.random.rand()) # Mearth
-                    tempPorb = self.iCDF_P2(np.random.rand()) # d
+                    tempMp = self.iCDF_M(self.rng.rand()) # Mearth
+                    tempPorb = self.iCDF_P2(self.rng.rand()) # d
                 if (Mp_range[0] <= tempMp <= Mp_range[1] and Porb_range[0] <= tempPorb <= Porb_range[1]):
                     Mp += [tempMp] # Mearth
                     Porb += [tempPorb] # d
@@ -188,13 +186,13 @@ class PlanetDistribution():
             while (len(Mp) < Nplanets):
                 
                 # Randomly select whether Rp < Rbrk or Rp > Rbrk.
-                temp = np.random.choice(len(tempF0), p=tempF0/np.sum(tempF0))
+                temp = self.rng.choice(len(tempF0), p=tempF0/np.sum(tempF0))
                 if (temp == 0):
-                    tempMp = self.iCDF_M(np.random.rand()) # Mearth
-                    tempPorb = self.iCDF_P1(np.random.rand()) # d
+                    tempMp = self.iCDF_M(self.rng.rand()) # Mearth
+                    tempPorb = self.iCDF_P1(self.rng.rand()) # d
                 elif (temp == 1):
-                    tempMp = self.iCDF_M(np.random.rand()) # Mearth
-                    tempPorb = self.iCDF_P2(np.random.rand()) # d
+                    tempMp = self.iCDF_M(self.rng.rand()) # Mearth
+                    tempPorb = self.iCDF_P2(self.rng.rand()) # d
                 if (Mp_range[0] <= tempMp <= Mp_range[1] and Porb_range[0] <= tempPorb <= Porb_range[1]):
                     Mp += [tempMp] # Mearth
                     Porb += [tempPorb] # d

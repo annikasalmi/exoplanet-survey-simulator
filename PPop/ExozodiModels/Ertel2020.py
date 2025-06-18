@@ -28,17 +28,15 @@ class ExozodiModel():
     """
     
     def __init__(self,
-                 Scenario,seed):
+                 Scenario,rng):
         """
         Parameters
         ----------
         Scenario: 'baseline', 'pessimistic', 'optimistic'
             Scenario for exozodi level.
         """
-        self.seed = seed
+        self.rng = rng
         
-        # Set random seed for reproducibility
-        np.random.seed(seed)
         # Model parameters.
         if (Scenario == 'baseline'):
             self.ExozodiData = np.load(os.path.join(PPOP_DIR,'ExozodiModels/ExozodiNominal.npy'))

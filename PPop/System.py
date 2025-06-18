@@ -32,7 +32,7 @@ class System():
                  Nstar=0,
                  Nuniverse=0,
                  Scale=1.,
-                 seed=663):
+                 rng=None):
         """
         Parameters
         ----------
@@ -71,9 +71,7 @@ class System():
         self.Nstar = Nstar
         self.Nuniverse = Nuniverse
         self.Scale = Scale
-        self.seed = seed
-        # Set random seed.
-        np.random.seed(self.seed)
+        self.rng = rng
         
         if (StabilityModel is None):
             
@@ -82,7 +80,7 @@ class System():
                 # Draw planet radius and planet orbital period.
                 self.Rp, self.Porb = PlanetDistribution.draw(Scale=self.Scale,
                                                              Star=self.Star,
-                                                             seed=self.seed) # Rearth, d
+                                                             rng=self.rng) # Rearth, d
                 
                 # Sort planets by orbital period.
                 ww = np.argsort(self.Porb)
@@ -98,7 +96,7 @@ class System():
                 # Draw planet mass and planet orbital period.
                 self.Mp, self.Porb = PlanetDistribution.draw(Scale=self.Scale,
                                                              Star=self.Star,
-                                                             seed=self.seed) # Mearth, d
+                                                             rng=self.rng) # Mearth, d
                 
                 # Sort planets by orbital period.
                 ww = np.argsort(self.Porb)

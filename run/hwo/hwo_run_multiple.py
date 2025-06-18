@@ -2,6 +2,7 @@ import time
 import os
 import pandas as pd
 import multiprocessing as mp
+import numpy as np
 from functools import partial
 
 from PPop.StarCatalogs import CrossfieldBrightSample, ExoCat_1, LTC_2, LTC_3, gaia
@@ -14,7 +15,8 @@ def run_single(i, star_catalog='Gaia'):
     '''
     Runs a single instance of the PPop simulation and HWO data analysis.
     '''
-    PPopObj = PPop(seed=i)
+    rng = np.random.default_rng()
+    PPopObj = PPop(rng=rng)
 
     if star_catalog == 'CrossfieldBrightSample':
         PPopObj.StarCatalog = CrossfieldBrightSample
@@ -30,7 +32,7 @@ def run_single(i, star_catalog='Gaia'):
     filename = f'test_runs_hwo_{i}'
     data_path = os.path.join(HWO_DATA_DIR, filename)
 
-    df = PPopObj.run_ppop(seed=i, data_path=data_path)
+    df = PPopObj.run_ppop(data_path=data_path)
     PPopObj.catalog_from_ppop(data_path, df=df)
     PPopObj.catalog_remove_distance(stype='A', mode='larger', dist=0.0)
     PPopObj.catalog_remove_distance(stype='M', mode='larger', dist=10.0)

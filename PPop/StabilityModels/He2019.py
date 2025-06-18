@@ -26,10 +26,9 @@ class StabilityModel():
     https://ui.adsabs.harvard.edu/abs/2019MNRAS.490.4575H/abstract
     """
     
-    def __init__(self, seed):
-        self.seed = seed
-        # Set random seed
-        np.random.seed(seed)
+    def __init__(self, rng):
+        self.rng = rng
+
         # Max number of re-draws if system is unstable and number of times no
         # stable system could be found after self.MaxTrials trials.
         self.MaxTrials = 1000.

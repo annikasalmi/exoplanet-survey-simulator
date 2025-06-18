@@ -24,17 +24,15 @@ class PlanetDistribution():
     """
     
     def __init__(self,
-                 Scenario, seed):
+                 Scenario, rng):
         """
         Parameters
         ----------
         Scenario: 'baseline', 'pessimistic', 'optimistic'
             Scenario for planet occurrence rates.
         """
-        self.seed = seed
+        self.rng = rng
         
-        # Set random seed.
-        np.random.seed(self.seed)
         # Print.
         print('--> Initializing SAG13 planet distribution')
         

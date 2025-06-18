@@ -67,7 +67,7 @@ def run_with_progress(func, sim_name, estimated_minutes=12, *args, **kwargs):
 
 # Run the whole thing
 if __name__ == "__main__":
-    NRUNS = 2
+    NRUNS = 10
     PARALLEL = True  # Set to True if you want to run in parallel
     STAR_CATALOG = 'Gaia'  # or 'ExoCat_1'
     SIM = 'hwo'
@@ -78,3 +78,9 @@ if __name__ == "__main__":
     else:
         raise ValueError("Invalid simulation type. Choose 'lifesim' or 'hwo'.")
     run_with_progress(func=main, sim_name = SIM, parallel=PARALLEL, nruns=NRUNS, star_catalog=STAR_CATALOG)
+    run_with_progress(func=main, sim_name = 'lifesim', parallel=PARALLEL, nruns=NRUNS, star_catalog=STAR_CATALOG)
+    print('now running 50 case....')
+    NRUNS = 50
+    run_with_progress(func=main, sim_name = SIM, parallel=PARALLEL, nruns=NRUNS, star_catalog=STAR_CATALOG)
+    run_with_progress(func=main, sim_name = 'lifesim', parallel=PARALLEL, nruns=NRUNS, star_catalog=STAR_CATALOG)
+    print('done')

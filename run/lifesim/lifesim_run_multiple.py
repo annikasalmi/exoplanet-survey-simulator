@@ -84,8 +84,8 @@ def main(parallel=True, nruns=1, star_catalog='Gaia'):
     # Step 2: Combine all runs into one DataFrame
     df_concat = pd.concat(results, ignore_index=True)
 
-    plot_by_star(df_concat, nruns=nruns, star_catalog=star_catalog)
-    plot_by_planet(df_concat, nruns=nruns, star_catalog=star_catalog)
+    plot_by_star(df_concat, nruns=nruns, star_catalog=star_catalog, name='lifesim')
+    plot_by_planet(df_concat, nruns=nruns, star_catalog=star_catalog, name='lifesim')
 
     print(f"Total time: {time.time() - start:.2f} seconds")
 

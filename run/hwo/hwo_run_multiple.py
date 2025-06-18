@@ -56,8 +56,8 @@ def main(parallel=False, nruns=1, star_catalog='Gaia'):
 
     df_concat = pd.concat(results, keys=range(nruns)).reset_index(level=0).rename(columns={'level_0': 'run'})
 
-    plot_by_star(df_concat, nruns=nruns, star_catalog=star_catalog)
-    plot_by_planet(df_concat, nruns=nruns, star_catalog=star_catalog)
+    plot_by_star(df_concat, nruns=nruns, star_catalog=star_catalog, name='hwo')
+    plot_by_planet(df_concat, nruns=nruns, star_catalog=star_catalog, name='hwo')
     print(f"Total time: {time.time() - start:.2f} seconds")
 
 

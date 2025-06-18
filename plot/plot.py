@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 from tools.paths import HWO_DATA_DIR
 
-def plot_by_star(df, nruns=1, star_catalog='Gaia'):
+def plot_by_star(df, nruns=1, star_catalog='Gaia', name='hwo'):
 
     # Bin by radius
     bins = [0, 1.5, 3.0, 6.0]
@@ -65,13 +65,13 @@ def plot_by_star(df, nruns=1, star_catalog='Gaia'):
     ax.set_xticks(x + 1.5 * bar_width)
     ax.set_xticklabels(star_order)
     ax.set_ylabel('Detectable Planets')
-    ax.set_title(f'Detectable Planets by Star Type for {nruns} Runs\nStar Catalog: {star_catalog}')
+    ax.set_title(f'Detectable Planets by Star Type for {name} for {nruns} Runs\nStar Catalog: {star_catalog}')
     ax.legend(title='Planet Radius')
     plt.tight_layout()
 
-    plt.savefig(os.path.join(HWO_DATA_DIR, f"planets_stellar_type_hwo_nruns{nruns}_{star_catalog}.png"), 
+    plt.savefig(os.path.join(HWO_DATA_DIR, f"planets_stellar_type_{name}_nruns{nruns}_{star_catalog}.png"), 
                              dpi=300, bbox_inches='tight')
-    plt.show()
+    # plt.show()
 
 def temp_zone(temp):
     if temp > 600:
@@ -98,7 +98,8 @@ def assign_category(row):
         return 'Sub-Jovians'
     else:
         return None
-def plot_by_planet_type(df, nruns=1, star_catalog='Gaia'):
+    
+def plot_by_planet(df, nruns=1, star_catalog='Gaia', name='hwo'):
     df['temp_zone'] = df['temp_p'].apply(temp_zone)
     df['category'] = df.apply(assign_category, axis=1)
     df = df.dropna(subset=['category'])
@@ -135,7 +136,7 @@ def plot_by_planet_type(df, nruns=1, star_catalog='Gaia'):
     ax.set_xticks(x)
     ax.set_xticklabels(categories, rotation=15, ha='right')
     ax.legend(title='Temp Zone')
-    ax.set_title(f'Detectable Planets by Planet Type for {nruns} Runs\nStar Catalog: {star_catalog}')
+    ax.set_title(f'Detectable Planets by Planet Type for {name} for {nruns} Runs\nStar Catalog: {star_catalog}')
 
     # Optional: annotation box
     textstr = 'D = 2.0 m\nScenario 1'
@@ -145,6 +146,6 @@ def plot_by_planet_type(df, nruns=1, star_catalog='Gaia'):
 
     plt.tight_layout()
 
-    plt.savefig(os.path.join(HWO_DATA_DIR, f"planets_planet_type_hwo_nruns{nruns}_{star_catalog}.png"), 
+    plt.savefig(os.path.join(HWO_DATA_DIR, f"planets_planet_type_{name}_nruns{nruns}_{star_catalog}.png"), 
                              dpi=300, bbox_inches='tight')
-    plt.show()
+    # plt.show()

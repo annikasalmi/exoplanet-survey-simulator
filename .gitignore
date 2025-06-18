@@ -26,7 +26,9 @@ TestPlanetPopulation.txt
 /PPop/data/*
 /run/logging/*/*.txt
 /run/lifesim/data/*
+/run/lifesim/plots/*
 /run/hwo/data/*
+/run/hwo/plots/*
 /run/hwo/__pycache__/*.pyc
 /run/lifesim/__pycache__/*.pyc
 /plot/__pycache__/*.pyc

@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-from tools.paths import HWO_DATA_DIR, LIFESIM_DATA_DIR
+from tools.paths import HWO_PLOTS_DIR, LIFESIM_DATA_DIR
 
 def plot_by_star(df, nruns=1, star_catalog='Gaia', name='hwo'):
     '''
@@ -61,7 +61,7 @@ def plot_by_star(df, nruns=1, star_catalog='Gaia', name='hwo'):
     plt.tight_layout()
     if name == 'hwo':
         name = 'HWO'
-        data_dir = HWO_DATA_DIR
+        data_dir = HWO_PLOTS_DIR
     if name == 'lifesim':
         name = 'LIFEsim'
         data_dir = LIFESIM_DATA_DIR
@@ -150,7 +150,7 @@ def plot_by_planet(df, nruns=1, star_catalog='Gaia', name='hwo'):
     plt.tight_layout()
     if name == 'hwo':
         name = 'HWO'
-        data_dir = HWO_DATA_DIR
+        data_dir = HWO_PLOTS_DIR
     if name == 'lifesim':
         name = 'LIFEsim'
         data_dir = LIFESIM_DATA_DIR
@@ -195,7 +195,7 @@ def plot_distances(df, nruns=1, star_catalog='Gaia', name='hwo'):
     plt.tight_layout()
     if name == 'hwo':
         name = 'HWO'
-        data_dir = HWO_DATA_DIR
+        data_dir = HWO_PLOTS_DIR
     if name == 'lifesim':
         name = 'LIFEsim'
         data_dir = LIFESIM_DATA_DIR
@@ -246,10 +246,12 @@ def plot_efficiency(df, nruns=1, star_catalog='Gaia', name='hwo'):
     plt.tight_layout()
     if name == 'hwo':
         name = 'HWO'
-        data_dir = HWO_DATA_DIR
+        data_dir = HWO_PLOTS_DIR
     if name == 'lifesim':
         name = 'LIFEsim'
         data_dir = LIFESIM_DATA_DIR
 
     plt.savefig(os.path.join(data_dir, f"detection_efficiency_{name}_nruns{nruns}_{star_catalog}.png"), 
                              dpi=300, bbox_inches='tight')
+    
+def plot_

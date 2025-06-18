@@ -14,20 +14,20 @@ array:
 connections:
 - - inst
   - transm
-- - inst
-  - exo
-- - inst
-  - local
-- - inst
-  - star
-- - transm
-  - star
+- - exo
+  - inst
+- - local
+  - inst
+- - star
+  - inst
+- - star
+  - transm
 - - opt
   - transm
-- - inst
-  - opt
-- - ahgs
-  - opt
+- - opt
+  - inst
+- - opt
+  - ahgs
 models:
   habitable: MS
   localzodi: darwinsim
@@ -57,6 +57,6 @@ other:
   output_path: /Users/annikasalmi/lifesim_github/mdwarf-habitability/run/lifesim/data
   wl_optimal: 15
 version:
-  git_branch: annika/22-lifesim-rerun
-  git_sha: 809c6965faca376c8c4bb676d648977a592a6b3c
+  git_branch: hotfix/fixing-randomness
+  git_sha: 90789bc5cbed893ff9c078d19e858c8f223ec2f4
   version: 0.2.32

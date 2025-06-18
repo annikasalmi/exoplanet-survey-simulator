@@ -13,9 +13,9 @@ from PPop.StarCatalogs import CrossfieldBrightSample, ExoCat_1, LTC_2, LTC_3, ga
 RUN_PPOP = False
 
 def run_lifesim_single(i, star_catalog='Gaia'):
-    rng = np.random.default_rng()
+    rng = np.random.default_rng(i)
     # ----- Generate new planet population -----
-    PPopObj = PPop(rng=i)
+    PPopObj = PPop(rng=rng)
 
     if star_catalog == 'ExoCat_1':
         PPopObj.StarCatalog = ExoCat_1
@@ -41,7 +41,7 @@ def run_lifesim_single(i, star_catalog='Gaia'):
     bus.data.catalog_from_ppop(data_path, df=df)
 
     # ----- Instrument and Modules -----
-    instrument = lifesim.Instrument(name='inst', rng=i)
+    instrument = lifesim.Instrument(name='inst', rng=rng)
     bus.add_module(instrument)
     bus.add_module(lifesim.TransmissionMap(name='transm'))
     bus.add_module(lifesim.PhotonNoiseExozodi(name='exo'))
@@ -68,22 +68,48 @@ def run_lifesim_single(i, star_catalog='Gaia'):
 
     return bus.data.catalog
 
-def main(parallel=True, nruns=1, star_catalog='Gaia'):
+
+def run_lifesim_import_catalog(i, star_catalog='Gaia'):
+    rng = np.random.default_rng(i)
+
+    # ----- Run LIFEsim with this catalog -----
+    bus = lifesim.Bus()
+    bus.data.options.set_scenario('baseline')
+    bus.data.options.set_manual(diameter=4.0)
+    bus.data.options.set_manual(output_path=LIFESIM_DATA_DIR)
+    bus.data.options.set_manual(output_filename=f'/test_runs_{i}')
+
+    bus.data.import_catalog(input_path=os.path.join(LIFESIM_DATA_DIR, f'test_runs_{i}_catalog.hdf5'))
+
+    return bus.data.catalog
+
+def main(parallel=True, nruns=1, star_catalog='Gaia', run_anew=True):
     start=time.time()
 
-    runner = partial(run_lifesim_single, star_catalog=star_catalog)
-    if parallel:
-        with mp.Pool(processes=mp.cpu_count()) as pool:
-            results = pool.map(runner, range(nruns))
+    if run_anew:
+        runner = partial(run_lifesim_single, star_catalog=star_catalog)
+        if parallel:
+            with mp.Pool(processes=mp.cpu_count()) as pool:
+                results = pool.map(runner, range(nruns))
+        else:
+            results = [run_lifesim_single(i=i, star_catalog=star_catalog) for i in range(nruns)]
     else:
-        results = [run_lifesim_single(i=i, star_catalog=star_catalog) for i in range(nruns)]
+        runner = partial(run_lifesim_import_catalog, star_catalog=star_catalog)
+        if parallel:
+            with mp.Pool(processes=mp.cpu_count()) as pool:
+                results = pool.map(runner, range(nruns))
+        else:
+            results = [run_lifesim_import_catalog(i=i, star_catalog=star_catalog) for i in range(nruns)]
+            
     print(f"Finished {nruns} runs in {time.time() - start:.2f} seconds")
     print('Starting plotting...')
 
     # Step 2: Combine all runs into one DataFrame
-    df_concat = pd.concat(results, ignore_index=True)
+    df_concat = pd.concat(results, keys=range(nruns)).reset_index(level=0).rename(columns={'level_0': 'run'})
 
     print(f"Total time: {time.time() - start:.2f} seconds")
+
+    return df_concat
 
 if __name__ == '__main__':
     

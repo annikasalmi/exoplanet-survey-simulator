@@ -73,7 +73,7 @@ def run_with_progress(func, name, estimated_minutes=12, *args, **kwargs):
 
     return result
 
-def run_sim(func, name, parallel, nruns, star_catalog):
+def run_sim(func, name, parallel, nruns, star_catalog, run_anew=True):
     '''
     Runs the simulation with the provided function, name, parallel execution flag,
     number of runs, and star catalog.'''
@@ -83,7 +83,8 @@ def run_sim(func, name, parallel, nruns, star_catalog):
         estimated_minutes=12,
         parallel=parallel,
         nruns=nruns,
-        star_catalog=star_catalog
+        star_catalog=star_catalog,
+        run_anew=run_anew
     )
 
         # Bin by radius
@@ -110,11 +111,11 @@ if __name__ == "__main__":
     STAR_CATALOG = 'Gaia'  # or 'ExoCat_1'
     
     # running 10 case
-    run_sim(func=main_hwo, name = 'hwo', parallel=PARALLEL, nruns=NRUNS, star_catalog=STAR_CATALOG)
-    run_sim(func=main_lifesim, name = 'lifesim', parallel=PARALLEL, nruns=NRUNS, star_catalog=STAR_CATALOG)
+    # run_sim(func=main_hwo, name = 'hwo', parallel=PARALLEL, nruns=NRUNS, star_catalog=STAR_CATALOG)
+    run_sim(func=main_lifesim, name = 'lifesim', parallel=True, nruns=1, star_catalog=STAR_CATALOG, run_anew=False)
     
     print('now running 50 case....')
-    NRUNS = 50
-    run_sim(func=main_hwo, name = 'hwo', parallel=PARALLEL, nruns=NRUNS, star_catalog=STAR_CATALOG)
-    run_sim(func=main_lifesim, name = 'lifesim', parallel=PARALLEL, nruns=NRUNS, star_catalog=STAR_CATALOG)
+    NRUNS = 49
+    # run_sim(func=main_hwo, name = 'hwo', parallel=PARALLEL, nruns=NRUNS, star_catalog=STAR_CATALOG)
+    run_sim(func=main_lifesim, name='lifesim',parallel=PARALLEL, nruns=NRUNS, star_catalog=STAR_CATALOG, run_anew=False)
     print('done')

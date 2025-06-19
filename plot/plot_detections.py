@@ -163,12 +163,12 @@ def plot_detection_mr(df, nruns=1, star_catalog='Gaia', name='hwo'):
     plt.savefig(os.path.join(data_dir, outfile), dpi=300, bbox_inches='tight')
 
 def plot_detection_vs_distance_color(df, nruns=1, star_catalog='Gaia', name='hwo'):
-    xvars = ['flux_p', 'maxangsep', 'flux_ratio', 'photon_rate', 'planet_flux', 'temp_p']
     if name == 'LIFEsim':
         xtitles = {
             'flux_p': 'Planet Flux ($W/m^2$)',
             'maxangsep': 'Maximum Angular Separation (arcsec)',
-        }
+        }  
+        xvars = ['flux_p', 'maxangsep']
     else:
         xtitles = {
             'flux_p': 'Planet Flux ($W/m^2$)',
@@ -176,6 +176,7 @@ def plot_detection_vs_distance_color(df, nruns=1, star_catalog='Gaia', name='hwo
             'flux_ratio': 'Planet/Star Flux Ratio',
             'photon_rate': 'Photon Rate (photons/s/m²)',
         }
+        xvars = ['flux_p', 'maxangsep', 'flux_ratio', 'photon_rate']
 
     data_dir = make_output_dir(name, nruns, star_catalog)
 

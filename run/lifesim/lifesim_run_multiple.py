@@ -5,6 +5,7 @@ from run.ppop.ppop_generator import PPop
 import multiprocessing as mp
 import time
 import pandas as pd
+import numpy as np
 from functools import partial
 
 from tools.paths import PPOP_DATA_DIR, LIFESIM_DATA_DIR
@@ -84,29 +85,29 @@ def run_lifesim_import_catalog(i, star_catalog='Gaia'):
 
     return bus.data.catalog
 
-def main(parallel=True, nruns=1, star_catalog='Gaia', run_anew=True):
+def main(parallel=True, nruns=np.arange(1), star_catalog='Gaia', run_anew=True):
     start=time.time()
 
     if run_anew:
         runner = partial(run_lifesim_single, star_catalog=star_catalog)
         if parallel:
             with mp.Pool(processes=mp.cpu_count()) as pool:
-                results = pool.map(runner, range(nruns))
+                results = pool.map(runner, nruns)
         else:
-            results = [run_lifesim_single(i=i, star_catalog=star_catalog) for i in range(nruns)]
+            results = [run_lifesim_single(i=i, star_catalog=star_catalog) for i in nruns]
     else:
         runner = partial(run_lifesim_import_catalog, star_catalog=star_catalog)
         if parallel:
             with mp.Pool(processes=mp.cpu_count()) as pool:
-                results = pool.map(runner, range(nruns))
+                results = pool.map(runner, nruns)
         else:
-            results = [run_lifesim_import_catalog(i=i, star_catalog=star_catalog) for i in range(nruns)]
+            results = [run_lifesim_import_catalog(i=i, star_catalog=star_catalog) for i in nruns]
             
-    print(f"Finished {nruns} runs in {time.time() - start:.2f} seconds")
+    print(f"Finished {len(nruns)} runs in {time.time() - start:.2f} seconds")
     print('Starting plotting...')
 
     # Step 2: Combine all runs into one DataFrame
-    df_concat = pd.concat(results, keys=range(nruns)).reset_index(level=0).rename(columns={'level_0': 'run'})
+    df_concat = pd.concat(results, keys=nruns).reset_index(level=0).rename(columns={'level_0': 'run'})
 
     print(f"Total time: {time.time() - start:.2f} seconds")
 

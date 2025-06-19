@@ -3,6 +3,7 @@ import threading
 import os
 from tqdm import tqdm
 import logging
+import numpy as np
 import pandas as pd
 from datetime import datetime
 
@@ -97,7 +98,7 @@ def run_sim(func, name, parallel, nruns, star_catalog, run_anew=True):
     # Combine all rows
     df_concat = pd.concat([df_concat, rocky_hz], ignore_index=True)
 
-    plot_all(df=df_concat, sim_name=name, nruns=nruns, star_catalog=star_catalog)
+    plot_all(df=df_concat, sim_name=name, nruns=len(nruns), star_catalog=star_catalog)
 
 # Run the whole thing
 if __name__ == "__main__":
@@ -109,7 +110,7 @@ if __name__ == "__main__":
     # run_sim(func=main_hwo, name = 'hwo', parallel=PARALLEL, nruns=NRUNS, star_catalog=STAR_CATALOG)
     # run_sim(func=main_lifesim, name = 'lifesim', parallel=True, nruns=1, star_catalog=STAR_CATALOG, run_anew=False)
     
-    NRUNS = 500
+    NRUNS = np.arange(500)
     try:
         run_sim(func=main_hwo, name = 'hwo', parallel=PARALLEL, nruns=NRUNS, star_catalog=STAR_CATALOG, run_anew=True)
     except Exception as e:

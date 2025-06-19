@@ -194,7 +194,7 @@ def plot_distances(df, nruns=1, star_catalog='Gaia', name='hwo'):
     plt.savefig(os.path.join(data_dir, f"planet_distance_{name}_nruns{nruns}_{star_catalog}.png"), 
                              dpi=300, bbox_inches='tight')
     
-def plot_efficiency(df, nruns=1, star_catalog='Gaia', name='hwo'):
+def plot_efficiency_rocky(df, nruns=1, star_catalog='Gaia', name='hwo'):
 
     # Filter only rocky eHZ planets
     rocky_ehz = df[df['radius_bin'] == 'Rocky HZ']
@@ -283,6 +283,81 @@ def plot_individual_failures(df, nruns=1, star_catalog='Gaia',name='hwo'):
     plt.savefig(os.path.join(data_dir, f"failure_detected_{name}_nruns{nruns}_{star_catalog}.png"), 
                              dpi=300, bbox_inches='tight')
 
+
+def plot_detection_efficiency(df, nruns=1, star_catalog='Gaia', name='hwo', 
+                              category_column=None, category_label=None):
+    """
+    Plot detection efficiency for planetary candidates based on temperature.
+    
+    Parameters:
+    - df: DataFrame containing at least 'temp_p' and 'detected' or 'detectable' columns
+    - nruns: Number of runs used in the simulation
+    - star_catalog: Name of the star catalog used
+    - name: Name for output files
+    - category_column: Optional column to filter by category (e.g., 'radius_bin')
+    - category_label: Label within category_column to filter (e.g., 'Rocky HZ')
+    """
+
+    # Optional filtering by category
+    if category_column and category_label:
+        df = df[df[category_column] == category_label]
+
+    # Bin setup
+    bins = np.linspace(125, 305, 40)  # ~4.6 K per bin
+    bin_centers = 0.5 * (bins[:-1] + bins[1:])
+
+    # Total count per bin
+    total_counts, _ = np.histogram(df['temp_p'], bins=bins)
+
+    # Handle detection mask flexibly
+    try:
+        mask = df['detected']
+    except KeyError:
+        mask = df['detectable']
+
+    detected_counts, _ = np.histogram(df[mask]['temp_p'], bins=bins)
+
+    # Compute efficiency safely
+    with np.errstate(divide='ignore', invalid='ignore'):
+        efficiency = np.true_divide(detected_counts, total_counts)
+        efficiency[np.isnan(efficiency)] = 0.0
+
+    # === Plotting ===
+    fig, ax1 = plt.subplots(figsize=(10, 6))
+
+    # Histogram bars
+    ax1.bar(bin_centers, total_counts, width=np.diff(bins), align='center', 
+            color='lightgrey', label='All planets present')
+    ax1.bar(bin_centers, detected_counts, width=np.diff(bins), align='center', 
+            color='green', label='Planets detectable')
+
+    ax1.set_ylabel("Number of planets")
+    ax1.set_xlabel("Temperature [K]")
+    ax1.set_xlim(bins[0], bins[-1])
+
+    # Efficiency curve on secondary axis
+    ax2 = ax1.twinx()
+    ax2.plot(bin_centers, efficiency, 'r--', linewidth=2, label='Detection efficiency')
+    ax2.set_ylabel("Detection efficiency")
+    ax2.set_ylim(0, 1.0)
+
+    # Combine legends
+    h1, l1 = ax1.get_legend_handles_labels()
+    h2, l2 = ax2.get_legend_handles_labels()
+    ax1.legend(h1 + h2, l1 + l2, loc='upper left')
+
+    # Title
+    category_str = f" ({category_label})" if category_label else ""
+    ax1.set_title(f'Detection Efficiency{category_str} for {name} ({nruns} runs)\nStar Catalog: {star_catalog}')
+
+    plt.tight_layout()
+
+    # Output
+    data_dir = make_output_dir(name, nruns, star_catalog)
+    outfile = f"detection_efficiency_{name}_nruns{nruns}_{star_catalog}.png"
+    plt.savefig(os.path.join(data_dir, outfile), dpi=300, bbox_inches='tight')
+
+
 def plot_all(df, nruns=1, star_catalog='Gaia', sim_name='hwo'):
 
     if sim_name == 'hwo':
@@ -293,6 +368,7 @@ def plot_all(df, nruns=1, star_catalog='Gaia', sim_name='hwo'):
     plot_by_star(df=df, name=name, nruns=nruns, star_catalog=star_catalog)
     plot_by_planet(df=df, name=name, nruns=nruns, star_catalog=star_catalog)
     plot_distances(df=df, name=name, nruns=nruns, star_catalog=star_catalog)
-    plot_efficiency(df=df, name=name, nruns=nruns, star_catalog=star_catalog)
-    if name == 'hwo':
+    plot_efficiency_rocky(df=df, name=name, nruns=nruns, star_catalog=star_catalog)
+    plot_detection_efficiency(df=df, nruns=nruns, star_catalog=star_catalog, name=name)
+    if name == 'HWO':
         plot_individual_failures(df)

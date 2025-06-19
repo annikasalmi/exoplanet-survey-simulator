@@ -49,32 +49,32 @@ def run_hwo_import_catalog(i, star_catalog):
     df = pd.read_csv(os.path.join(HWO_DATA_DIR, star_catalog, f'hwo_catalog_{i}.csv'))
     return df
 
-def main(parallel=False, nruns=1, star_catalog='Gaia', run_anew=True):
+def main(parallel=False, nruns=np.arange(1), star_catalog='Gaia', run_anew=True):
     start = time.time()
 
     if run_anew:
         runner = partial(run_single, star_catalog=star_catalog)
         if parallel:
             with mp.Pool(processes=mp.cpu_count()) as pool:
-                results = pool.map(runner, range(nruns))
+                results = pool.map(runner, nruns)
         else:
-            results = [run_single(i=i, star_catalog=star_catalog) for i in range(nruns)]
+            results = [run_single(i=i, star_catalog=star_catalog) for i in nruns]
     else:
         runner = run_hwo_import_catalog
         if parallel:
             with mp.Pool(processes=mp.cpu_count()) as pool:
-                results = pool.map(runner, range(nruns))
+                results = pool.map(runner, nruns)
         else:
-            results = [run_hwo_import_catalog(i=i, star_catalog=star_catalog) for i in range(nruns)]
+            results = [run_hwo_import_catalog(i=i, star_catalog=star_catalog) for i in nruns]
 
-    df_concat = pd.concat(results, keys=range(nruns)).reset_index(level=0).rename(columns={'level_0': 'run'})
+    df_concat = pd.concat(results, keys=nruns).reset_index(level=0).rename(columns={'level_0': 'run'})
     print(f"Total time: {time.time() - start:.2f} seconds")
 
     return df_concat
 
 
 if __name__ == '__main__':
-    NRUNS = 3
+    NRUNS = np.arange(3)
     STAR_CATALOG = 'Gaia'#ExoCat_1'  # or 'LTC_3'
     mp.set_start_method('spawn')
     main(nruns=NRUNS, star_catalog=STAR_CATALOG, parallel=True)

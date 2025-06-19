@@ -1,4 +1,5 @@
 import numpy as np
+import tools.constants as const
 
 
 def single_habitable_zone(model: str,
@@ -77,3 +78,7 @@ def single_habitable_zone(model: str,
     hz_center = (hz_in + hz_out) / 2  # HZ center  in AU
 
     return s_in, s_out, l_sun, hz_in, hz_out, hz_center
+
+if __name__ == "__main__":
+    s_in, s_out, l_sun, hz_in, hz_out, hz_center= single_habitable_zone(model='MS',radius_s=1, temp_s=const.temp_sun)
+

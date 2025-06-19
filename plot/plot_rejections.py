@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from plot.helpers import make_output_dir, get_rejection_reason
-from tools.constants import iwa, min_planet_flux_star_ratio, min_flux
+from tools.constants import iwa, min_planet_flux_star_ratio, min_photons
 
 
 def plot_failures_piechart(df, nruns=1, star_catalog='Gaia',name='hwo'):
@@ -26,42 +26,41 @@ def plot_failures_piechart(df, nruns=1, star_catalog='Gaia',name='hwo'):
     plt.savefig(os.path.join(data_dir, f"failure_detected_{name}_nruns{nruns}_{star_catalog}.png"), 
                              dpi=300, bbox_inches='tight')
     
-
-def plot_failures_histogram(df, nruns=1, star_catalog='Gaia', name='hwo'):
+def plot_failures_histogram_multipanel(df, nruns=1, star_catalog='Gaia', name='hwo'):
     df['rejection_reason'] = df.apply(get_rejection_reason, axis=1)
 
-    # === Histograms for Each Failure Reason ===
+    # Define failure categories and thresholds
     cutoffs = {
-        'Min Photons': ('photon_rate', min_flux),
+        'Min Photons': ('photon_rate', min_photons),
         'Flux Ratio': ('flux_ratio', min_planet_flux_star_ratio),
         'IWA': ('angsep', iwa),
     }
 
-    for reason, (column, threshold) in cutoffs.items():
+    fig, axs = plt.subplots(1, 3, figsize=(18, 5), sharey=True)
+
+    for ax, (reason, (column, threshold)) in zip(axs, cutoffs.items()):
         reason_df = df[df['rejection_reason'] == reason]
 
-        plt.figure(figsize=(8, 5))
-        plt.hist(df[column], bins=40, color='lightgray', edgecolor='black', log=True)
+        ax.hist(df[column], bins=40, color='lightgray', edgecolor='black', log=True)
 
         if isinstance(threshold, tuple):
-            # Draw two lines for a range
-            plt.axvline(threshold[0], color='red', linestyle='--', label='Min cutoff = {:.2e}'.format(threshold[0]))
-            plt.axvline(threshold[1], color='red', linestyle='--', label='Max cutoff = {:.2e}'.format(threshold[1]))
+            ax.axvline(threshold[0], color='red', linestyle='--', label=f'Min cutoff = {threshold[0]:.2e}')
+            ax.axvline(threshold[1], color='red', linestyle='--', label=f'Max cutoff = {threshold[1]:.2e}')
         else:
-            # Single cutoff
-            plt.axvline(threshold, color='red', linestyle='--', label='Cutoff = {:.2e}'.format(threshold))
+            ax.axvline(threshold, color='red', linestyle='--', label=f'Cutoff = {threshold:.2e}')
 
-        plt.title(f"Reason planet not detected: {reason} too low — {len(reason_df)} cases")
-        plt.xlabel(column.replace('_', ' ').capitalize())
-        plt.ylabel("Number of planets")
-        plt.legend()
-        plt.tight_layout()
+        ax.set_title(f"{reason} — {len(reason_df)} failures")
+        ax.set_xlabel(column.replace('_', ' ').capitalize())
+        ax.set_ylabel("Number of planets")
+        ax.legend()
 
-        data_dir = make_output_dir(name, nruns, star_catalog)
+    plt.suptitle("Reasons for Planet Non-Detection", fontsize=14)
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
 
-        filename = f"failure_{reason.replace(' ', '_')}_{name}_nruns{nruns}_{star_catalog}.png"
-        plt.savefig(os.path.join(data_dir, filename), dpi=300, bbox_inches='tight')
-        plt.close()
+    data_dir = make_output_dir(name, nruns, star_catalog)
+    filename = f"failure_multipanel_{name}_nruns{nruns}_{star_catalog}.png"
+    plt.savefig(os.path.join(data_dir, filename), dpi=300, bbox_inches='tight')
+    plt.close()
 
     
 def plot_rejections(df, nruns=1, star_catalog='Gaia', name='hwo'):

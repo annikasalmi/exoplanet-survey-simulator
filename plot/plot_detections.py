@@ -4,61 +4,76 @@ import matplotlib.pyplot as plt
 
 from plot.helpers import make_output_dir
 
-def plot_efficiency_rocky(df, nruns=1, star_catalog='Gaia', name='hwo'):
+def plot_efficiency_multipanel(df, nruns=1, star_catalog='Gaia', name='hwo'):
+    fig, axs = plt.subplots(1, 3, figsize=(18, 6), sharey=False)
 
-    # Filter only rocky eHZ planets
-    rocky_ehz = df[df['radius_bin'] == 'Rocky HZ']
+    filters = {
+        'Rocky HZ': df[
+            (df['habitable'] == True) &
+            (df['radius_p'] < 1.5)
+        ],
 
-    # Bin edges
-    bins = np.linspace(125, 305, 40)  # ~4.6 K per bin
+        'HZ Earth-like around Sun-like': df[
+            (df['habitable'] == True) &
+            (df['radius_p'] >= 0.8) & (df['radius_p'] <= 1.5) &
+            (df['mass_s'] >= 0.8) & (df['mass_s'] <= 1.2)
+        ],
+
+        'HZ around M dwarfs': df[
+            (df['habitable'] == True) &
+            (df['stype'].str.contains('M'))
+        ]
+    }
+
+    bins = np.linspace(125, 305, 40)  # Temperature bins
     bin_centers = 0.5 * (bins[:-1] + bins[1:])
 
-    # Histogram of all and detected
-    total_counts, _ = np.histogram(rocky_ehz['temp_p'], bins=bins)
-    try:
-        mask = rocky_ehz['detected']
-    except KeyError:
-        mask = rocky_ehz['detectable']
+    for i, (label, subset) in enumerate(filters.items()):
+        ax1 = axs[i]
 
-    detected_counts, _ = np.histogram(
-        rocky_ehz[mask]['temp_p'],
-        bins=bins
-    )
+        # Total and detected counts
+        total_counts, _ = np.histogram(subset['temp_p'], bins=bins)
+        try:
+            mask = subset['detected']
+        except KeyError:
+            mask = subset['detectable']
 
-    # Avoid divide-by-zero
-    with np.errstate(divide='ignore', invalid='ignore'):
-        efficiency = np.true_divide(detected_counts, total_counts)
-        efficiency[np.isnan(efficiency)] = 0.0
+        detected_counts, _ = np.histogram(subset[mask]['temp_p'], bins=bins)
 
-    # === Plot ===
-    fig, ax1 = plt.subplots(figsize=(10, 6))
+        with np.errstate(divide='ignore', invalid='ignore'):
+            efficiency = np.true_divide(detected_counts, total_counts)
+            efficiency[np.isnan(efficiency)] = 0.0
 
-    # Bar plots
-    ax1.bar(bin_centers, total_counts, width=np.diff(bins), align='center', color='lightgrey', label='Rocky, eHZ planets present')
-    ax1.bar(bin_centers, detected_counts, width=np.diff(bins), align='center', color='green', label='Rocky, eHZ planets detectable')
+        # Plot bars
+        ax1.bar(bin_centers, total_counts, width=np.diff(bins), color='lightgrey', align='center', label='Total')
+        ax1.bar(bin_centers, detected_counts, width=np.diff(bins), color='green', align='center', label='Detected')
 
-    ax1.set_ylabel("Number of rocky, eHZ planets")
-    ax1.set_xlabel("Temperature [K]")
-    ax1.set_xlim(bins[0], bins[-1])
+        ax1.set_xlabel("Temperature [K]")
+        ax1.set_xlim(bins[0], bins[-1])
+        ax1.set_title(label)
 
-    # Secondary axis for detection efficiency
-    ax2 = ax1.twinx()
-    ax2.plot(bin_centers, efficiency, 'r--', linewidth=2, label='Detection efficiency')
-    ax2.set_ylabel("Detection efficiency")
-    ax2.set_ylim(0, 1.0)
+        # Secondary y-axis for efficiency
+        ax2 = ax1.twinx()
+        ax2.plot(bin_centers, efficiency, 'r--', linewidth=2, label='Efficiency')
+        ax2.set_ylim(0, 1.0)
 
-    # Legends
-    h1, l1 = ax1.get_legend_handles_labels()
-    h2, l2 = ax2.get_legend_handles_labels()
-    ax1.legend(h1 + h2, l1 + l2, loc='upper left')
+        # Combine legends
+        h1, l1 = ax1.get_legend_handles_labels()
+        h2, l2 = ax2.get_legend_handles_labels()
+        ax1.legend(h1 + h2, l1 + l2, loc='upper left')
 
-    ax1.set_title(f'Efficiency in Detecting Planets for {name} for {nruns} Runs\nStar Catalog: {star_catalog}')
+        if i == 0:
+            ax1.set_ylabel("Number of Planets")
+            ax2.set_ylabel("Detection Efficiency")
 
-    plt.tight_layout()
+    fig.suptitle(f"Detection Efficiency Across Planet Types for {name} ({nruns} Runs)\nStar Catalog: {star_catalog}", fontsize=14)
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+
     data_dir = make_output_dir(name, nruns, star_catalog)
+    outfile = f"detection_efficiency_multipanel_{name}_nruns{nruns}_{star_catalog}.png"
+    plt.savefig(os.path.join(data_dir, outfile), dpi=300, bbox_inches='tight')
+    plt.close()
 
-    plt.savefig(os.path.join(data_dir, f"detection_efficiency_rocky_{name}_nruns{nruns}_{star_catalog}.png"), 
-                             dpi=300, bbox_inches='tight')
     
 
 
@@ -162,21 +177,15 @@ def plot_detection_mr(df, nruns=1, star_catalog='Gaia', name='hwo'):
     outfile = f"detection_mr_log_{name}_nruns{nruns}_{star_catalog}.png"
     plt.savefig(os.path.join(data_dir, outfile), dpi=300, bbox_inches='tight')
 
-def plot_detection_vs_distance_color(df, nruns=1, star_catalog='Gaia', name='hwo'):
-    if name == 'LIFEsim':
-        xtitles = {
-            'flux_p': 'Planet Flux ($W/m^2$)',
-            'maxangsep': 'Maximum Angular Separation (arcsec)',
-        }  
-        xvars = ['flux_p', 'maxangsep']
-    else:
-        xtitles = {
-            'flux_p': 'Planet Flux ($W/m^2$)',
-            'maxangsep': 'Maximum Angular Separation (arcsec)',
-            'flux_ratio': 'Planet/Star Flux Ratio',
-            'photon_rate': 'Photon Rate (photons/s/m²)',
-        }
-        xvars = ['flux_p', 'maxangsep', 'flux_ratio', 'photon_rate']
+def plot_detection_vs_temp_color(df, nruns=1, star_catalog='Gaia', name='hwo'):
+    '''
+    Flexible enough to add more vars if necessary. For now realized only needed for temp_p.
+    '''
+    
+    xtitles = {
+        'temp_p': 'Planet Temperature ($K$)',
+    }  
+    xvars = ['temp_p']
 
     data_dir = make_output_dir(name, nruns, star_catalog)
 
@@ -209,6 +218,6 @@ def plot_detection_vs_distance_color(df, nruns=1, star_catalog='Gaia', name='hwo
 
 def plot_detections(df, nruns=1, star_catalog='Gaia', name='hwo'):
     plot_detection_efficiency(df, nruns=nruns, star_catalog=star_catalog, name=name)
-    plot_efficiency_rocky(df, nruns=nruns, star_catalog=star_catalog, name=name)
+    plot_efficiency_multipanel(df, nruns=nruns, star_catalog=star_catalog, name=name)
     plot_detection_mr(df, nruns=nruns, star_catalog=star_catalog, name=name)
-    plot_detection_vs_distance_color(df, nruns=nruns, star_catalog=star_catalog, name=name)
+    plot_detection_vs_temp_color(df, nruns=nruns, star_catalog=star_catalog, name=name)

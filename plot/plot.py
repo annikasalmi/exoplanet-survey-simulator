@@ -8,8 +8,7 @@ def plot_all(df, nruns=1, star_catalog='Gaia', sim_name='hwo'):
     if sim_name == 'hwo':
         name = 'HWO'
     elif sim_name == 'lifesim':
-        name = 'LIFEsim'
-
+        name = 'LIFEsim'    
     plot_by_type(df=df, name=name, nruns=nruns, star_catalog=star_catalog)
     plot_detections(df=df, name=name, nruns=nruns, star_catalog=star_catalog)
     if name == 'HWO':

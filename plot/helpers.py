@@ -52,3 +52,20 @@ def get_rejection_reason(row):
         return 'Min Photons'
     else:
         return 'Detected'
+    
+
+# Function to compute mean and std by run
+def pivot_stats_temp(df_filtered):
+    grouped = df_filtered.groupby(['run', 'category', 'temp_zone']).size().reset_index(name='count')
+    pivot = grouped.pivot_table(index='run', columns=['category', 'temp_zone'], values='count', fill_value=0)
+    mean = pivot.mean(axis=0).reset_index(name='count')
+    std = pivot.std(axis=0).reset_index(name='error')
+    return pd.merge(mean, std, on=['category', 'temp_zone'])
+
+
+def pivot_stats_radius(df_grouped):
+    pivot = df_grouped.pivot_table(index='run', columns=['stype', 'radius_bin'], values='count', fill_value=0)
+    mean = pivot.mean(axis=0).reset_index(name='count')
+    std = pivot.std(axis=0).reset_index(name='error')
+    merged = pd.merge(mean, std, on=['stype', 'radius_bin'])
+    return merged

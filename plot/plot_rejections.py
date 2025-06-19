@@ -26,7 +26,7 @@ def plot_failures_piechart(df, nruns=1, star_catalog='Gaia',name='hwo'):
     plt.savefig(os.path.join(data_dir, f"failure_detected_{name}_nruns{nruns}_{star_catalog}.png"), 
                              dpi=300, bbox_inches='tight')
     
-def plot_failures_histogram_multipanel(df, nruns=1, star_catalog='Gaia', name='hwo'):
+def plot_failures_histogram(df, nruns=1, star_catalog='Gaia', name='hwo'):
     df['rejection_reason'] = df.apply(get_rejection_reason, axis=1)
 
     # Define failure categories and thresholds

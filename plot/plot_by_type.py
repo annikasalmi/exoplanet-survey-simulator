@@ -3,162 +3,205 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-from plot.helpers import make_output_dir, temp_zone, assign_category
+from plot.helpers import make_output_dir, temp_zone, assign_category, pivot_stats_temp, pivot_stats_radius
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 
 def plot_by_star(df, nruns=1, star_catalog='Gaia', name='hwo'):
-    '''
-    Plots the number of detectable planets by star type and radius bin.
-    '''
-    # Group by run, stype, radius_bin
-    df = df.groupby(['run', 'stype', 'radius_bin']).size().reset_index(name='count')
+       '''
+       Creates two grouped bar plots:
+       1. Total planet counts by star type and radius bin (stacked detected + undetected with errors).
+       2. Detected planets only by star type and radius bin (with error bars).
+       '''
+       df['detected_flag'] = df['detected'].astype(bool)
 
-    # Pivot to have runs as index and (stype, radius_bin) as columns
-    df_pivot = df.pivot_table(index='run', columns=['stype', 'radius_bin'], values='count', fill_value=0)
+       # Group data
+       total = df.groupby(['run', 'stype', 'radius_bin']).size().reset_index(name='count')
+       detected = df[df['detected_flag']].groupby(['run', 'stype', 'radius_bin']).size().reset_index(name='count')
 
-    # Compute mean and std across runs
-    df_mean = df_pivot.mean(axis=0)
-    df_std = df_pivot.std(axis=0)
+       total_stats = pivot_stats_radius(total)
+       detected_stats = pivot_stats_radius(detected)
 
-    # Convert MultiIndex back to DataFrame
-    grouped_sum = df_mean.reset_index(name='count')
-    grouped_sum['error'] = df_std.values
+       def prep_plot_df(stats, star_order, bin_labels):
+              df = stats.pivot(index='stype', columns='radius_bin', values='count').fillna(0)
+              errors = stats.pivot(index='stype', columns='radius_bin', values='error').fillna(0)
+              df = df.reindex(star_order).reindex(columns=bin_labels, fill_value=0)
+              errors = errors.reindex(star_order).reindex(columns=bin_labels, fill_value=0)
+              return df, errors
 
-    # Pivot to plotting format
-    pivot_counts = grouped_sum.pivot(index='stype', columns='radius_bin', values='count').fillna(0)
-    pivot_errors = grouped_sum.pivot(index='stype', columns='radius_bin', values='error').fillna(0)
+       star_order = ['F', 'G', 'K', 'M']
+       bin_labels = ['<1.5', '1.5–3.0', '3.0–6.0', 'Rocky HZ']
 
-    # Reorder for clean plotting
-    star_order = ['F', 'G', 'K', 'M']
-    bin_labels = ['<1.5', '1.5–3.0', '3.0–6.0', 'Rocky HZ']
-    pivot_counts = pivot_counts.reindex(star_order).reindex(columns=bin_labels, fill_value=0)
-    pivot_errors = pivot_errors.reindex(star_order).reindex(columns=bin_labels, fill_value=0)
+       total_df, total_err = prep_plot_df(total_stats, star_order, bin_labels)
+       det_df, det_err = prep_plot_df(detected_stats, star_order, bin_labels)
 
-    # Create grouped bar plot
-    colors = ['lightblue', 'deepskyblue', 'midnightblue', 'forestgreen']
-    hatches = ['...', 'ooo', 'OO', None]
-    bar_width = 0.2
-    x = np.arange(len(star_order))
+       colors = ['lightblue', 'deepskyblue', 'midnightblue', 'forestgreen']
+       hatches = ['...', 'ooo', 'OO', None]
+       bar_width = 0.2
+       x = np.arange(len(star_order))
 
-    _, ax = plt.subplots(figsize=(10, 6))
-    for i, label in enumerate(bin_labels):
-        heights = pivot_counts[label].tolist()
-        errors = pivot_errors[label].tolist()
+       # === Full bar plot with total + detected overlay ===
+       fig1, ax1 = plt.subplots(figsize=(10, 6))
+       for i, label in enumerate(bin_labels):
+              heights = total_df[label].tolist()
+              errors = total_err[label].tolist()
+              ax1.bar(x + i * bar_width, heights, width=bar_width,
+                     yerr=errors, label=label,
+                     color=colors[i], hatch=hatches[i], edgecolor='black')
+              for j, (h, err) in enumerate(zip(heights, errors)):
+                     ax1.text(x[j] + i * bar_width, h + 2, f"{int(h)}±{int(err)}", ha='center', fontsize=8)
 
-        ax.bar(x + i * bar_width, heights, width=bar_width,
-               yerr=errors, label=label,
-               color=colors[i], hatch=hatches[i], edgecolor='black')
+       ax1.set_xticks(x + 1.5 * bar_width)
+       ax1.set_xticklabels(star_order)
+       ax1.set_ylabel('Total Planets')
+       ax1.set_title(f'Total Planets by Star Type for {name} ({nruns} Runs)\nStar Catalog: {star_catalog}')
+       ax1.legend(title='Radius Bin')
+       plt.tight_layout()
 
-        # Add text annotations
-        for j, (h, err) in enumerate(zip(heights, errors)):
-            ax.text(x[j] + i * bar_width, h + 2, f"{int(h)}±{int(err)}", ha='center', fontsize=8)
+       # === Plot detected planets only ===
+       _, ax2 = plt.subplots(figsize=(10, 6))
+       for i, label in enumerate(bin_labels):
+              heights = det_df[label].fillna(0).tolist()
+              errors = det_err[label].fillna(0).tolist()
+              ax2.bar(x + i * bar_width, heights, width=bar_width,
+                     yerr=errors, label=label,
+                     color=colors[i], hatch=hatches[i], edgecolor='black')
+              for j, (h, err) in enumerate(zip(heights, errors)):
+                     ax2.text(x[j] + i * bar_width, h + 2, f"{int(h)}±{int(err)}", ha='center', fontsize=8)
 
-    ax.set_xticks(x + 1.5 * bar_width)
-    ax.set_xticklabels(star_order)
-    ax.set_ylabel('Detectable Planets')
-    ax.set_title(f'Detectable Planets by Star Type for {name} for {nruns} Runs\nStar Catalog: {star_catalog}')
-    ax.legend(title='Planet Radius')
+       ax2.set_xticks(x + 1.5 * bar_width)
+       ax2.set_xticklabels(star_order)
+       ax2.set_ylabel('Detected Planets')
+       ax2.set_title(f'Detected Planets by Star Type for {name} ({nruns} Runs)\nStar Catalog: {star_catalog}')
+       ax2.legend(title='Radius Bin')
+       plt.tight_layout()
 
-    plt.tight_layout()
-    data_dir = make_output_dir(name, nruns, star_catalog)
+       plt.tight_layout()
+       data_dir = make_output_dir(name, nruns, star_catalog)
 
-    plt.savefig(os.path.join(data_dir, f"stellar_type_{name}_nruns{nruns}_{star_catalog}.png"), 
+       plt.savefig(os.path.join(data_dir, f"stellar_type_{name}_nruns{nruns}_{star_catalog}.png"), 
                              dpi=300, bbox_inches='tight')
 
     
 def plot_by_planet(df, nruns=1, star_catalog='Gaia', name='hwo'):
-    '''
-    Plots the number of detectable planets by planet type and temperature zone.
-    '''
-    df['temp_zone'] = df['temp_p'].apply(temp_zone)
-    df['category'] = df.apply(assign_category, axis=1)
-    df = df.dropna(subset=['category'])
+       '''
+       Produces two plots:
+       1. Stacked bar plot: detected vs. undetected planets by category and temperature zone with error bars.
+       2. Detected-only bar plot with error bars.
+       '''
+       df['temp_zone'] = df['temp_p'].apply(temp_zone)
+       df['category'] = df.apply(assign_category, axis=1)
+       df = df.dropna(subset=['category'])
+       df['detected_flag'] = df['detected'].astype(bool)
 
-    # Count by category and temp zone
-    grouped = df.groupby(['category', 'temp_zone']).size().unstack(fill_value=0)
+       total_stats = pivot_stats_temp(df)
+       detected_stats = pivot_stats_temp(df[df['detected_flag']])
 
-    # Ensure consistent order
-    categories = ['Rocky eHZ', 'Exo-Earth Candidates', 'Rocky + Super-Earths', 'Sub-Neptunes', 'Sub-Jovians']
-    temp_zones = ['hot', 'warm', 'cold']
-    grouped = grouped.reindex(index=categories, columns=temp_zones, fill_value=0)
+       categories = ['Rocky eHZ', 'Exo-Earth Candidates', 'Rocky + Super-Earths', 'Sub-Neptunes', 'Sub-Jovians']
+       temp_zones = ['hot', 'warm', 'cold']
+       offsets = [-0.2, 0, 0.2]
+       x = np.arange(len(categories))
+       bar_width = 0.2
+       colors = ['red', 'gold', 'blue']
+       labels = ['hot', 'warm', 'cold']
 
-    # Plot
-    x = np.arange(len(categories))
-    bar_width = 0.2  # Smaller width for grouping
-    offsets = [-bar_width, 0, bar_width]  # for 'hot', 'warm', 'cold'
+       def plot_from_stats(stats, title, ylabel):
+              fig, ax = plt.subplots(figsize=(10, 6))
+              for i, zone in enumerate(temp_zones):
+                     data = stats[stats['temp_zone'] == zone].set_index('category').reindex(categories)
+                     counts = data['count'].fillna(0).values
+                     errors = data['error'].fillna(0).values
+                     ax.bar(x + offsets[i], counts, bar_width, label=labels[i],
+                            color=colors[i], edgecolor='black', yerr=errors, capsize=4)
+                     for j, (h, err) in enumerate(zip(counts, errors)):
+                            ax.text(x[j] + offsets[i], h + 1, f"{int(h)}±{int(err)}", ha='center', fontsize=8)
+              ax.set_xticks(x)
+              ax.set_xticklabels(categories, rotation=15, ha='right')
+              ax.set_ylabel(ylabel)
+              ax.set_title(title)
+              ax.legend(title='Temp Zone')
+              plt.tight_layout()
+              return fig
 
-    fig, ax = plt.subplots(figsize=(10, 6))
+       fig1 = plot_from_stats(total_stats, f'Total Planets by Type and Temp Zone\n{name}, {nruns} Runs — {star_catalog}', "Planet Count")
+       fig2 = plot_from_stats(detected_stats, f'Detected Planets by Type and Temp Zone\n{name}, {nruns} Runs — {star_catalog}', "Detected Planet Count")
 
-    colors = ['red', 'gold', 'blue']
-    hatches = ['//', '--', '\\\\']
-    labels = ['hot', 'warm', 'cold']
+       return fig1, fig2
 
-    for i, (zone, offset) in enumerate(zip(temp_zones, offsets)):
-        values = grouped[zone].values
-        ax.bar(x + offset, values, bar_width, label=labels[i],
-               color=colors[i], hatch=hatches[i], edgecolor='black')
-
-        # Add text annotations
-        for j, val in enumerate(values):
-            ax.text(x[j] + offset, val + 1, str(val), ha='center', va='bottom', fontsize=8)
-
-    ax.set_ylabel("Detectable Planets")
-    ax.set_xticks(x)
-    ax.set_xticklabels(categories, rotation=15, ha='right')
-    ax.legend(title='Temp Zone')
-    ax.set_title(f'Detectable Planets by Planet Type for {name} for {nruns} Runs\nStar Catalog: {star_catalog}')
-
-    # Optional: annotation box
-    textstr = 'D = 2.0 m\nScenario 1'
-    props = dict(boxstyle='round', facecolor='white', edgecolor='black')
-    ax.text(0.98, 0.98, textstr, transform=ax.transAxes, fontsize=10,
-            verticalalignment='top', horizontalalignment='right', bbox=props)
-
-    plt.tight_layout()
-    data_dir = make_output_dir(name, nruns, star_catalog)
-
-
-    plt.savefig(os.path.join(data_dir, f"planet_type_{name}_nruns{nruns}_{star_catalog}.png"), 
-                             dpi=300, bbox_inches='tight')
     
 def plot_distances(df, nruns=1, star_catalog='Gaia', name='hwo'):
-    '''
-    Plots the number of detectable planets by distance bins.
-    '''
-    bins = [0, 3, 5, 7, 9, 11, 13, 15, np.inf]
-    labels = ['< 3', '3 - 5', '5 - 7', '7 - 9', '9 - 11', '11 - 13', '13 - 15', '> 15']
-    df['distance_bin'] = pd.cut(df['distance_s'], bins=bins, labels=labels, right=False)
+       '''
+       Produces two bar plots:
+       1. Stacked bar plot of detected vs. undetected planets by distance bin with error bars.
+       2. Detected-only bar plot with error bars.
+       '''
+       import os
 
-    # Count and uncertainty (Poisson: sqrt(N))
-    counts = df['distance_bin'].value_counts().reindex(labels, fill_value=0)
-    errors = np.sqrt(counts)
+       bins = [0, 3, 5, 7, 9, 11, 13, 15, np.inf]
+       labels = ['< 3', '3 - 5', '5 - 7', '7 - 9', '9 - 11', '11 - 13', '13 - 15', '> 15']
+       df['distance_bin'] = pd.cut(df['distance_s'], bins=bins, labels=labels, right=False)
+       df['detected_flag'] = df['detected'].astype(bool)
 
-    # Plotting
-    x = np.arange(len(labels))
-    bar_width = 0.6
-    color = '#66c2a5'  # Soft green like in your image
+       # Compute total and detected counts by run
+       def run_bin_counts(subset):
+              return subset.groupby(['run', 'distance_bin']).size().unstack(fill_value=0).reindex(columns=labels, fill_value=0)
 
-    fig, ax = plt.subplots(figsize=(10, 6))
+       total_per_run = run_bin_counts(df)
+       detected_per_run = run_bin_counts(df[df['detected_flag']])
 
-    bars = ax.bar(x, counts, width=bar_width, yerr=errors,
-                capsize=4, color=color, hatch='//', edgecolor='black')
+       total_mean = total_per_run.mean()
+       total_std = total_per_run.std()
 
-    # Add count ± error text
-    for i, (val, err) in enumerate(zip(counts, errors)):
-        ax.text(i, val + 3, f"{int(val)}±{int(err)}", ha='center', va='bottom', fontsize=10)
+       detected_mean = detected_per_run.mean()
+       detected_std = detected_per_run.std()
 
-    # Labels and formatting
-    ax.set_ylabel("Detectable planets", fontsize=12)
-    ax.set_xlabel("Distance [pc]", fontsize=12)
-    ax.set_xticks(x)
-    ax.set_xticklabels(labels)
-    ax.set_ylim(0, max(counts + errors) * 1.2)
-    ax.set_title(f'Detectable Planets by Distance for {name} for {nruns} Runs\nStar Catalog: {star_catalog}')
+       undetected_mean = total_mean - detected_mean
 
-    plt.tight_layout()
-    data_dir = make_output_dir(name, nruns, star_catalog)
+       x = np.arange(len(labels))
+       bar_width = 0.6
 
-    plt.savefig(os.path.join(data_dir, f"planet_distance_{name}_nruns{nruns}_{star_catalog}.png"), 
-                             dpi=300, bbox_inches='tight')
+       # === Full stacked bar plot with error bars ===
+       fig1, ax1 = plt.subplots(figsize=(10, 6))
+       ax1.bar(x, undetected_mean, width=bar_width, label='Not detected',
+              color='lightgray', edgecolor='black', alpha=0.5)
+       ax1.bar(x, detected_mean, width=bar_width, bottom=undetected_mean,
+              label='Detected', color='seagreen', edgecolor='black')
+
+       for i, (det, undet, err) in enumerate(zip(detected_mean, undetected_mean, total_std)):
+              total = det + undet
+              ax1.text(i, total + 2, f"{int(total)}±{int(err)}", ha='center', va='bottom', fontsize=10)
+
+       ax1.set_ylabel("Planet Count")
+       ax1.set_xlabel("Distance [pc]")
+       ax1.set_xticks(x)
+       ax1.set_xticklabels(labels)
+       ax1.set_ylim(0, (total_mean + total_std).max() * 1.2)
+       ax1.set_title(f'Planet Detection by Distance Bin\n{name}, {nruns} Runs — {star_catalog}')
+       ax1.legend()
+       plt.tight_layout()
+
+       # === Detected-only bar plot ===
+       fig2, ax2 = plt.subplots(figsize=(10, 6))
+       ax2.bar(x, detected_mean, width=bar_width, yerr=detected_std,
+              capsize=4, color='seagreen', edgecolor='black', label='Detected')
+
+       for i, (val, err) in enumerate(zip(detected_mean, detected_std)):
+              ax2.text(i, val + 2, f"{int(val)}±{int(err)}", ha='center', va='bottom', fontsize=10)
+
+       ax2.set_ylabel("Detected Planet Count")
+       ax2.set_xlabel("Distance [pc]")
+       ax2.set_xticks(x)
+       ax2.set_xticklabels(labels)
+       ax2.set_ylim(0, (detected_mean + detected_std).max() * 1.2)
+       ax2.set_title(f'Detected Planets by Distance Bin\n{name}, {nruns} Runs — {star_catalog}')
+       ax2.legend()
+       plt.tight_layout()
+
+       data_dir = make_output_dir(name, nruns, star_catalog)
+
+       plt.savefig(os.path.join(data_dir, f"planet_distance_{name}_nruns{nruns}_{star_catalog}.png"), 
+                                   dpi=300, bbox_inches='tight')
 
 def plot_by_type(df, nruns=1, star_catalog='Gaia', name='hwo'):
     plot_by_planet(df, nruns=nruns, star_catalog=star_catalog, name=name)

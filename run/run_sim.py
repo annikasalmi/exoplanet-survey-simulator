@@ -112,7 +112,7 @@ if __name__ == "__main__":
     
     NRUNS = np.arange(500)
     try:
-        run_sim(func=main_hwo, name = 'hwo', parallel=PARALLEL, nruns=NRUNS, star_catalog=STAR_CATALOG, run_anew=True)
+        run_sim(func=main_hwo, name = 'hwo', parallel=PARALLEL, nruns=NRUNS, star_catalog=STAR_CATALOG, run_anew=False)
     except Exception as e:
         print(f"Error running HWO simulation: {e}")
     try:
@@ -120,7 +120,7 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Error running LIFEsim simulation: {e}")
     try:
-        run_sim(func=main_lifesim, name='lifesim', parallel=PARALLEL, nruns=NRUNS, star_catalog='LTC_3')
+        run_sim(func=main_lifesim, name='lifesim', parallel=PARALLEL, nruns=NRUNS, star_catalog='LTC_3', run_anew=False)
     except Exception as e:
         print(f"Error running LIFEsim simulation with LTC_3 catalog: {e}")
     print('done')

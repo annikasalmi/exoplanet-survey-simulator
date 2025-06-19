@@ -60,7 +60,7 @@ def main(parallel=False, nruns=np.arange(1), star_catalog='Gaia', run_anew=True)
         else:
             results = [run_single(i=i, star_catalog=star_catalog) for i in nruns]
     else:
-        runner = run_hwo_import_catalog
+        runner = partial(run_hwo_import_catalog, star_catalog=star_catalog)
         if parallel:
             with mp.Pool(processes=mp.cpu_count()) as pool:
                 results = pool.map(runner, nruns)

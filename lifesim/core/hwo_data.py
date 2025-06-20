@@ -1,8 +1,10 @@
 import pandas as pd
 import numpy as np
 
-import tools.constants as const
+import tools.physics_constants as const
+from tools.physics_constants import HWOConstants as HWO
 from lifesim.core.data import Data
+from typing import Union
 
 
 # TODO: automatically add data storage for all
@@ -26,16 +28,23 @@ class HWOData():
         Location of the Options class. All options and free parameters used in a LIFEsim simulation
         must be stored here.
     """
-    def __init__(self, data):#: Data | pd.DataFrame):
-        if type(data) == Data:
-            self.catalog=Data.catalog
-        elif type(data) == pd.DataFrame:
+    def __init__(self, data: Union[Data, pd.DataFrame]):
+        if isinstance(data, Data):
+            self.catalog = data.catalog
+        elif isinstance(data, pd.DataFrame):
             self.catalog = data
         else:
             raise TypeError('Needs to be a pd.DataFrame or type Data object for data.')
-        self.flux_ratio = self.calc_flux()
-        self.iwa_constraint = self.calc_iwa_constraint()
-        self.photons = self.calc_photons()
+        
+        # Validate that required columns exist
+        self._validate_catalog()
+
+    def _validate_catalog(self) -> None:
+        """Validate that the catalog has all required columns."""
+        required_columns = ['temp_p', 'temp_s', 'radius_p', 'radius_s', 'distance_s', 'maxangsep']
+        missing_columns = [col for col in required_columns if col not in self.catalog.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns in catalog: {missing_columns}")
 
     def blackbody_flux(self, wavelength_m, temperature_K):
         """
@@ -56,12 +65,17 @@ class HWOData():
         denominator = (wavelength_m**5) * (np.exp(exponent) - 1)
         return numerator / denominator
 
-    def calc_planet_flux(self):
+    def calc_planet_flux(self, case: str):
+        flux_planet_a = self.blackbody_flux(HWO(case).min_wavelength_hwo, self.catalog.temp_p.values)
+        flux_planet_b = self.blackbody_flux(HWO(case).max_wavelength_hwo, self.catalog.temp_p.values)
 
-        flux_planet_a = self.blackbody_flux(const.min_wavelength_hwo, self.catalog.temp_p.values)
-        flux_planet_b = self.blackbody_flux(const.max_wavelength_hwo, self.catalog.temp_p.values)
+        if case == 'best':
+            planet_flux = np.maximum(flux_planet_a, flux_planet_b)
+        elif case == 'worst':
+            planet_flux = np.minimum(flux_planet_a, flux_planet_b)
+        else:
+            raise ValueError("case must be 'best' or 'worst'")
 
-        planet_flux = np.maximum(flux_planet_a, flux_planet_b)
         return planet_flux
     
     def bolometric_flux(self, T, d_pc=10, R=const.R_earth):
@@ -80,17 +94,22 @@ class HWOData():
         flux = const.sigma * T**4 * (R**2 / d**2)
         return flux
 
-    def calc_flux(self):
-        flux_planet_a = self.blackbody_flux(const.min_wavelength_hwo, self.catalog.temp_p.values)
-        flux_planet_b = self.blackbody_flux(const.max_wavelength_hwo, self.catalog.temp_p.values)
+    def calc_flux_ratio(self, case: str):
+        flux_planet_a = self.blackbody_flux(HWO(case).min_wavelength_hwo, self.catalog.temp_p.values)
+        flux_planet_b = self.blackbody_flux(HWO(case).max_wavelength_hwo, self.catalog.temp_p.values)
 
-        flux_star_a = self.blackbody_flux(const.min_wavelength_hwo, self.catalog.temp_s.values)
-        flux_star_b = self.blackbody_flux(const.max_wavelength_hwo, self.catalog.temp_s.values)
+        flux_star_a = self.blackbody_flux(HWO(case).min_wavelength_hwo, self.catalog.temp_s.values)
+        flux_star_b = self.blackbody_flux(HWO(case).max_wavelength_hwo, self.catalog.temp_s.values)
 
         flux_ratio_a = self.catalog.radius_p.values**2 * flux_planet_a / (self.catalog.radius_s.values**2 * flux_star_a)
         flux_ratio_b = self.catalog.radius_p.values**2 * flux_planet_b / (self.catalog.radius_s.values**2 * flux_star_b)
 
-        flux_ratio = np.maximum(flux_ratio_a, flux_ratio_b)
+        if case == 'best':
+            flux_ratio = np.maximum(flux_ratio_a, flux_ratio_b)
+        elif case == 'worst':
+            flux_ratio = np.minimum(flux_ratio_a, flux_ratio_b)
+        else:
+            raise ValueError("case must be 'best' or 'worst'")
 
         return flux_ratio
     
@@ -102,17 +121,23 @@ class HWOData():
         E_photon = self.photon_energy(wavelength)
         return flux / E_photon  # photons/sec/m²
     
-    def calc_photons(self):
+    def calc_photons(self, case: str):
         # Calculate photon rates for both wavelength limits
         photon_rate_a = self.photon_rate(self.bolometric_flux(self.catalog.temp_p.values, 
                                                               self.catalog.distance_s.values), 
-                                                              const.min_wavelength_hwo)
+                                                              HWO(case).min_wavelength_hwo)
         photon_rate_b = self.photon_rate(self.bolometric_flux(self.catalog.temp_p.values, 
                                                               self.catalog.distance_s.values), 
-                                                              const.max_wavelength_hwo)
+                                                              HWO(case).max_wavelength_hwo)
 
         # Return the maximum photon rate
-        return np.maximum(photon_rate_a, photon_rate_b)
+        if case == 'best':
+            photons = np.maximum(photon_rate_a, photon_rate_b)
+        elif case == 'worst': 
+            photons = np.minimum(photon_rate_a, photon_rate_b)
+        else:
+            raise ValueError("case must be 'best' or 'worst'")
+        return photons
     
     def calc_iwa_constraint(self):
         iwa_constraint = self.catalog.maxangsep
@@ -120,19 +145,23 @@ class HWOData():
     
     def determine_detectable(self):
         # Evaluate individual constraints
-        iwa_condition = self.iwa_constraint >= const.iwa
-        flux_condition = self.flux_ratio >= const.min_planet_flux_star_ratio
-        min_photon_rate_condition = self.photons >= const.min_photons
+        cases = ['best', 'worst']
 
-        # Store individual condition results
-        self.catalog['iwa_pass'] = iwa_condition
-        self.catalog['flux_pass'] = flux_condition
-        self.catalog['min_photons_pass'] = min_photon_rate_condition
-        # self.catalog['planet_flux'] = self.calc_planet_flux()
-        self.catalog['flux_ratio'] = self.flux_ratio
-        self.catalog['photon_rate'] = self.calc_photons()
+        for c in cases:
+            iwa_condition = self.calc_iwa_constraint() >= HWO(c).iwa
+            flux_condition = self.calc_flux_ratio(c) >= HWO(c).min_planet_flux_star_ratio
+            min_photon_rate_condition = self.calc_photons(c) >= HWO(c).min_photons
 
-        # Total combined detection condition
-        total_condition = iwa_condition & flux_condition & min_photon_rate_condition
-        self.catalog['detected'] = total_condition
-        return self.catalog.detected
+            # Store individual condition results (boolean)
+            self.catalog['iwa_pass_' + c] = iwa_condition
+            self.catalog['flux_pass_' + c] = flux_condition  # Changed from flux_ratio_ to flux_pass_
+            self.catalog['min_photons_pass_' + c] = min_photon_rate_condition
+            
+            # Store actual values (separate columns)
+            self.catalog['flux_ratio_value_' + c] = self.calc_flux_ratio(c)
+            self.catalog['photon_rate_value_' + c] = self.calc_photons(c)
+
+            # Total combined detection condition
+            total_condition = iwa_condition & flux_condition & min_photon_rate_condition
+            self.catalog['detected_' + c] = total_condition
+        return self.catalog

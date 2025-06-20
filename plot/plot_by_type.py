@@ -1,210 +1,230 @@
 import os
-import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-
-from plot.helpers import make_output_dir, temp_zone, assign_category, pivot_stats_temp, pivot_stats_radius
-import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 
-def plot_by_star(df, nruns=1, star_catalog='Gaia', name='hwo'):
-       '''
-       Creates two grouped bar plots:
-       1. Total planet counts by star type and radius bin (stacked detected + undetected with errors).
-       2. Detected planets only by star type and radius bin (with error bars).
-       '''
-       df['detected_flag'] = df['detected'].astype(bool)
+from plot.helpers import (
+    make_output_dir, temp_zone, assign_category, prep_plot_df_stars, pivot_stats,
+    bar_plot_with_errors, overlay_best_worst, output_filename, get_detection_masks
+)
+from tools.plotting_constants import (
+    STAR_ORDER, BIN_LABELS, CATEGORY_LABELS, TEMP_ZONES, DISTANCE_LABELS,
+    STAR_COLORS, STAR_HATCHES, TEMP_COLORS, BAR_WIDTH_STAR, BAR_WIDTH_TEMP, BAR_WIDTH_DIST
+)
 
-       # Group data
-       total = df.groupby(['run', 'stype', 'radius_bin']).size().reset_index(name='count')
-       detected = df[df['detected_flag']].groupby(['run', 'stype', 'radius_bin']).size().reset_index(name='count')
+class PlotPlanetType:
+    """
+    Class for generating grouped bar plots of planet statistics by star type, planet type, and distance.
+    Handles best/worst case overlays for HWO scenarios.
+    """
+    def __init__(self, df: pd.DataFrame, nruns: int = 1, star_catalog: str = 'Gaia', name: str = 'HWO'):
+        """Initialize the plotter with data and metadata."""
+        self.df = df.copy()
+        self.nruns = nruns
+        self.star_catalog = star_catalog
+        self.name = name
+        self.data_dir = make_output_dir(name, nruns, star_catalog)
+        if self.name == 'HWO':
+            self.case = ' (best case)'
+        else:
+            self.case = ''
 
-       total_stats = pivot_stats_radius(total)
-       detected_stats = pivot_stats_radius(detected)
+    def plot_all(self) -> None:
+        """Main entry point to generate all plots based on the name parameter."""
+        self.plot_by_planet()
+        self.plot_by_star()
+        self.plot_distances()
 
-       def prep_plot_df(stats, star_order, bin_labels):
-              df = stats.pivot(index='stype', columns='radius_bin', values='count').fillna(0)
-              errors = stats.pivot(index='stype', columns='radius_bin', values='error').fillna(0)
-              df = df.reindex(star_order).reindex(columns=bin_labels, fill_value=0)
-              errors = errors.reindex(star_order).reindex(columns=bin_labels, fill_value=0)
-              return df, errors
+    def plot_by_star(self) -> None:
+        """Grouped bar plots by star type and radius bin. For HWO, uses detected_best/worst logic."""
+        df = self.df.copy()
+        x = np.arange(len(STAR_ORDER))
+        # Total stats
+        total = df.groupby(['run', 'stype', 'radius_bin']).size().reset_index(name='count')
+        total_stats = pivot_stats(total, ['stype', 'radius_bin'])
+        total_df, total_err = prep_plot_df_stars(total_stats, STAR_ORDER, BIN_LABELS)
+        heights_list = prepare_bar_lists(total_df, BIN_LABELS)
+        errors_list = prepare_bar_lists(total_err, BIN_LABELS)
+        bar_plot_with_errors(
+            x, heights_list, errors_list, BAR_WIDTH_STAR, BIN_LABELS, colors=STAR_COLORS, hatches=STAR_HATCHES,
+            xticks=x + 1.5 * BAR_WIDTH_STAR, xticklabels=STAR_ORDER, ylabel='Total Planets',
+            title=f'Total Planets by Star Type for {self.name} ({self.nruns} Runs)\nStar Catalog: {self.star_catalog}',
+            legend_title='Radius Bin', filename=os.path.join(self.data_dir, output_filename('stellar_type_total', self.name, self.nruns, self.star_catalog)),
+            figsize=(12, 8)
+        )
+        # Detected stats
+        mask_best, _ = get_detection_masks(df, self.name)
+        if self.name == 'HWO':
+            df['detected_flag_best'] = mask_best.astype(bool)
+            detected = df[df['detected_flag_best']].groupby(['run', 'stype', 'radius_bin']).size().reset_index(name='count')
+        else:
+            df['detected_flag'] = mask_best.astype(bool)
+            detected = df[df['detected_flag']].groupby(['run', 'stype', 'radius_bin']).size().reset_index(name='count')
+        detected_stats = pivot_stats(detected, ['stype', 'radius_bin'])
+        det_df, det_err = prep_plot_df_stars(detected_stats, STAR_ORDER, BIN_LABELS)
+        heights_list = prepare_bar_lists(det_df, BIN_LABELS)
+        errors_list = prepare_bar_lists(det_err, BIN_LABELS)
+        bar_plot_with_errors(
+            x, heights_list, errors_list, BAR_WIDTH_STAR, BIN_LABELS, colors=STAR_COLORS, hatches=STAR_HATCHES,
+            xticks=x + 1.5 * BAR_WIDTH_STAR, xticklabels=STAR_ORDER, ylabel='Detected Planets',
+            title=f'Detected Planets by Star Type for {self.name} ({self.nruns} Runs)\nStar Catalog: {self.star_catalog}',
+            legend_title='Radius Bin', filename=os.path.join(self.data_dir, output_filename('stellar_type_detected', self.name, self.nruns, self.star_catalog)),
+            figsize=(12, 8)
+        )
+        # Best/worst overlays if HWO
+        if self.name == 'HWO' and mask_worst is not None:
+            df['detected_flag_worst'] = mask_worst.astype(bool)
+            detected_worst = df[df['detected_flag_worst']].groupby(['run', 'stype', 'radius_bin']).size().reset_index(name='count')
+            detected_best = df[df['detected_flag_best']].groupby(['run', 'stype', 'radius_bin']).size().reset_index(name='count')
+            worst_stats = pivot_stats(detected_worst, ['stype', 'radius_bin'])
+            best_stats = pivot_stats(detected_best, ['stype', 'radius_bin'])
+            worst_df, _ = prep_plot_df_stars(worst_stats, STAR_ORDER, BIN_LABELS)
+            best_df, _ = prep_plot_df_stars(best_stats, STAR_ORDER, BIN_LABELS)
+            worst_list = prepare_bar_lists(worst_df, BIN_LABELS)
+            best_list = prepare_bar_lists(best_df, BIN_LABELS)
+            fig, ax = plt.subplots(figsize=(10, 6))
+            overlay_best_worst(
+                ax, x, BAR_WIDTH_STAR,
+                worst_list + best_list,
+                ['green'] * len(worst_list) + ['lightgreen'] * len(best_list),
+                ['Worst Case (Green)'] * len(worst_list) + ['Best Case (Light Green)'] * len(best_list)
+            )
+            ax.set_xticks(x + 1.5 * BAR_WIDTH_STAR)
+            ax.set_xticklabels(STAR_ORDER)
+            ax.set_ylabel('Detected Planets (Best/Worst)')
+            ax.set_title(f'Best/Worst Detected Planets by Star Type\n{self.name}, {self.nruns} Runs — {self.star_catalog}')
+            ax.legend(title='Overlay', fontsize=9)
+            plt.tight_layout()
+            plt.savefig(os.path.join(self.data_dir, output_filename('stellar_type_detected', self.name, self.nruns, self.star_catalog, 'best_worst')), dpi=300, bbox_inches='tight')
+            plt.close(fig)
 
-       star_order = ['F', 'G', 'K', 'M']
-       bin_labels = ['<1.5', '1.5–3.0', '3.0–6.0', 'Rocky HZ']
+    def plot_by_planet(self) -> None:
+        """Bar plots by planet category and temperature zone. Best/worst overlays for HWO."""
+        df = self.df.copy()
+        df['temp_zone'] = df['temp_p'].apply(temp_zone)
+        df['category'] = df.apply(assign_category, axis=1)
+        df = df.dropna(subset=['category'])
+        x = np.arange(len(CATEGORY_LABELS))
+        # Total
+        total_stats = pivot_stats(df, ['category', 'temp_zone'])
+        heights_list, errors_list = [], []
+        for zone in TEMP_ZONES:
+            data = total_stats[total_stats['temp_zone'] == zone].set_index('category').reindex(CATEGORY_LABELS)
+            heights_list.append(data['count'].fillna(0).values)
+            errors_list.append(data['error'].fillna(0).values)
+        bar_plot_with_errors(
+            x, heights_list, errors_list, BAR_WIDTH_TEMP, TEMP_ZONES, colors=TEMP_COLORS,
+            xticks=x, xticklabels=CATEGORY_LABELS, ylabel='Planet Count',
+            title=f'Total Planets by Type and Temp Zone\n{self.name}, {self.nruns} Runs — {self.star_catalog}',
+            legend_title='Temp Zone', filename=os.path.join(self.data_dir, output_filename('planets_by_type_total', self.name, self.nruns, self.star_catalog)),
+            text_offset=1
+        )
+        # Detected
+        mask_best, mask_worst = get_detection_masks(df, self.name)
+        if self.name == 'HWO':
+            df['detected_flag_best'] = mask_best.astype(bool)
+            detected_stats = pivot_stats(df[df['detected_flag_best']], ['category', 'temp_zone'])
+        else:
+            df['detected_flag'] = mask_best.astype(bool)
+            detected_stats = pivot_stats(df[df['detected_flag']], ['category', 'temp_zone'])
+        heights_list, errors_list = [], []
+        for zone in TEMP_ZONES:
+            data = detected_stats[detected_stats['temp_zone'] == zone].set_index('category').reindex(CATEGORY_LABELS)
+            heights_list.append(data['count'].fillna(0).values)
+            errors_list.append(data['error'].fillna(0).values)
+        bar_plot_with_errors(
+            x, heights_list, errors_list, BAR_WIDTH_TEMP, TEMP_ZONES, colors=TEMP_COLORS,
+            xticks=x, xticklabels=CATEGORY_LABELS, ylabel='Detected Planet Count',
+            title=f'Detected Planets by Type and Temp Zone\n{self.name}, {self.nruns} Runs — {self.star_catalog}',
+            legend_title='Temp Zone', filename=os.path.join(self.data_dir, output_filename('planets_by_type_detected', self.name, self.nruns, self.star_catalog)),
+            text_offset=1
+        )
+        # Best/worst overlays if HWO
+        if self.name == 'HWO' and mask_worst is not None:
+            df['detected_flag_worst'] = mask_worst.astype(bool)
+            worst_stats = pivot_stats(df[df['detected_flag_worst']], ['category', 'temp_zone'])
+            best_stats = pivot_stats(df[df['detected_flag_best']], ['category', 'temp_zone'])
+            worst_list, best_list = [], []
+            for zone in TEMP_ZONES:
+                data_worst = worst_stats[worst_stats['temp_zone'] == zone].set_index('category').reindex(CATEGORY_LABELS)
+                data_best = best_stats[best_stats['temp_zone'] == zone].set_index('category').reindex(CATEGORY_LABELS)
+                worst_list.append(data_worst['count'].fillna(0).values)
+                best_list.append(data_best['count'].fillna(0).values)
+            fig, ax = plt.subplots(figsize=(10, 6))
+            overlay_best_worst(
+                ax, x, BAR_WIDTH_TEMP,
+                worst_list + best_list,
+                ['green'] * len(worst_list) + ['lightgreen'] * len(best_list),
+                ['Worst Case (Green)'] * len(worst_list) + ['Best Case (Light Green)'] * len(best_list)
+            )
+            ax.set_xticks(x)
+            ax.set_xticklabels(CATEGORY_LABELS, rotation=15, ha='right')
+            ax.set_ylabel('Detected Planets (Best/Worst)')
+            ax.set_title(f'Best/Worst Detected Planets by Type and Temp Zone\n{self.name}, {self.nruns} Runs — {self.star_catalog}')
+            ax.legend(title='Overlay', fontsize=9)
+            plt.tight_layout()
+            plt.savefig(os.path.join(self.data_dir, output_filename('planets_by_type_detected', self.name, self.nruns, self.star_catalog, 'best_worst')), dpi=300, bbox_inches='tight')
+            plt.close(fig)
 
-       total_df, total_err = prep_plot_df(total_stats, star_order, bin_labels)
-       det_df, det_err = prep_plot_df(detected_stats, star_order, bin_labels)
-
-       colors = ['lightblue', 'deepskyblue', 'midnightblue', 'forestgreen']
-       hatches = ['...', 'ooo', 'OO', None]
-       bar_width = 0.2
-       x = np.arange(len(star_order))
-
-       # === Full bar plot with total + detected overlay ===
-       fig1, ax1 = plt.subplots(figsize=(10, 6))
-       for i, label in enumerate(bin_labels):
-              heights = total_df[label].tolist()
-              errors = total_err[label].tolist()
-              ax1.bar(x + i * bar_width, heights, width=bar_width,
-                     yerr=errors, label=label,
-                     color=colors[i], hatch=hatches[i], edgecolor='black')
-              for j, (h, err) in enumerate(zip(heights, errors)):
-                     ax1.text(x[j] + i * bar_width, h + 2, f"{int(h)}±{int(err)}", ha='center', fontsize=8)
-
-       ax1.set_xticks(x + 1.5 * bar_width)
-       ax1.set_xticklabels(star_order)
-       ax1.set_ylabel('Total Planets')
-       ax1.set_title(f'Total Planets by Star Type for {name} ({nruns} Runs)\nStar Catalog: {star_catalog}')
-       ax1.legend(title='Radius Bin')
-       plt.tight_layout()
-
-       # === Plot detected planets only ===
-       _, ax2 = plt.subplots(figsize=(10, 6))
-       for i, label in enumerate(bin_labels):
-              heights = det_df[label].fillna(0).tolist()
-              errors = det_err[label].fillna(0).tolist()
-              ax2.bar(x + i * bar_width, heights, width=bar_width,
-                     yerr=errors, label=label,
-                     color=colors[i], hatch=hatches[i], edgecolor='black')
-              for j, (h, err) in enumerate(zip(heights, errors)):
-                     ax2.text(x[j] + i * bar_width, h + 2, f"{int(h)}±{int(err)}", ha='center', fontsize=8)
-
-       ax2.set_xticks(x + 1.5 * bar_width)
-       ax2.set_xticklabels(star_order)
-       ax2.set_ylabel('Detected Planets')
-       ax2.set_title(f'Detected Planets by Star Type for {name} ({nruns} Runs)\nStar Catalog: {star_catalog}')
-       ax2.legend(title='Radius Bin')
-       plt.tight_layout()
-
-       plt.tight_layout()
-       data_dir = make_output_dir(name, nruns, star_catalog)
-
-       plt.savefig(os.path.join(data_dir, f"stellar_type_{name}_nruns{nruns}_{star_catalog}.png"), 
-                             dpi=300, bbox_inches='tight')
-
-    
-def plot_by_planet(df, nruns=1, star_catalog='Gaia', name='hwo'):
-       '''
-       Produces two plots:
-       1. Stacked bar plot: detected vs. undetected planets by category and temperature zone with error bars.
-       2. Detected-only bar plot with error bars.
-       '''
-       df['temp_zone'] = df['temp_p'].apply(temp_zone)
-       df['category'] = df.apply(assign_category, axis=1)
-       df = df.dropna(subset=['category'])
-       df['detected_flag'] = df['detected'].astype(bool)
-
-       total_stats = pivot_stats_temp(df)
-       detected_stats = pivot_stats_temp(df[df['detected_flag']])
-
-       categories = ['Rocky eHZ', 'Exo-Earth Candidates', 'Rocky + Super-Earths', 'Sub-Neptunes', 'Sub-Jovians']
-       temp_zones = ['hot', 'warm', 'cold']
-       offsets = [-0.2, 0, 0.2]
-       x = np.arange(len(categories))
-       bar_width = 0.2
-       colors = ['red', 'gold', 'blue']
-       labels = ['hot', 'warm', 'cold']
-
-       def plot_from_stats(stats, title, ylabel):
-              fig, ax = plt.subplots(figsize=(10, 6))
-              for i, zone in enumerate(temp_zones):
-                     data = stats[stats['temp_zone'] == zone].set_index('category').reindex(categories)
-                     counts = data['count'].fillna(0).values
-                     errors = data['error'].fillna(0).values
-                     ax.bar(x + offsets[i], counts, bar_width, label=labels[i],
-                            color=colors[i], edgecolor='black', yerr=errors, capsize=4)
-                     for j, (h, err) in enumerate(zip(counts, errors)):
-                            ax.text(x[j] + offsets[i], h + 1, f"{int(h)}±{int(err)}", ha='center', fontsize=8)
-              ax.set_xticks(x)
-              ax.set_xticklabels(categories, rotation=15, ha='right')
-              ax.set_ylabel(ylabel)
-              ax.set_title(title)
-              ax.legend(title='Temp Zone')
-              plt.tight_layout()
-              return fig
-
-       fig1 = plot_from_stats(total_stats, f'Total Planets by Type and Temp Zone\n{name}, {nruns} Runs — {star_catalog}', "Planet Count")
-       fig2 = plot_from_stats(detected_stats, f'Detected Planets by Type and Temp Zone\n{name}, {nruns} Runs — {star_catalog}', "Detected Planet Count")
-
-       return fig1, fig2
-
-    
-def plot_distances(df, nruns=1, star_catalog='Gaia', name='hwo'):
-       '''
-       Produces two bar plots:
-       1. Stacked bar plot of detected vs. undetected planets by distance bin with error bars.
-       2. Detected-only bar plot with error bars.
-       '''
-       import os
-
-       bins = [0, 3, 5, 7, 9, 11, 13, 15, np.inf]
-       labels = ['< 3', '3 - 5', '5 - 7', '7 - 9', '9 - 11', '11 - 13', '13 - 15', '> 15']
-       df['distance_bin'] = pd.cut(df['distance_s'], bins=bins, labels=labels, right=False)
-       df['detected_flag'] = df['detected'].astype(bool)
-
-       # Compute total and detected counts by run
-       def run_bin_counts(subset):
-              return subset.groupby(['run', 'distance_bin']).size().unstack(fill_value=0).reindex(columns=labels, fill_value=0)
-
-       total_per_run = run_bin_counts(df)
-       detected_per_run = run_bin_counts(df[df['detected_flag']])
-
-       total_mean = total_per_run.mean()
-       total_std = total_per_run.std()
-
-       detected_mean = detected_per_run.mean()
-       detected_std = detected_per_run.std()
-
-       undetected_mean = total_mean - detected_mean
-
-       x = np.arange(len(labels))
-       bar_width = 0.6
-
-       # === Full stacked bar plot with error bars ===
-       fig1, ax1 = plt.subplots(figsize=(10, 6))
-       ax1.bar(x, undetected_mean, width=bar_width, label='Not detected',
-              color='lightgray', edgecolor='black', alpha=0.5)
-       ax1.bar(x, detected_mean, width=bar_width, bottom=undetected_mean,
-              label='Detected', color='seagreen', edgecolor='black')
-
-       for i, (det, undet, err) in enumerate(zip(detected_mean, undetected_mean, total_std)):
-              total = det + undet
-              ax1.text(i, total + 2, f"{int(total)}±{int(err)}", ha='center', va='bottom', fontsize=10)
-
-       ax1.set_ylabel("Planet Count")
-       ax1.set_xlabel("Distance [pc]")
-       ax1.set_xticks(x)
-       ax1.set_xticklabels(labels)
-       ax1.set_ylim(0, (total_mean + total_std).max() * 1.2)
-       ax1.set_title(f'Planet Detection by Distance Bin\n{name}, {nruns} Runs — {star_catalog}')
-       ax1.legend()
-       plt.tight_layout()
-
-       # === Detected-only bar plot ===
-       fig2, ax2 = plt.subplots(figsize=(10, 6))
-       ax2.bar(x, detected_mean, width=bar_width, yerr=detected_std,
-              capsize=4, color='seagreen', edgecolor='black', label='Detected')
-
-       for i, (val, err) in enumerate(zip(detected_mean, detected_std)):
-              ax2.text(i, val + 2, f"{int(val)}±{int(err)}", ha='center', va='bottom', fontsize=10)
-
-       ax2.set_ylabel("Detected Planet Count")
-       ax2.set_xlabel("Distance [pc]")
-       ax2.set_xticks(x)
-       ax2.set_xticklabels(labels)
-       ax2.set_ylim(0, (detected_mean + detected_std).max() * 1.2)
-       ax2.set_title(f'Detected Planets by Distance Bin\n{name}, {nruns} Runs — {star_catalog}')
-       ax2.legend()
-       plt.tight_layout()
-
-       data_dir = make_output_dir(name, nruns, star_catalog)
-
-       plt.savefig(os.path.join(data_dir, f"planet_distance_{name}_nruns{nruns}_{star_catalog}.png"), 
-                                   dpi=300, bbox_inches='tight')
-
-def plot_by_type(df, nruns=1, star_catalog='Gaia', name='hwo'):
-    plot_by_planet(df, nruns=nruns, star_catalog=star_catalog, name=name)
-    plot_by_star(df, nruns=nruns, star_catalog=star_catalog, name=name)
-    plot_distances(df, nruns=nruns, star_catalog=star_catalog, name=name)
-    
+    def plot_distances(self) -> None:
+        """Bar plots by distance bin. Best/worst overlays for HWO."""
+        df = self.df.copy()
+        bins = [0, 3, 5, 7, 9, 11, 13, 15, np.inf]
+        df['distance_bin'] = pd.cut(df['distance_s'], bins=bins, labels=DISTANCE_LABELS, right=False)
+        x = np.arange(len(DISTANCE_LABELS))
+        # Detected logic
+        mask_best, mask_worst = get_detection_masks(df, self.name)
+        if self.name == 'HWO':
+            df['detected_flag_best'] = mask_best.astype(bool)
+            detected_per_run = df[df['detected_flag_best']].groupby(['run', 'distance_bin']).size().unstack(fill_value=0).reindex(columns=DISTANCE_LABELS, fill_value=0)
+        else:
+            df['detected_flag'] = mask_best.astype(bool)
+            detected_per_run = df[df['detected_flag']].groupby(['run', 'distance_bin']).size().unstack(fill_value=0).reindex(columns=DISTANCE_LABELS, fill_value=0)
+        total_per_run = df.groupby(['run', 'distance_bin']).size().unstack(fill_value=0).reindex(columns=DISTANCE_LABELS, fill_value=0)
+        total_mean = total_per_run.mean()
+        total_std = total_per_run.std()
+        detected_mean = detected_per_run.mean()
+        detected_std = detected_per_run.std()
+        undetected_mean = total_mean - detected_mean
+        # Stacked bar plot
+        heights_list = [undetected_mean.values, detected_mean.values]
+        errors_list = [total_std.values, detected_std.values]
+        bottom_list = [None, undetected_mean.values]
+        alpha_list = [0.5, 1.0]
+        bar_plot_with_errors(
+            x, heights_list, [None, None], BAR_WIDTH_DIST, ['Not detected', 'Detected'],
+            colors=['lightgray', 'seagreen'],
+            xticks=x, xticklabels=DISTANCE_LABELS, ylabel='Planet Count',
+            title=f'Planet Detection by Distance Bin\n{self.name}, {self.nruns} Runs — {self.star_catalog}',
+            legend_title=None, filename=os.path.join(self.data_dir, output_filename('planet_distance', self.name, self.nruns, self.star_catalog)),
+            stacked=True, bottom_list=bottom_list, alpha_list=alpha_list, text_offset=2
+        )
+        # Detected-only bar plot
+        heights_list = [detected_mean.values]
+        errors_list = [detected_std.values]
+        bar_plot_with_errors(
+            x, heights_list, errors_list, BAR_WIDTH_DIST, ['Detected'], colors=['seagreen'],
+            xticks=x, xticklabels=DISTANCE_LABELS, ylabel='Detected Planet Count',
+            title=f'Detected Planets by Distance Bin\n{self.name}, {self.nruns} Runs — {self.star_catalog}',
+            legend_title=None, filename=os.path.join(self.data_dir, output_filename('planet_distance_detected', self.name, self.nruns, self.star_catalog)),
+            text_offset=2
+        )
+        # Best/worst overlays if HWO
+        if self.name == 'HWO' and mask_worst is not None:
+            df['detected_flag_worst'] = mask_worst.astype(bool)
+            detected_worst_per_run = df[df['detected_flag_worst']].groupby(['run', 'distance_bin']).size().unstack(fill_value=0).reindex(columns=DISTANCE_LABELS, fill_value=0)
+            detected_best_per_run = df[df['detected_flag_best']].groupby(['run', 'distance_bin']).size().unstack(fill_value=0).reindex(columns=DISTANCE_LABELS, fill_value=0)
+            detected_worst_mean = detected_worst_per_run.mean()
+            detected_best_mean = detected_best_per_run.mean()
+            fig, ax = plt.subplots(figsize=(10, 6))
+            ax.bar(x, detected_worst_mean.values, width=BAR_WIDTH_DIST, color='green', label='Worst Case (Green)', edgecolor='black', alpha=0.7)
+            ax.bar(x, detected_best_mean.values, width=BAR_WIDTH_DIST, color='lightgreen', label='Best Case (Light Green)', edgecolor='black', alpha=0.8)
+            ax.set_ylabel('Detected Planet Count (Best/Worst)')
+            ax.set_xlabel('Distance [pc]')
+            ax.set_xticks(x)
+            ax.set_xticklabels(DISTANCE_LABELS)
+            ax.set_title(f'Best/Worst Detected Planets by Distance Bin\n{self.name}, {self.nruns} Runs — {self.star_catalog}')
+            ax.legend(title='Overlay', fontsize=9)
+            plt.tight_layout()
+            plt.savefig(os.path.join(self.data_dir, output_filename('planet_distance_detected', self.name, self.nruns, self.star_catalog, 'best_worst')), dpi=300, bbox_inches='tight')
+            plt.close(fig)

@@ -3,6 +3,7 @@
     "configurations": [
 
 
+
         {
             "name": "Python Debugger: Current File",
             "type": "debugpy",
@@ -28,8 +29,9 @@
             "name": "run_sim.py",
             "type": "debugpy",
             "request": "launch",
-            "program": "run/run_sim.py",
-            "console": "integratedTerminal"
+            "program": "${workspaceFolder}/run/run_sim.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}"
         },
     ]
 }

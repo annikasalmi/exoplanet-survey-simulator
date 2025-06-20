@@ -1,223 +1,229 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+from plot.helpers import make_output_dir, output_filename, scatter_best_worst_overlay, get_detection_masks
 
-from plot.helpers import make_output_dir
+class PlanetDetectionPlotter:
+    """
+    Class for generating detection efficiency and detection plots for HWO scenarios.
+    Uses detected_best and detected_worst columns for overlays.
+    """
+    def __init__(self, df, nruns: int = 1, star_catalog: str = 'Gaia', name: str = 'HWO'):
+        """Initialize with data and metadata. Supports both HWO and non-HWO scenarios."""
+        self.df = df.copy()
+        self.nruns = nruns
+        self.star_catalog = star_catalog
+        self.name = name
+        self.data_dir = make_output_dir(name, nruns, star_catalog)
 
-def plot_efficiency_multipanel(df, nruns=1, star_catalog='Gaia', name='hwo'):
-    fig, axs = plt.subplots(1, 3, figsize=(18, 6), sharey=False)
+    def plot_all(self) -> None:
+        """Generate all detection plots."""
+        self.plot_detection_efficiency()
+        self.plot_efficiency_multipanel()
+        self.plot_detection_mr()
+        self.plot_detection_vs_temp_color()
 
-    filters = {
-        'Rocky HZ': df[
-            (df['habitable'] == True) &
-            (df['radius_p'] < 1.5)
-        ],
+    def plot_efficiency_multipanel(self) -> None:
+        """Plot detection efficiency for several planet types in a multipanel figure, with best/worst overlays for HWO, or just detected for others."""
+        fig, axs = plt.subplots(1, 3, figsize=(18, 6), sharey=False)
+        filters = {
+            'Rocky HZ': self.df[
+                (self.df['habitable'] == True) &
+                (self.df['radius_p'] < 1.5)
+            ],
+            'HZ Earth-like around Sun-like': self.df[
+                (self.df['habitable'] == True) &
+                (self.df['radius_p'] >= 0.8) & (self.df['radius_p'] <= 1.5) &
+                (self.df['mass_s'] >= 0.8) & (self.df['mass_s'] <= 1.2)
+            ],
+            'HZ around M dwarfs': self.df[
+                (self.df['habitable'] == True) &
+                (self.df['stype'].str.contains('M'))
+            ]
+        }
+        bins = np.linspace(125, 305, 40)
+        bin_centers = 0.5 * (bins[:-1] + bins[1:])
+        for i, (label, subset) in enumerate(filters.items()):
+            ax1 = axs[i]
+            total_counts, _ = np.histogram(subset['temp_p'], bins=bins)
+            mask_best, mask_worst = get_detection_masks(subset, self.name)
+            if self.name == 'HWO':
+                detected_counts_best, _ = np.histogram(subset[mask_best]['temp_p'], bins=bins)
+                detected_counts_worst = np.zeros_like(total_counts)
+                if mask_worst is not None:
+                    detected_counts_worst, _ = np.histogram(subset[mask_worst]['temp_p'], bins=bins)
+                with np.errstate(divide='ignore', invalid='ignore'):
+                    efficiency_best = np.true_divide(detected_counts_best, total_counts)
+                    efficiency_best[np.isnan(efficiency_best)] = 0.0
+                    efficiency_worst = np.true_divide(detected_counts_worst, total_counts)
+                    efficiency_worst[np.isnan(efficiency_worst)] = 0.0
+                ax1.bar(bin_centers, total_counts, width=np.diff(bins), color='lightgrey', align='center', label='Total')
+                ax1.bar(bin_centers, detected_counts_worst, width=np.diff(bins), color='green', alpha=0.4, align='center', label='Detected (Worst)')
+                ax1.bar(bin_centers, detected_counts_best, width=np.diff(bins), color='green', alpha=0.8, align='center', label='Detected (Best)')
+                ax1.set_xlabel("Temperature [K]")
+                ax1.set_xlim(bins[0], bins[-1])
+                ax1.set_title(label)
+                ax2 = ax1.twinx()
+                ax2.plot(bin_centers, efficiency_worst, 'g:', linewidth=2, label='Efficiency (Worst)')
+                ax2.plot(bin_centers, efficiency_best, 'r--', linewidth=2, label='Efficiency (Best)')
+                ax2.set_ylim(0, 1.0)
+            else:
+                detected_counts, _ = np.histogram(subset[mask_best]['temp_p'], bins=bins)
+                with np.errstate(divide='ignore', invalid='ignore'):
+                    efficiency = np.true_divide(detected_counts, total_counts)
+                    efficiency[np.isnan(efficiency)] = 0.0
+                ax1.bar(bin_centers, total_counts, width=np.diff(bins), color='lightgrey', align='center', label='Total')
+                ax1.bar(bin_centers, detected_counts, width=np.diff(bins), color='green', alpha=0.8, align='center', label='Detected')
+                ax1.set_xlabel("Temperature [K]")
+                ax1.set_xlim(bins[0], bins[-1])
+                ax1.set_title(label)
+                ax2 = ax1.twinx()
+                ax2.plot(bin_centers, efficiency, 'r--', linewidth=2, label='Efficiency')
+                ax2.set_ylim(0, 1.0)
+            h1, l1 = ax1.get_legend_handles_labels()
+            h2, l2 = ax2.get_legend_handles_labels()
+            ax1.legend(h1 + h2, l1 + l2, loc='upper left')
+            if i == 0:
+                ax1.set_ylabel("Number of Planets")
+                ax2.set_ylabel("Detection Efficiency")
+        fig.suptitle(f"Detection Efficiency Across Planet Types for {self.name} ({self.nruns} Runs)\nStar Catalog: {self.star_catalog}", fontsize=14)
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
+        outfile = output_filename('detection_efficiency_multipanel', self.name, self.nruns, self.star_catalog)
+        plt.savefig(os.path.join(self.data_dir, outfile), dpi=300, bbox_inches='tight')
+        plt.close()
 
-        'HZ Earth-like around Sun-like': df[
-            (df['habitable'] == True) &
-            (df['radius_p'] >= 0.8) & (df['radius_p'] <= 1.5) &
-            (df['mass_s'] >= 0.8) & (df['mass_s'] <= 1.2)
-        ],
-
-        'HZ around M dwarfs': df[
-            (df['habitable'] == True) &
-            (df['stype'].str.contains('M'))
-        ]
-    }
-
-    bins = np.linspace(125, 305, 40)  # Temperature bins
-    bin_centers = 0.5 * (bins[:-1] + bins[1:])
-
-    for i, (label, subset) in enumerate(filters.items()):
-        ax1 = axs[i]
-
-        # Total and detected counts
-        total_counts, _ = np.histogram(subset['temp_p'], bins=bins)
-        try:
-            mask = subset['detected']
-        except KeyError:
-            mask = subset['detectable']
-
-        detected_counts, _ = np.histogram(subset[mask]['temp_p'], bins=bins)
-
-        with np.errstate(divide='ignore', invalid='ignore'):
-            efficiency = np.true_divide(detected_counts, total_counts)
-            efficiency[np.isnan(efficiency)] = 0.0
-
-        # Plot bars
-        ax1.bar(bin_centers, total_counts, width=np.diff(bins), color='lightgrey', align='center', label='Total')
-        ax1.bar(bin_centers, detected_counts, width=np.diff(bins), color='green', align='center', label='Detected')
-
-        ax1.set_xlabel("Temperature [K]")
-        ax1.set_xlim(bins[0], bins[-1])
-        ax1.set_title(label)
-
-        # Secondary y-axis for efficiency
-        ax2 = ax1.twinx()
-        ax2.plot(bin_centers, efficiency, 'r--', linewidth=2, label='Efficiency')
-        ax2.set_ylim(0, 1.0)
-
-        # Combine legends
+    def plot_detection_efficiency(self, category_column=None, category_label=None) -> None:
+        """Plot detection efficiency for planetary candidates based on temperature, with best/worst overlays for HWO, or just detected for others."""
+        df = self.df.copy()
+        if category_column and category_label:
+            df = df[df[category_column] == category_label]
+        bins = np.linspace(125, 305, 40)
+        bin_centers = 0.5 * (bins[:-1] + bins[1:])
+        total_counts, _ = np.histogram(df['temp_p'], bins=bins)
+        mask_best, mask_worst = get_detection_masks(df, self.name)
+        if self.name == 'HWO':
+            detected_counts_best, _ = np.histogram(df[mask_best]['temp_p'], bins=bins)
+            detected_counts_worst = np.zeros_like(total_counts)
+            if mask_worst is not None:
+                detected_counts_worst, _ = np.histogram(df[mask_worst]['temp_p'], bins=bins)
+            with np.errstate(divide='ignore', invalid='ignore'):
+                efficiency_best = np.true_divide(detected_counts_best, total_counts)
+                efficiency_best[np.isnan(efficiency_best)] = 0.0
+                efficiency_worst = np.true_divide(detected_counts_worst, total_counts)
+                efficiency_worst[np.isnan(efficiency_worst)] = 0.0
+            fig, ax1 = plt.subplots(figsize=(10, 6))
+            ax1.bar(bin_centers, total_counts, width=np.diff(bins), align='center', color='lightgrey', label='All planets present')
+            ax1.bar(bin_centers, detected_counts_worst, width=np.diff(bins), align='center', color='green', alpha=0.4, label='Planets detectable (Worst)')
+            ax1.bar(bin_centers, detected_counts_best, width=np.diff(bins), color='green', alpha=0.8, align='center', label='Planets detectable (Best)')
+            ax1.set_ylabel("Number of planets")
+            ax1.set_xlabel("Temperature [K]")
+            ax1.set_xlim(bins[0], bins[-1])
+            ax2 = ax1.twinx()
+            ax2.plot(bin_centers, efficiency_worst, 'g:', linewidth=2, label='Detection efficiency (Worst)')
+            ax2.plot(bin_centers, efficiency_best, 'r--', linewidth=2, label='Detection efficiency (Best)')
+            ax2.set_ylabel("Detection efficiency")
+            ax2.set_ylim(0, 1.0)
+        else:
+            detected_counts, _ = np.histogram(df[mask_best]['temp_p'], bins=bins)
+            with np.errstate(divide='ignore', invalid='ignore'):
+                efficiency = np.true_divide(detected_counts, total_counts)
+                efficiency[np.isnan(efficiency)] = 0.0
+            fig, ax1 = plt.subplots(figsize=(10, 6))
+            ax1.bar(bin_centers, total_counts, width=np.diff(bins), align='center', color='lightgrey', label='All planets present')
+            ax1.bar(bin_centers, detected_counts, width=np.diff(bins), color='green', alpha=0.8, align='center', label='Detected')
+            ax1.set_ylabel("Number of planets")
+            ax1.set_xlabel("Temperature [K]")
+            ax1.set_xlim(bins[0], bins[-1])
+            ax2 = ax1.twinx()
+            ax2.plot(bin_centers, efficiency, 'r--', linewidth=2, label='Detection efficiency')
+            ax2.set_ylabel("Detection efficiency")
+            ax2.set_ylim(0, 1.0)
         h1, l1 = ax1.get_legend_handles_labels()
         h2, l2 = ax2.get_legend_handles_labels()
         ax1.legend(h1 + h2, l1 + l2, loc='upper left')
-
-        if i == 0:
-            ax1.set_ylabel("Number of Planets")
-            ax2.set_ylabel("Detection Efficiency")
-
-    fig.suptitle(f"Detection Efficiency Across Planet Types for {name} ({nruns} Runs)\nStar Catalog: {star_catalog}", fontsize=14)
-    plt.tight_layout(rect=[0, 0, 1, 0.95])
-
-    data_dir = make_output_dir(name, nruns, star_catalog)
-    outfile = f"detection_efficiency_multipanel_{name}_nruns{nruns}_{star_catalog}.png"
-    plt.savefig(os.path.join(data_dir, outfile), dpi=300, bbox_inches='tight')
-    plt.close()
-
-    
-
-
-def plot_detection_efficiency(df, nruns=1, star_catalog='Gaia', name='hwo', 
-                              category_column=None, category_label=None):
-    """
-    Plot detection efficiency for planetary candidates based on temperature.
-    
-    Parameters:
-    - df: DataFrame containing at least 'temp_p' and 'detected' or 'detectable' columns
-    - nruns: Number of runs used in the simulation
-    - star_catalog: Name of the star catalog used
-    - name: Name for output files
-    - category_column: Optional column to filter by category (e.g., 'radius_bin')
-    - category_label: Label within category_column to filter (e.g., 'Rocky HZ')
-    """
-
-    # Optional filtering by category
-    if category_column and category_label:
-        df = df[df[category_column] == category_label]
-
-    # Bin setup
-    bins = np.linspace(125, 305, 40)  # ~4.6 K per bin
-    bin_centers = 0.5 * (bins[:-1] + bins[1:])
-
-    # Total count per bin
-    total_counts, _ = np.histogram(df['temp_p'], bins=bins)
-
-    # Handle detection mask flexibly
-    try:
-        mask = df['detected']
-    except KeyError:
-        mask = df['detectable']
-
-    detected_counts, _ = np.histogram(df[mask]['temp_p'], bins=bins)
-
-    # Compute efficiency safely
-    with np.errstate(divide='ignore', invalid='ignore'):
-        efficiency = np.true_divide(detected_counts, total_counts)
-        efficiency[np.isnan(efficiency)] = 0.0
-
-    # === Plotting ===
-    fig, ax1 = plt.subplots(figsize=(10, 6))
-
-    # Histogram bars
-    ax1.bar(bin_centers, total_counts, width=np.diff(bins), align='center', 
-            color='lightgrey', label='All planets present')
-    ax1.bar(bin_centers, detected_counts, width=np.diff(bins), align='center', 
-            color='green', label='Planets detectable')
-
-    ax1.set_ylabel("Number of planets")
-    ax1.set_xlabel("Temperature [K]")
-    ax1.set_xlim(bins[0], bins[-1])
-
-    # Efficiency curve on secondary axis
-    ax2 = ax1.twinx()
-    ax2.plot(bin_centers, efficiency, 'r--', linewidth=2, label='Detection efficiency')
-    ax2.set_ylabel("Detection efficiency")
-    ax2.set_ylim(0, 1.0)
-
-    # Combine legends
-    h1, l1 = ax1.get_legend_handles_labels()
-    h2, l2 = ax2.get_legend_handles_labels()
-    ax1.legend(h1 + h2, l1 + l2, loc='upper left')
-
-    # Title
-    category_str = f" ({category_label})" if category_label else ""
-    ax1.set_title(f'Detection Efficiency{category_str} for {name} ({nruns} runs)\nStar Catalog: {star_catalog}')
-
-    plt.tight_layout()
-
-    # Output
-    data_dir = make_output_dir(name, nruns, star_catalog)
-    outfile = f"detection_efficiency_{name}_nruns{nruns}_{star_catalog}.png"
-    plt.savefig(os.path.join(data_dir, outfile), dpi=300, bbox_inches='tight')
-
-def plot_detection_mr(df, nruns=1, star_catalog='Gaia', name='hwo'):
-    plt.figure(figsize=(8,6))
-
-    # Separate by detection status
-    detected = df[df['detected'] == 1]
-    not_detected = df[df['detected'] == 0]
-
-    # Plot detected (green) and not detected (red)
-    plt.scatter(not_detected['radius_p'], not_detected['mass_p'],
-                color='red', alpha=0.6, label='Not Detected')
-    plt.scatter(detected['radius_p'], detected['mass_p'],
-                color='green', alpha=0.6, label='Detected')
-
-    plt.xscale('log')
-    plt.yscale('log')
-
-    plt.xlabel("Planet Radius ($R_\\oplus$)")
-    plt.ylabel("Planet Mass ($M_\\oplus$)")
-    plt.title("Detection Likelihood by Planet Radius and Mass (Log Scale)")
-    plt.legend()
-    plt.tight_layout()
-
-    # Save figure
-    data_dir = make_output_dir(name, nruns, star_catalog)
-    outfile = f"detection_mr_log_{name}_nruns{nruns}_{star_catalog}.png"
-    plt.savefig(os.path.join(data_dir, outfile), dpi=300, bbox_inches='tight')
-
-def plot_detection_vs_temp_color(df, nruns=1, star_catalog='Gaia', name='hwo'):
-    '''
-    Flexible enough to add more vars if necessary. For now realized only needed for temp_p.
-    '''
-    
-    xtitles = {
-        'temp_p': 'Planet Temperature ($K$)',
-    }  
-    xvars = ['temp_p']
-
-    data_dir = make_output_dir(name, nruns, star_catalog)
-
-    for var in xvars:
-        # Filter to valid, positive values
-        df_plot = df[(df[var] > 0) & (df['distance_s'] > 0)]
-
-        # Separate by detection
-        detected = df_plot[df_plot['detected'] == 1]
-        not_detected = df_plot[df_plot['detected'] == 0]
-
-        plt.figure(figsize=(8,6))
-        plt.scatter(not_detected[var], not_detected['distance_s'],
-                    color='red', alpha=0.6, label='Not Detected')
-        plt.scatter(detected[var], detected['distance_s'],
-                    color='green', alpha=0.6, label='Detected')
-
-        plt.xscale('log')  # log scale appropriate for most x variables
-        plt.yscale('log')  # distance can also span orders of magnitude
-
-        plt.xlabel(xtitles.get(var, var))
-        plt.ylabel("Distance to Star (pc)")
-        plt.title(f"{xtitles.get(var, var)} vs. Distance to Star")
-        plt.legend()
+        category_str = f" ({category_label})" if category_label else ""
+        ax1.set_title(f'Detection Efficiency{category_str} for {self.name} ({self.nruns} runs)\nStar Catalog: {self.star_catalog}')
         plt.tight_layout()
-
-        outfile = f"{var}_vs_distance_{name}_nruns{nruns}_{star_catalog}.png"
-        plt.savefig(os.path.join(data_dir, outfile), dpi=300, bbox_inches='tight')
+        outfile = output_filename('detection_efficiency', self.name, self.nruns, self.star_catalog)
+        plt.savefig(os.path.join(self.data_dir, outfile), dpi=300, bbox_inches='tight')
         plt.close()
 
-def plot_detections(df, nruns=1, star_catalog='Gaia', name='hwo'):
-    plot_detection_efficiency(df, nruns=nruns, star_catalog=star_catalog, name=name)
-    plot_efficiency_multipanel(df, nruns=nruns, star_catalog=star_catalog, name=name)
-    plot_detection_mr(df, nruns=nruns, star_catalog=star_catalog, name=name)
-    plot_detection_vs_temp_color(df, nruns=nruns, star_catalog=star_catalog, name=name)
+    def plot_detection_mr(self) -> None:
+        """Plot detection likelihood by planet radius and mass (log scale), with best/worst overlays for HWO, or just detected for others."""
+        plt.figure(figsize=(8,6))
+        ax = plt.gca()
+        mask_best, mask_worst = get_detection_masks(self.df, self.name)
+        if self.name == 'HWO':
+            detected_best = self.df[mask_best == 1]
+            not_detected_best = self.df[mask_best == 0]
+            detected_worst = self.df[mask_worst == 1] if mask_worst is not None else None
+            not_detected_worst = self.df[mask_worst == 0] if mask_worst is not None else None
+            # Plot undetected first (background)
+            if not_detected_best is not None and len(not_detected_best) > 0:
+                ax.scatter(not_detected_best['radius_p'], not_detected_best['mass_p'], color='red', alpha=0.1, label='Not Detected (Best)', s=10)
+            if not_detected_worst is not None and len(not_detected_worst) > 0:
+                ax.scatter(not_detected_worst['radius_p'], not_detected_worst['mass_p'], color='red', alpha=0.1, label='Not Detected (Worst)', s=10)
+            # Overlay detected on top
+            if detected_best is not None and len(detected_best) > 0:
+                ax.scatter(detected_best['radius_p'], detected_best['mass_p'], color='green', alpha=0.8, label='Detected (Best)', s=20)
+            if detected_worst is not None and len(detected_worst) > 0:
+                ax.scatter(detected_worst['radius_p'], detected_worst['mass_p'], color='green', alpha=0.4, label='Detected (Worst)', s=20)
+        else:
+            detected = self.df[mask_best == 1]
+            not_detected = self.df[mask_best == 0]
+            # Plot undetected first (background)
+            ax.scatter(not_detected['radius_p'], not_detected['mass_p'], color='red', alpha=0.1, label='Not Detected', s=10)
+            # Overlay detected on top
+            ax.scatter(detected['radius_p'], detected['mass_p'], color='green', alpha=0.8, label='Detected', s=20)
+        plt.xscale('log')
+        plt.yscale('log')
+        plt.xlabel("Planet Radius ($R_\\oplus$)")
+        plt.ylabel("Planet Mass ($M_\\oplus$)")
+        plt.title("Detection Likelihood by Planet Radius and Mass (Log Scale)")
+        plt.legend()
+        plt.tight_layout()
+        outfile = output_filename('detection_mr_log', self.name, self.nruns, self.star_catalog)
+        plt.savefig(os.path.join(self.data_dir, outfile), dpi=300, bbox_inches='tight')
+        plt.close()
+
+    def plot_detection_vs_temp_color(self) -> None:
+        """Plot temperature vs. distance to star, colored by detection status, with best/worst overlays for HWO, or just detected for others."""
+        xtitles = {'temp_p': 'Planet Temperature ($K$)'}
+        xvars = ['temp_p']
+        for var in xvars:
+            df_plot = self.df[(self.df[var] > 0) & (self.df['distance_s'] > 0)]
+            plt.figure(figsize=(8,6))
+            ax = plt.gca()
+            mask_best, mask_worst = get_detection_masks(df_plot, self.name)
+            if self.name == 'HWO':
+                detected_best = df_plot[mask_best == 1]
+                not_detected_best = df_plot[mask_best == 0]
+                detected_worst = df_plot[mask_worst == 1] if mask_worst is not None else None
+                not_detected_worst = df_plot[mask_worst == 0] if mask_worst is not None else None
+                # Plot undetected first (background)
+                if not_detected_best is not None and len(not_detected_best) > 0:
+                    ax.scatter(not_detected_best[var], not_detected_best['distance_s'], color='red', alpha=0.1, label='Not Detected (Best)', s=10)
+                if not_detected_worst is not None and len(not_detected_worst) > 0:
+                    ax.scatter(not_detected_worst[var], not_detected_worst['distance_s'], color='red', alpha=0.1, label='Not Detected (Worst)', s=10)
+                # Overlay detected on top
+                if detected_best is not None and len(detected_best) > 0:
+                    ax.scatter(detected_best[var], detected_best['distance_s'], color='green', alpha=0.8, label='Detected (Best)', s=20)
+                if detected_worst is not None and len(detected_worst) > 0:
+                    ax.scatter(detected_worst[var], detected_worst['distance_s'], color='green', alpha=0.4, label='Detected (Worst)', s=20)
+            else:
+                detected = df_plot[mask_best == 1]
+                not_detected = df_plot[mask_best == 0]
+                # Plot undetected first (background)
+                ax.scatter(not_detected[var], not_detected['distance_s'], color='red', alpha=0.1, label='Not Detected', s=10)
+                # Overlay detected on top
+                ax.scatter(detected[var], detected['distance_s'], color='green', alpha=0.8, label='Detected', s=20)
+            plt.xscale('log')
+            plt.yscale('log')
+            plt.xlabel(xtitles.get(var, var))
+            plt.ylabel("Distance to Star (pc)")
+            plt.title(f"{xtitles.get(var, var)} vs. Distance to Star")
+            plt.legend()
+            plt.tight_layout()
+            outfile = output_filename(f"{var}_vs_distance", self.name, self.nruns, self.star_catalog)
+            plt.savefig(os.path.join(self.data_dir, outfile), dpi=300, bbox_inches='tight')
+            plt.close()

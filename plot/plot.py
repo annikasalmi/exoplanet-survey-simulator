@@ -1,15 +1,15 @@
-from plot.plot_by_type import plot_by_type
-from plot.plot_detections import plot_detections
-from plot.plot_rejections import plot_rejections
+from plot.plot_by_type import PlotPlanetType
+from plot.plot_detections import PlanetDetectionPlotter
+from plot.plot_rejections import PlanetRejectionPlotter
 
 
-def plot_all(df, nruns=1, star_catalog='Gaia', sim_name='hwo'):
+def plot_all(df, nruns=1, star_catalog='Gaia', sim_name='HWO'):
 
     if sim_name == 'hwo':
-        name = 'HWO'
+        sim_name = 'HWO'
     elif sim_name == 'lifesim':
-        name = 'LIFEsim'    
-    plot_by_type(df=df, name=name, nruns=nruns, star_catalog=star_catalog)
-    plot_detections(df=df, name=name, nruns=nruns, star_catalog=star_catalog)
-    if name == 'HWO':
-        plot_rejections(df, nruns=nruns, star_catalog=star_catalog, name=name)
+        sim_name = 'LIFEsim'    
+    PlotPlanetType(df=df, name=sim_name, nruns=nruns, star_catalog=star_catalog).plot_all()
+    PlanetDetectionPlotter(df=df, name=sim_name, nruns=nruns, star_catalog=star_catalog).plot_all()
+    if sim_name == 'HWO':
+        PlanetRejectionPlotter(df, nruns=nruns, star_catalog=star_catalog, name=sim_name).plot_all()

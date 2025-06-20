@@ -1,6 +1,8 @@
 import time
 import threading
 import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from tqdm import tqdm
 import logging
 import numpy as np
@@ -106,16 +108,8 @@ if __name__ == "__main__":
     PARALLEL = True  # Set to True if you want to run in parallel
     STAR_CATALOG = 'Gaia'  # or 'ExoCat_1'
     NRUNS = np.arange(500)
-    # try:
+    
     run_sim(func=main_hwo, name = 'hwo', parallel=PARALLEL, nruns=NRUNS, star_catalog=STAR_CATALOG, run_anew=False)
-    # except Exception as e:
-    #     print(f"Error running HWO simulation: {e}")
-    # try:
-    # run_sim(func=main_lifesim, name='lifesim',parallel=PARALLEL, nruns=NRUNS, star_catalog=STAR_CATALOG, run_anew=True)
-    # except Exception as e:
-    #     print(f"Error running LIFEsim simulation: {e}")
-    # try:
-    #     run_sim(func=main_lifesim, name='lifesim', parallel=PARALLEL, nruns=NRUNS, star_catalog='LTC_3', run_anew=False)
-    # except Exception as e:
-    #     print(f"Error running LIFEsim simulation with LTC_3 catalog: {e}")
+    run_sim(func=main_lifesim, name='lifesim',parallel=PARALLEL, nruns=NRUNS, star_catalog=STAR_CATALOG, run_anew=False)
+    run_sim(func=main_lifesim, name='lifesim', parallel=PARALLEL, nruns=NRUNS, star_catalog='LTC_3', run_anew=False)
     print('done')

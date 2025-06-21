@@ -160,8 +160,10 @@ def bar_plot_with_errors(
                      color=color, hatch=hatch, edgecolor='black',
                      bottom=bottom, alpha=alpha)
         for j, (h, err) in enumerate(zip(heights, errors if errors is not None else [0]*len(heights))):
+            h_display = int(h) if not np.isnan(h) else 0
+            err_display = int(err) if not np.isnan(err) else 0
             y = h + (bottom[j] if (bottom is not None and stacked and j < len(bottom)) else 0) + text_offset
-            ax.text((x[j] + i * bar_width) if not stacked else x[j], y, f"{int(h)}±{int(err)}", ha='center', fontsize=8)
+            ax.text((x[j] + i * bar_width) if not stacked else x[j], y, f"{h_display}±{err_display}", ha='center', fontsize=8)
     if xticks is not None and xticklabels is not None:
         ax.set_xticks(xticks)
         ax.set_xticklabels(xticklabels)

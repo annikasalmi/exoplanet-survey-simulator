@@ -70,9 +70,11 @@ class HWOData():
         flux_planet_b = self.blackbody_flux(HWO(case).max_wavelength_hwo, self.catalog.temp_p.values)
 
         if case == 'best':
-            planet_flux = np.maximum(flux_planet_a, flux_planet_b)
-        elif case == 'worst':
+            # Best case: use minimum flux (easier to detect)
             planet_flux = np.minimum(flux_planet_a, flux_planet_b)
+        elif case == 'worst':
+            # Worst case: use maximum flux (harder to detect)
+            planet_flux = np.maximum(flux_planet_a, flux_planet_b)
         else:
             raise ValueError("case must be 'best' or 'worst'")
 
@@ -95,11 +97,12 @@ class HWOData():
         return flux
 
     def calc_flux_ratio(self, case: str):
-        flux_planet_a = self.blackbody_flux(HWO(case).min_wavelength_hwo, self.catalog.temp_p.values)
-        flux_planet_b = self.blackbody_flux(HWO(case).max_wavelength_hwo, self.catalog.temp_p.values)
+        hwo = HWO(case)
+        flux_planet_a = self.blackbody_flux(hwo.min_wavelength_hwo, self.catalog.temp_p.values)
+        flux_planet_b = self.blackbody_flux(hwo.max_wavelength_hwo, self.catalog.temp_p.values)
 
-        flux_star_a = self.blackbody_flux(HWO(case).min_wavelength_hwo, self.catalog.temp_s.values)
-        flux_star_b = self.blackbody_flux(HWO(case).max_wavelength_hwo, self.catalog.temp_s.values)
+        flux_star_a = self.blackbody_flux(hwo.min_wavelength_hwo, self.catalog.temp_s.values)
+        flux_star_b = self.blackbody_flux(hwo.max_wavelength_hwo, self.catalog.temp_s.values)
 
         flux_ratio_a = self.catalog.radius_p.values**2 * flux_planet_a / (self.catalog.radius_s.values**2 * flux_star_a)
         flux_ratio_b = self.catalog.radius_p.values**2 * flux_planet_b / (self.catalog.radius_s.values**2 * flux_star_b)
@@ -116,25 +119,64 @@ class HWOData():
     def photon_energy(self, wavelength):
         return const.h * const.c / wavelength  # in joules
 
-    # Photon rate calculation
-    def photon_rate(self, flux, wavelength):
-        E_photon = self.photon_energy(wavelength)
-        return flux / E_photon  # photons/sec/m²
+    def photon_rate_per_hour_per_micron(self, flux_w_m2, wavelength_m):
+        """
+        Calculate photon rate in photons/hour/μm given:
+        - flux in W/m² (Watts per square meter)
+        - wavelength in meters
+
+        Assumes collection over 1 m².
+
+        Returns: photon rate in photons/hour/μm
+        """
+        # Constants
+        h = 6.62607015e-34  # Planck's constant (J·s)
+        c = 2.99792458e8    # Speed of light (m/s)
+
+        # Convert wavelength to meters (if it's not already)
+        wavelength_m = np.asarray(wavelength_m)
+
+        # Energy per photon (Joules)
+        energy_per_photon = h * c / wavelength_m
+
+        # Photon rate (photons/sec/m²)
+        photons_per_second_per_m2 = flux_w_m2 / energy_per_photon
+
+        # Convert to photons/hour/m²
+        photons_per_hour_per_m2 = photons_per_second_per_m2 / 3600
+
+        # Convert to photons/hour/μm (assuming 1 μm bandwidth)
+        # This is a spectral density, so we multiply by wavelength bandwidth
+        wavelength_um = wavelength_m / 1e6  # convert m to μm
+        photons_per_hour_per_um = photons_per_hour_per_m2 * wavelength_um
+
+        return photons_per_hour_per_um
     
     def calc_photons(self, case: str):
-        # Calculate photon rates for both wavelength limits
-        photon_rate_a = self.photon_rate(self.bolometric_flux(self.catalog.temp_p.values, 
-                                                              self.catalog.distance_s.values), 
-                                                              HWO(case).min_wavelength_hwo)
-        photon_rate_b = self.photon_rate(self.bolometric_flux(self.catalog.temp_p.values, 
-                                                              self.catalog.distance_s.values), 
-                                                              HWO(case).max_wavelength_hwo)
+        # Calculate photon rates for both wavelength limits using spectral flux density
+        # Use blackbody flux (spectral) instead of bolometric flux
+        
+        # Get spectral flux density at the specific wavelengths
+        spectral_flux_a = self.blackbody_flux(HWO(case).min_wavelength_hwo, self.catalog.temp_p.values)
+        spectral_flux_b = self.blackbody_flux(HWO(case).max_wavelength_hwo, self.catalog.temp_p.values)
+        
+        # Convert to flux at Earth (accounting for distance and planet size)
+        # spectral_flux is in W·sr⁻¹·m⁻³, we need W/m²
+        # For a planet: flux_at_earth = spectral_flux * (planet_radius² / distance²) * π
+        flux_at_earth_a = spectral_flux_a * (self.catalog.radius_p.values**2 / (self.catalog.distance_s.values * const.pc_to_m)**2) * np.pi
+        flux_at_earth_b = spectral_flux_b * (self.catalog.radius_p.values**2 / (self.catalog.distance_s.values * const.pc_to_m)**2) * np.pi
+        
+        # Calculate photon rates
+        photon_rate_a = self.photon_rate_per_hour_per_micron(flux_at_earth_a, HWO(case).min_wavelength_hwo)
+        photon_rate_b = self.photon_rate_per_hour_per_micron(flux_at_earth_b, HWO(case).max_wavelength_hwo)
 
-        # Return the maximum photon rate
+        # Return the appropriate photon rate based on case
         if case == 'best':
-            photons = np.maximum(photon_rate_a, photon_rate_b)
-        elif case == 'worst': 
+            # Best case: use minimum photon rate (easier to detect)
             photons = np.minimum(photon_rate_a, photon_rate_b)
+        elif case == 'worst': 
+            # Worst case: use maximum photon rate (harder to detect)
+            photons = np.maximum(photon_rate_a, photon_rate_b)
         else:
             raise ValueError("case must be 'best' or 'worst'")
         return photons

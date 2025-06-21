@@ -13,16 +13,14 @@ class HWOConstants():
         if scenario not in ['best', 'worst']:
             raise ValueError("Only 'best' and 'worst' case HWO scenarios are implemented.")
         if self.scenario == 'best':
-            self.iwa = 41e-3
-            self.min_planet_flux_star_ratio = 10e-10
-            self.min_flux = 1e-19
+            self.iwa = 20.6e-3
+            self.min_planet_flux_star_ratio = 2.5e-11
             self.min_wavelength_hwo = 200e-9  # Minimum wavelength for HWO (m)
             self.max_wavelength_hwo = 2500e-9  # Maximum wavelength for HWO (m)
-            self.min_photons = 5 # Minimum photons for detection
+            self.min_photons = 1 # Minimum photons for detection (photons/hour/micron)
         elif self.scenario == 'worst':
             self.iwa = 124e-3
-            self.min_planet_flux_star_ratio = 10e-9
-            self.min_flux = 1e-18
+            self.min_planet_flux_star_ratio = 10e-10
             self.min_wavelength_hwo = 300e-9  # Minimum wavelength for HWO (m)
             self.max_wavelength_hwo = 2400e-9  # Maximum wavelength for HWO (m)
-            self.min_photons = 10 # Minimum photons for detection
+            self.min_photons = 50 # Minimum photons for detection

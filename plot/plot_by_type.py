@@ -39,64 +39,138 @@ class PlotPlanetType:
         """Grouped bar plots by star type and radius bin. For HWO, uses detected_best/worst logic."""
         df = self.df.copy()
         x = np.arange(len(STAR_ORDER))
-        # Total stats
-        total = df.groupby(['run', 'stype', 'radius_bin']).size().reset_index(name='count')
-        total_stats = pivot_stats(total, ['stype', 'radius_bin'])
-        total_df, total_err = prep_plot_df_stars(total_stats, STAR_ORDER, BIN_LABELS)
-        heights_list = prepare_bar_lists(total_df, BIN_LABELS)
-        errors_list = prepare_bar_lists(total_err, BIN_LABELS)
-        bar_plot_with_errors(
-            x, heights_list, errors_list, BAR_WIDTH_STAR, BIN_LABELS, colors=STAR_COLORS, hatches=STAR_HATCHES,
-            xticks=x + 1.5 * BAR_WIDTH_STAR, xticklabels=STAR_ORDER, ylabel='Total Planets',
-            title=f'Total Planets by Star Type for {self.name} ({self.nruns} Runs)\nStar Catalog: {self.star_catalog}',
-            legend_title='Radius Bin', filename=os.path.join(self.data_dir, output_filename('stellar_type_total', self.name, self.nruns, self.star_catalog)),
-            figsize=(12, 8)
-        )
+        
+        # Total stats - simple groupby and sum across runs
+        total_counts = df.groupby(['stype', 'radius_bin']).size().reset_index()
+        total_counts.columns = ['stype', 'radius_bin', 'count']
+        
+        # Calculate means and stds across runs
+        total_per_run = df.groupby(['run', 'stype', 'radius_bin']).size().reset_index()
+        total_per_run.columns = ['run', 'stype', 'radius_bin', 'count']
+        total_pivot = total_per_run.pivot_table(index=['stype', 'radius_bin'], columns='run', values='count', fill_value=0)
+        
+        total_mean = total_pivot.mean(axis=1).reset_index()
+        total_mean = total_mean.rename(columns={total_mean.columns[-1]: 'count'})
+        
+        total_std = total_pivot.std(axis=1).reset_index()
+        total_std = total_std.rename(columns={total_std.columns[-1]: 'count'})
+        
+        # Create the plot
+        fig, ax = plt.subplots(figsize=(12, 8))
+        bar_width = BAR_WIDTH_STAR
+        
+        # Plot bars for each radius bin
+        for i, bin_label in enumerate(BIN_LABELS):
+            # Get data for this radius bin
+            bin_data = total_mean[total_mean['radius_bin'] == bin_label]
+            bin_std = total_std[total_std['radius_bin'] == bin_label]
+            
+            # Align with STAR_ORDER
+            heights = []
+            errors = []
+            for star in STAR_ORDER:
+                star_data = bin_data[bin_data['stype'] == star]
+                star_std_data = bin_std[bin_std['stype'] == star]
+                if len(star_data) > 0:
+                    heights.append(star_data.iloc[0]['count'])
+                    errors.append(star_std_data.iloc[0]['count'])
+                else:
+                    heights.append(0)
+                    errors.append(0)
+            
+            ax.bar(x + i * bar_width, heights, bar_width, 
+                   label=bin_label, color=STAR_COLORS[i], 
+                   hatch=STAR_HATCHES[i], edgecolor='black',
+                   yerr=errors, capsize=3)
+            
+            # Add text annotations for counts
+            for j, (h, err) in enumerate(zip(heights, errors)):
+                if h > 0:  # Only add text if there are planets
+                    # Handle NaN values
+                    h_display = int(h) if not np.isnan(h) else 0
+                    err_display = int(err) if not np.isnan(err) else 0
+                    ax.text(x[j] + i * bar_width, h + err + 0.5, f"{h_display}±{err_display}", 
+                           ha='center', fontsize=8)
+        
+        ax.set_xlabel('Star Type')
+        ax.set_ylabel('Total Planets')
+        ax.set_title(f'Total Planets by Star Type for {self.name} ({self.nruns} Runs)\nStar Catalog: {self.star_catalog}')
+        ax.set_xticks(x + 1.5 * bar_width)
+        ax.set_xticklabels(STAR_ORDER)
+        ax.legend(title='Radius Bin')
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.data_dir, 
+                                output_filename('stellar_type_total', self.name, self.nruns, self.star_catalog)), 
+                   dpi=300, bbox_inches='tight')
+        plt.close(fig)
+        
         # Detected stats
-        mask_best, _ = get_detection_masks(df, self.name)
+        mask_best, mask_worst = get_detection_masks(df, self.name)
         if self.name == 'HWO':
             df['detected_flag_best'] = mask_best.astype(bool)
-            detected = df[df['detected_flag_best']].groupby(['run', 'stype', 'radius_bin']).size().reset_index(name='count')
+            detected_df = df[df['detected_flag_best']]
         else:
             df['detected_flag'] = mask_best.astype(bool)
-            detected = df[df['detected_flag']].groupby(['run', 'stype', 'radius_bin']).size().reset_index(name='count')
-        detected_stats = pivot_stats(detected, ['stype', 'radius_bin'])
-        det_df, det_err = prep_plot_df_stars(detected_stats, STAR_ORDER, BIN_LABELS)
-        heights_list = prepare_bar_lists(det_df, BIN_LABELS)
-        errors_list = prepare_bar_lists(det_err, BIN_LABELS)
-        bar_plot_with_errors(
-            x, heights_list, errors_list, BAR_WIDTH_STAR, BIN_LABELS, colors=STAR_COLORS, hatches=STAR_HATCHES,
-            xticks=x + 1.5 * BAR_WIDTH_STAR, xticklabels=STAR_ORDER, ylabel='Detected Planets',
-            title=f'Detected Planets by Star Type for {self.name} ({self.nruns} Runs)\nStar Catalog: {self.star_catalog}',
-            legend_title='Radius Bin', filename=os.path.join(self.data_dir, output_filename('stellar_type_detected', self.name, self.nruns, self.star_catalog)),
-            figsize=(12, 8)
-        )
-        # Best/worst overlays if HWO
-        if self.name == 'HWO' and mask_worst is not None:
-            df['detected_flag_worst'] = mask_worst.astype(bool)
-            detected_worst = df[df['detected_flag_worst']].groupby(['run', 'stype', 'radius_bin']).size().reset_index(name='count')
-            detected_best = df[df['detected_flag_best']].groupby(['run', 'stype', 'radius_bin']).size().reset_index(name='count')
-            worst_stats = pivot_stats(detected_worst, ['stype', 'radius_bin'])
-            best_stats = pivot_stats(detected_best, ['stype', 'radius_bin'])
-            worst_df, _ = prep_plot_df_stars(worst_stats, STAR_ORDER, BIN_LABELS)
-            best_df, _ = prep_plot_df_stars(best_stats, STAR_ORDER, BIN_LABELS)
-            worst_list = prepare_bar_lists(worst_df, BIN_LABELS)
-            best_list = prepare_bar_lists(best_df, BIN_LABELS)
-            fig, ax = plt.subplots(figsize=(10, 6))
-            overlay_best_worst(
-                ax, x, BAR_WIDTH_STAR,
-                worst_list + best_list,
-                ['green'] * len(worst_list) + ['lightgreen'] * len(best_list),
-                ['Worst Case (Green)'] * len(worst_list) + ['Best Case (Light Green)'] * len(best_list)
-            )
-            ax.set_xticks(x + 1.5 * BAR_WIDTH_STAR)
-            ax.set_xticklabels(STAR_ORDER)
-            ax.set_ylabel('Detected Planets (Best/Worst)')
-            ax.set_title(f'Best/Worst Detected Planets by Star Type\n{self.name}, {self.nruns} Runs — {self.star_catalog}')
-            ax.legend(title='Overlay', fontsize=9)
-            plt.tight_layout()
-            plt.savefig(os.path.join(self.data_dir, output_filename('stellar_type_detected', self.name, self.nruns, self.star_catalog, 'best_worst')), dpi=300, bbox_inches='tight')
-            plt.close(fig)
+            detected_df = df[df['detected_flag']]
+        
+        # Calculate detected counts across runs
+        detected_per_run = detected_df.groupby(['run', 'stype', 'radius_bin']).size().reset_index()
+        detected_per_run.columns = ['run', 'stype', 'radius_bin', 'count']
+        detected_pivot = detected_per_run.pivot_table(index=['stype', 'radius_bin'], columns='run', values='count', fill_value=0)
+ 
+        detected_mean = detected_pivot.mean(axis=1).reset_index()
+        detected_mean = detected_mean.rename(columns={detected_mean.columns[-1]: 'count'})
+        
+        detected_std = detected_pivot.std(axis=1).reset_index()
+        detected_std = detected_std.rename(columns={detected_std.columns[-1]: 'count'})
+        
+        # Create the detected plot
+        fig, ax = plt.subplots(figsize=(12, 8))
+        
+        # Plot bars for each radius bin
+        for i, bin_label in enumerate(BIN_LABELS):
+            # Get data for this radius bin
+            bin_data = detected_mean[detected_mean['radius_bin'] == bin_label]
+            bin_std = detected_std[detected_std['radius_bin'] == bin_label]
+            
+            # Align with STAR_ORDER
+            heights = []
+            errors = []
+            for star in STAR_ORDER:
+                star_data = bin_data[bin_data['stype'] == star]
+                star_std_data = bin_std[bin_std['stype'] == star]
+                if len(star_data) > 0:
+                    heights.append(star_data.iloc[0]['count'])
+                    errors.append(star_std_data.iloc[0]['count'])
+                else:
+                    heights.append(0)
+                    errors.append(0)
+            
+            ax.bar(x + i * bar_width, heights, bar_width, 
+                   label=bin_label, color=STAR_COLORS[i], 
+                   hatch=STAR_HATCHES[i], edgecolor='black',
+                   yerr=errors, capsize=3)
+            
+            # Add text annotations for counts
+            for j, (h, err) in enumerate(zip(heights, errors)):
+                if h > 0:  # Only add text if there are planets
+                    # Handle NaN values
+                    h_display = int(h) if not np.isnan(h) else 0
+                    err_display = int(err) if not np.isnan(err) else 0
+                    ax.text(x[j] + i * bar_width, h + err + 0.1, f"{h_display}±{err_display}", 
+                           ha='center', fontsize=8)
+        
+        ax.set_xlabel('Star Type')
+        ax.set_ylabel('Detected Planets')
+        ax.set_title(f'Detected Planets by Star Type for {self.name} ({self.nruns} Runs)\nStar Catalog: {self.star_catalog}')
+        ax.set_xticks(x + 1.5 * bar_width)
+        ax.set_xticklabels(STAR_ORDER)
+        ax.legend(title='Radius Bin')
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.data_dir, 
+                                output_filename('stellar_type_detected', self.name, self.nruns, self.star_catalog)), 
+                   dpi=300, bbox_inches='tight')
+        plt.close(fig)
 
     def plot_by_planet(self) -> None:
         """Bar plots by planet category and temperature zone. Best/worst overlays for HWO."""

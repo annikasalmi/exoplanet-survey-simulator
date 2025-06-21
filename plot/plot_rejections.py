@@ -69,103 +69,104 @@ class PlanetRejectionPlotter:
     def plot_failures_histogram(self) -> None:
         """
         Plot histograms of rejection reasons for non-detected planets.
-        Overlays best and worst case scenarios in the same plot for each reason.
+        Shows actual values with cutoff lines overlaid.
         """
-        # Prepare data for both scenarios
-        dfs = {
-            'Best': self._get_rejection_df('best'),
-            'Worst': self._get_rejection_df('worst')
-        }
-        colors = {'Best': '#1f77b4', 'Worst': '#ff7f0e'}
-        hwo_consts = {
-            'Best': HWOConstants('best'),
-            'Worst': HWOConstants('worst')
-        }
-        # Map rejection reasons to actual column names with suffixes
-        column_mapping = {
-            'Min Photons': {
-                'Best': 'photon_rate_value_best',
-                'Worst': 'photon_rate_value_worst'
-            },
-            'Flux Ratio': {
-                'Best': 'flux_ratio_value_best', 
-                'Worst': 'flux_ratio_value_worst'
-            },
-            'IWA': {
-                'Best': 'maxangsep',  # Fixed: use maxangsep instead of angsep
-                'Worst': 'maxangsep'
-            }
-        }
-        # Add rejection_reason column to both dfs
-        for key in dfs:
-            if not dfs[key].empty:
-                dfs[key] = dfs[key].copy()
-                dfs[key]['rejection_reason'] = dfs[key].apply(get_rejection_reason, axis=1)
-        # If both are empty, skip
-        if all(df.empty for df in dfs.values()):
+        # Get the main dataframe with actual values
+        df = self.df.copy()
+        
+        # Add rejection_reason column
+        df['rejection_reason'] = df.apply(get_rejection_reason, axis=1)
+        
+        # If no data, skip
+        if df.empty:
             return
-        fig, axs = plt.subplots(1, 3, figsize=(18, 5), sharey=True)
-        for ax, (reason, scenario_columns) in zip(axs, column_mapping.items()):
-            for scenario in ['Best', 'Worst']:
-                df = dfs[scenario]
-                if df.empty:
-                    continue
-                column = scenario_columns[scenario]
-                # Check if column exists
-                if column not in df.columns:
-                    print(f"Warning: Column '{column}' not found in DataFrame. Available columns: {list(df.columns)}")
-                    continue
-                reason_df = df[df['rejection_reason'] == reason]
-                # Debug prints
-                print(f"Debug {reason} - {scenario}:")
-                print(f"  Total planets in rejection df: {len(df)}")
-                print(f"  Planets rejected for {reason}: {len(reason_df)}")
-                print(f"  Column '{column}' exists: {column in df.columns}")
-                if column in df.columns:
-                    print(f"  Column '{column}' has data: {df[column].notna().sum()} non-null values")
-                    print(f"  Column '{column}' range: {df[column].min():.2e} to {df[column].max():.2e}")
+            
+        # Map rejection reasons to actual column names (without best/worst suffixes)
+        column_mapping = {
+            'Number of photons hitting detector': 'photon_rate_value_best',
+            'Flux Ratio': 'flux_ratio_value_best', 
+            'IWA': 'maxangsep'
+        }
+        
+        _, axs = plt.subplots(1, 3, figsize=(18, 5), sharey=True)
+        
+        for ax, (reason, column) in zip(axs, column_mapping.items()):
+            # Check if column exists
+            if column not in df.columns:
+                print(f"Warning: Column '{column}' not found in DataFrame. Available columns: {list(df.columns)}")
+                continue
                 
-                # Use better binning for wide ranges
-                if reason == 'Flux Ratio':
-                    # Use log-spaced bins for flux ratio
-                    min_val = float(df[column].min())
-                    max_val = float(df[column].max())
-                    bins = np.logspace(np.log10(min_val), np.log10(max_val), 40)
-                elif reason == 'Min Photons':
-                    # Use log-spaced bins for photon rates
-                    min_val = float(df[column].min())
-                    max_val = float(df[column].max())
-                    bins = np.logspace(np.log10(min_val), np.log10(max_val), 40)
-                else:
-                    # Use linear bins for IWA
-                    bins = 40
+            reason_df = df[df['rejection_reason'] == reason]
+            
+            # Debug prints
+            print(f"Debug {reason}:")
+            print(f"  Total planets in df: {len(df)}")
+            print(f"  Planets rejected for {reason}: {len(reason_df)}")
+            print(f"  Column '{column}' exists: {column in df.columns}")
+            if column in df.columns:
+                print(f"  Column '{column}' has data: {df[column].notna().sum()} non-null values")
+                print(f"  Column '{column}' range: {df[column].min():.2e} to {df[column].max():.2e}")
+            
+            # Use better binning for wide ranges
+            if reason in ['Flux Ratio', 'Min Photons']:
+                # Use log-spaced bins for flux ratio and photon rates
+                min_val = float(df[column].min())
+                max_val = float(df[column].max())
+                bins = np.logspace(np.log10(min_val), np.log10(max_val), 40)
+            else:
+                # Use linear bins for IWA
+                bins = 40
+            
+            # Plot histogram of all planets
+            ax.hist(df[column], bins=bins, color='lightblue', alpha=0.7, edgecolor='black', 
+                   log=True, label='All planets')
+            
+            # Plot histogram of rejected planets for this reason
+            if len(reason_df) > 0:
+                print(f"  Plotted histogram for {reason} with {len(reason_df)} rejected points")
+            else:
+                print(f"  No data to plot for {reason}")
+            
+            # Draw cutoff lines for both best and worst case scenarios
+            hwo_best = HWOConstants('best')
+            hwo_worst = HWOConstants('worst')
+            
+            threshold_name = {
+                'Number of photons hitting detector': 'min_photons',
+                'Flux Ratio': 'min_planet_flux_star_ratio',
+                'IWA': 'iwa',
+            }[reason]
+            
+            best_threshold = getattr(hwo_best, threshold_name)
+            worst_threshold = getattr(hwo_worst, threshold_name)
+            
+            # Plot cutoff lines
+            if isinstance(best_threshold, tuple):
+                ax.axvline(best_threshold[0], color='blue', linestyle='--', alpha=0.7, 
+                          label=f'Best case cutoff = {best_threshold[0]:.2e}')
+                ax.axvline(best_threshold[1], color='blue', linestyle=':', alpha=0.7, 
+                          label=f'Best case max = {best_threshold[1]:.2e}')
+            else:
+                ax.axvline(best_threshold, color='blue', linestyle='--', alpha=0.7, 
+                          label=f'Best case cutoff = {best_threshold:.2e}')
                 
-                # Plot histograms
-                ax.hist(df[column], bins=bins, color=colors[scenario], alpha=0.5, edgecolor='black', log=True, label=f'{scenario} (all)')
-                if len(reason_df) > 0:
-                    ax.hist(reason_df[column], bins=bins, color=colors[scenario], alpha=0.9, edgecolor='black', log=True, label=f'{scenario} ({reason})', histtype='step')
-                    print(f"  Plotted histogram for {reason} - {scenario} with {len(reason_df)} points")
-                else:
-                    print(f"  No data to plot for {reason} - {scenario}")
-                
-                # Draw cutoffs for each scenario
-                threshold = getattr(hwo_consts[scenario], {
-                    'Min Photons': 'min_photons',
-                    'Flux Ratio': 'min_planet_flux_star_ratio',
-                    'IWA': 'iwa',
-                }[reason])
-                if isinstance(threshold, tuple):
-                    ax.axvline(threshold[0], color=colors[scenario], linestyle='--', label=f'{scenario} Min cutoff = {threshold[0]:.2e}')
-                    ax.axvline(threshold[1], color=colors[scenario], linestyle=':', label=f'{scenario} Max cutoff = {threshold[1]:.2e}')
-                else:
-                    ax.axvline(threshold, color=colors[scenario], linestyle='--', label=f'{scenario} Cutoff = {threshold:.2e}')
+            if isinstance(worst_threshold, tuple):
+                ax.axvline(worst_threshold[0], color='orange', linestyle='--', alpha=0.7, 
+                          label=f'Worst case cutoff = {worst_threshold[0]:.2e}')
+                ax.axvline(worst_threshold[1], color='orange', linestyle=':', alpha=0.7, 
+                          label=f'Worst case max = {worst_threshold[1]:.2e}')
+            else:
+                ax.axvline(worst_threshold, color='orange', linestyle='--', alpha=0.7, 
+                          label=f'Worst case cutoff = {worst_threshold:.2e}')
+            
             ax.set_title(f"{reason}")
             ax.set_xlabel(reason.replace('_', ' ').capitalize())
             ax.set_ylabel("Number of planets")
             ax.legend(fontsize=8)
-        suptitle = f"Reasons for Planet Non-Detection (Best vs. Worst Case)"
+            
+        suptitle = "Actual Values vs. Cutoff Thresholds for Planet Rejection"
         plt.suptitle(suptitle, fontsize=14)
         plt.tight_layout(rect=[0, 0, 1, 0.95])
-        filename = output_filename('failure_multipanel', self.name, self.nruns, self.star_catalog, 'best_vs_worst')
+        filename = output_filename('failure_multipanel', self.name, self.nruns, self.star_catalog, 'actual_values')
         plt.savefig(os.path.join(self.data_dir, filename), dpi=300, bbox_inches='tight')
         plt.close()

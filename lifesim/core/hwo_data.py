@@ -5,6 +5,7 @@ import tools.physics_constants as const
 from tools.physics_constants import HWOConstants as HWO
 from lifesim.core.data import Data
 from typing import Union
+from PPop.ExozodiModels.Ertel2020 import ExozodiModel
 
 
 # TODO: automatically add data storage for all
@@ -184,8 +185,104 @@ class HWOData():
     def calc_iwa_constraint(self):
         iwa_constraint = self.catalog.maxangsep
         return iwa_constraint
+
+    def calc_exozodi_constraint(self, case: str, exozodi_scenario: str = 'baseline'):
+        """
+        Calculate exozodi flux constraint for each planet.
+        
+        Parameters
+        ----------
+        case : str
+            'best' or 'worst' case scenario
+        exozodi_scenario : str
+            'baseline', 'pessimistic', or 'optimistic' exozodi scenario
+            
+        Returns
+        -------
+        exozodi_flux_ratios : array
+            Ratio of exozodi flux to planet flux for each planet
+        """
+        # Initialize exozodi model
+        rng = np.random.default_rng(42)  # Fixed seed for reproducibility
+        exozodi_model = ExozodiModel(exozodi_scenario, rng)
+        
+        # Calculate planet flux in HWO band
+        planet_flux = self.calc_planet_flux(case)
+        
+        # Calculate exozodi flux for each planet
+        exozodi_fluxes = []
+        for i in range(len(self.catalog)):
+            # Get planet properties
+            star_temp = self.catalog.iloc[i]['temp_s']
+            star_radius = self.catalog.iloc[i]['radius_s']
+            distance = self.catalog.iloc[i]['distance_s']
+            
+            # Estimate planet semi-major axis (this would ideally come from the catalog)
+            # For now, use a reasonable estimate based on planet temperature
+            planet_temp = self.catalog.iloc[i]['temp_p']
+            # Simple estimate: a = sqrt(L_star / (4πσT^4)) where T is planet temperature
+            star_luminosity = 4 * np.pi * (star_radius * const.R_sun)**2 * const.sigma * star_temp**4
+            planet_semi_major_axis = np.sqrt(star_luminosity / (4 * np.pi * const.sigma * planet_temp**4)) / const.au_to_m
+            
+            # Calculate exozodi flux at planet distance
+            exozodi_flux, _ = exozodi_model.getExozodiFluxAtPlanetDistance(
+                star_temp, star_radius, distance, planet_semi_major_axis
+            )
+            exozodi_fluxes.append(exozodi_flux)
+        
+        exozodi_fluxes = np.array(exozodi_fluxes)
+        
+        # Calculate flux ratio (planet flux / exozodi flux)
+        # We want planet flux > exozodi flux for detection
+        flux_ratios = planet_flux / exozodi_fluxes
+        
+        return flux_ratios
     
-    def determine_detectable(self):
+    def calc_exozodi_constraint_simple(self, case: str, exozodi_level: float = 1.0):
+        """
+        Simplified exozodi constraint using a fixed exozodi level.
+        
+        Parameters
+        ----------
+        case : str
+            'best' or 'worst' case scenario
+        exozodi_level : float
+            Exozodi level (1.0 = solar system level)
+            
+        Returns
+        -------
+        exozodi_flux_ratios : array
+            Ratio of planet flux to exozodi flux
+        """
+        # Calculate planet flux in HWO band
+        planet_flux = self.calc_planet_flux(case)
+        
+        # For simplified approach, assume exozodi flux is proportional to stellar flux
+        # and scales with exozodi level
+        stellar_flux = self.blackbody_flux(HWO(case).min_wavelength_hwo, self.catalog.temp_s.values)
+        
+        # Exozodi flux is approximately exozodi_level * stellar_flux * (some scaling factor)
+        # The scaling factor accounts for the fact that exozodi emission is in IR
+        # and we're observing in the HWO band
+        ir_scaling_factor = 0.1  # Rough estimate: ~10% of stellar flux in IR
+        exozodi_flux = exozodi_level * stellar_flux * ir_scaling_factor
+        
+        # Calculate flux ratio (planet flux / exozodi flux)
+        flux_ratios = planet_flux / exozodi_flux
+        
+        return flux_ratios
+    
+    def determine_detectable(self, use_exozodi_constraint: bool = True, exozodi_scenario: str = 'baseline'):
+        """
+        Determine which planets are detectable based on all constraints.
+        
+        Parameters
+        ----------
+        use_exozodi_constraint : bool
+            Whether to include exozodi constraint in detection logic
+        exozodi_scenario : str
+            Exozodi scenario to use ('baseline', 'pessimistic', 'optimistic')
+        """
         # Evaluate individual constraints
         cases = ['best', 'worst']
 
@@ -196,14 +293,28 @@ class HWOData():
 
             # Store individual condition results (boolean)
             self.catalog['iwa_pass_' + c] = iwa_condition
-            self.catalog['flux_pass_' + c] = flux_condition  # Changed from flux_ratio_ to flux_pass_
+            self.catalog['flux_pass_' + c] = flux_condition
             self.catalog['min_photons_pass_' + c] = min_photon_rate_condition
             
             # Store actual values (separate columns)
             self.catalog['flux_ratio_value_' + c] = self.calc_flux_ratio(c)
             self.catalog['photon_rate_value_' + c] = self.calc_photons(c)
 
-            # Total combined detection condition
-            total_condition = iwa_condition & flux_condition & min_photon_rate_condition
+            # Calculate exozodi constraint if requested
+            if use_exozodi_constraint:
+                exozodi_flux_ratios = self.calc_exozodi_constraint(c, exozodi_scenario)
+                # Planet flux should be greater than exozodi flux (ratio > 1)
+                exozodi_condition = exozodi_flux_ratios > 1.0
+                self.catalog['exozodi_pass_' + c] = exozodi_condition
+                self.catalog['exozodi_flux_ratio_' + c] = exozodi_flux_ratios
+                
+                # Total combined detection condition including exozodi
+                total_condition = (iwa_condition & flux_condition & 
+                                 min_photon_rate_condition & exozodi_condition)
+            else:
+                # Total combined detection condition without exozodi
+                total_condition = iwa_condition & flux_condition & min_photon_rate_condition
+            
             self.catalog['detected_' + c] = total_condition
+        
         return self.catalog

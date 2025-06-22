@@ -5,6 +5,7 @@ sigma = 5.670374419e-8  # Stefan-Boltzmann constant (W/m^2/K^4)
 R_earth = 6.371e6        # Earth's radius in meters
 pc_to_m = 3.0857e16      # 1 parsec in meters
 temp_sun = 5772         # temp of Sun in Kelvin
+R_sun = 6.957e8         # Solar radius in meters
 
 # HWO specific
 class HWOConstants():

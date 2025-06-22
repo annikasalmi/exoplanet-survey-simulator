@@ -130,6 +130,37 @@ class System():
         # Draw system exozodiacal dust level.
         self.z = ExozodiModel.getExozodiLevel()
         
+        # Calculate exozodi flux in HWO band for each planet
+        self.exozodi_flux_hwo = []
+        self.exozodi_planet_flux_ratio = []
+        
+        for i in range(len(self.Rp)):
+            # Calculate exozodi flux at this planet's distance
+            exozodi_flux, _ = ExozodiModel.getExozodiFluxAtPlanetDistance(
+                star_temp_K=self.Star.Teff,
+                star_radius_Rsun=self.Star.Rad,
+                distance_pc=self.Star.Dist,
+                planet_semi_major_axis_au=self.ap[i],  # Use planet's semi-major axis
+                exozodi_level=self.z
+            )
+            self.exozodi_flux_hwo.append(exozodi_flux)
+            
+            # Calculate ratio of exozodi flux to planet flux at planet's distance
+            flux_ratio, _, _ = ExozodiModel.getExozodiFluxRatioAtPlanetDistance(
+                star_temp_K=self.Star.Teff,
+                star_radius_Rsun=self.Star.Rad,
+                distance_pc=self.Star.Dist,
+                planet_radius_Rearth=self.Rp[i],
+                planet_temp_K=self.Tp[i],
+                planet_semi_major_axis_au=self.ap[i],  # Use planet's semi-major axis
+                exozodi_level=self.z
+            )
+            self.exozodi_planet_flux_ratio.append(flux_ratio)
+        
+        # Convert to numpy arrays for consistency
+        self.exozodi_flux_hwo = np.array(self.exozodi_flux_hwo)
+        self.exozodi_planet_flux_ratio = np.array(self.exozodi_planet_flux_ratio)
+        
         # Compute the other properties of the drawn planets.
         self.ap = self.getap() # au
         self.rp = self.getrp() # au
@@ -265,11 +296,8 @@ class System():
         
         Table = open(Name+'.txt', 'w')
         
-        # Old header.
-        Table.write('nMC\tRp\tPorb\tMp\tecc\tinc\tOmega\tomega\ttheta\tAbond\tAgeomVIS\tAgeomMIR\tzodis\ta\trp\tang_sep\tang_sep_max\tFinc\tf\tTp\tnstar\tRs\tMs\tTs\tdist\tstype\tra\tdec\tlGal\tbGal\t\n')
-        
-        # New header.
-        Table.write('Nuniverse\tRp\tPorb\tMp\tep\tip\tOmegap\tomegap\tthetap\tAbond\tAgeomVIS\tAgeomMIR\tz\tap\trp\tAngSep\tmaxAngSep\tFp\tfp\tTp\tNstar\tRs\tMs\tTs\tDs\tStype\tRA\tDec\tlGal\tbGal\t\n')
+        # Header with exozodi flux information
+        Table.write('Nuniverse\tRp\tPorb\tMp\tep\tip\tOmegap\tomegap\tthetap\tAbond\tAgeomVIS\tAgeomMIR\tz\texozodi_flux_hwo\texozodi_planet_flux_ratio\tap\trp\tAngSep\tmaxAngSep\tFp\tfp\tTp\tNstar\tRs\tMs\tTs\tDs\tStype\tRA\tDec\tlGal\tbGal\t\n')
         
         Table.close()
         
@@ -277,31 +305,6 @@ class System():
         
         pass
 
-        
-    def write(self,
-              Name):
-        """
-        Parameters
-        ----------
-        Name: str
-            Name of the output planet table.
-        """
-        
-        Table = open(Name+'.txt', 'w')
-        
-        # Old header.
-        Table.write('nMC\tRp\tPorb\tMp\tecc\tinc\tOmega\tomega\ttheta\tAbond\tAgeomVIS\tAgeomMIR\tzodis\ta\trp\tang_sep\tang_sep_max\tFinc\tf\tTp\tnstar\tRs\tMs\tTs\tdist\tstype\tra\tdec\tlGal\tbGal\t\n')
-        
-        # New header.
-        Table.write('Nuniverse\tRp\tPorb\tMp\tep\tip\tOmegap\tomegap\tthetap\tAbond\tAgeomVIS\tAgeomMIR\tz\tap\trp\tAngSep\tmaxAngSep\tFp\tfp\tTp\tNstar\tRs\tMs\tTs\tDs\tStype\tRA\tDec\tlGal\tbGal\t\n')
-        
-        Table.close()
-        
-        self.append(Name)
-        
-        pass
-
-     
     def write_df(self):
         """
         Write out to a dataframe
@@ -361,6 +364,8 @@ class System():
             - AgeomVIS: planet geometric albedo in the visible.
             - AgeomMIR: planet geometric albedo in the mid-infrared.
             - z: exozodiacal dust level.
+            - exozodi_flux_hwo: exozodi flux in HWO wavelength band (W/m²).
+            - exozodi_planet_flux_ratio: ratio of exozodi flux to planet flux in HWO band.
             - ap: planet semi-major axis (au).
             - rp: planet physical separation (au).
             - AngSep: planet projected angular separation (arcsec).
@@ -385,10 +390,10 @@ class System():
         # Write the simulated planets to the planet population table.
         if (self.Star.lGal is None or self.Star.bGal is None):
             for i in range(len(self.Rp)):
-                Table.write('%.0f\t' % self.Nuniverse+'%.5f\t' % self.Rp[i]+'%.5f\t' % self.Porb[i]+'%.5f\t' % self.Mp[i]+'%.5f\t' % self.ep[i]+'%.5f\t' % self.ip[i]+'%.5f\t' % self.Omegap[i]+'%.5f\t' % self.omegap[i]+'%.5f\t' % self.thetap[i]+'%.5f\t' % self.Abond[i]+'%.5f\t' % self.AgeomVIS[i]+'%.5f\t' % self.AgeomMIR[i]+'%.5f\t' % self.z+'%.5f\t' % self.ap[i]+'%.5f\t' % self.rp[i]+'%.5f\t' % self.AngSep[i]+'%.5f\t' % self.maxAngSep[i]+'%.5f\t' % self.Fp[i]+'%.5f\t' % self.fp[i]+'%.5f\t' % self.Tp[i]+'%.0f\t' % self.Nstar+'%.5f\t' % self.Star.Rad+'%.5f\t' % self.Star.Mass+'%.5f\t' % self.Star.Teff+'%.5f\t' % self.Star.Dist+self.Star.Stype+'\t%.5f\t' % self.Star.RA+'%.5f\t' % self.Star.Dec+'None\t'+'None\t\n')
+                Table.write('%.0f\t' % self.Nuniverse+'%.5f\t' % self.Rp[i]+'%.5f\t' % self.Porb[i]+'%.5f\t' % self.Mp[i]+'%.5f\t' % self.ep[i]+'%.5f\t' % self.ip[i]+'%.5f\t' % self.Omegap[i]+'%.5f\t' % self.omegap[i]+'%.5f\t' % self.thetap[i]+'%.5f\t' % self.Abond[i]+'%.5f\t' % self.AgeomVIS[i]+'%.5f\t' % self.AgeomMIR[i]+'%.5f\t' % self.z+'%.5f\t' % self.exozodi_flux_hwo[i]+'%.5f\t' % self.exozodi_planet_flux_ratio[i]+'%.5f\t' % self.ap[i]+'%.5f\t' % self.rp[i]+'%.5f\t' % self.AngSep[i]+'%.5f\t' % self.maxAngSep[i]+'%.5f\t' % self.Fp[i]+'%.5f\t' % self.fp[i]+'%.5f\t' % self.Tp[i]+'%.0f\t' % self.Nstar+'%.5f\t' % self.Star.Rad+'%.5f\t' % self.Star.Mass+'%.5f\t' % self.Star.Teff+'%.5f\t' % self.Star.Dist+self.Star.Stype+'\t%.5f\t' % self.Star.RA+'%.5f\t' % self.Star.Dec+'None\t'+'None\t\n')
         else:
             for i in range(len(self.Rp)):
-                Table.write('%.0f\t' % self.Nuniverse+'%.5f\t' % self.Rp[i]+'%.5f\t' % self.Porb[i]+'%.5f\t' % self.Mp[i]+'%.5f\t' % self.ep[i]+'%.5f\t' % self.ip[i]+'%.5f\t' % self.Omegap[i]+'%.5f\t' % self.omegap[i]+'%.5f\t' % self.thetap[i]+'%.5f\t' % self.Abond[i]+'%.5f\t' % self.AgeomVIS[i]+'%.5f\t' % self.AgeomMIR[i]+'%.5f\t' % self.z+'%.5f\t' % self.ap[i]+'%.5f\t' % self.rp[i]+'%.5f\t' % self.AngSep[i]+'%.5f\t' % self.maxAngSep[i]+'%.5f\t' % self.Fp[i]+'%.5f\t' % self.fp[i]+'%.5f\t' % self.Tp[i]+'%.0f\t' % self.Nstar+'%.5f\t' % self.Star.Rad+'%.5f\t' % self.Star.Mass+'%.5f\t' % self.Star.Teff+'%.5f\t' % self.Star.Dist+self.Star.Stype+'\t%.5f\t' % self.Star.RA+'%.5f\t' % self.Star.Dec+'%.5f\t' % self.Star.lGal+'%.5f\t\n' % self.Star.bGal)
+                Table.write('%.0f\t' % self.Nuniverse+'%.5f\t' % self.Rp[i]+'%.5f\t' % self.Porb[i]+'%.5f\t' % self.Mp[i]+'%.5f\t' % self.ep[i]+'%.5f\t' % self.ip[i]+'%.5f\t' % self.Omegap[i]+'%.5f\t' % self.omegap[i]+'%.5f\t' % self.thetap[i]+'%.5f\t' % self.Abond[i]+'%.5f\t' % self.AgeomVIS[i]+'%.5f\t' % self.AgeomMIR[i]+'%.5f\t' % self.z+'%.5f\t' % self.exozodi_flux_hwo[i]+'%.5f\t' % self.exozodi_planet_flux_ratio[i]+'%.5f\t' % self.ap[i]+'%.5f\t' % self.rp[i]+'%.5f\t' % self.AngSep[i]+'%.5f\t' % self.maxAngSep[i]+'%.5f\t' % self.Fp[i]+'%.5f\t' % self.fp[i]+'%.5f\t' % self.Tp[i]+'%.0f\t' % self.Nstar+'%.5f\t' % self.Star.Rad+'%.5f\t' % self.Star.Mass+'%.5f\t' % self.Star.Teff+'%.5f\t' % self.Star.Dist+self.Star.Stype+'\t%.5f\t' % self.Star.RA+'%.5f\t' % self.Star.Dec+'%.5f\t' % self.Star.lGal+'%.5f\t\n' % self.Star.bGal)
         
         Table.close()
         

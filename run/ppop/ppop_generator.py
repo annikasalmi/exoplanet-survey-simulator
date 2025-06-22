@@ -58,11 +58,9 @@ class PPop():
         # Select the mass, eccentricity, stability, orbit, albedo, and exozodiacal dust models to be used
         self.MassModel = Chen2017 # Forecaster
         self.EccentricityModel = Circular
-        #StabilityModel = None
         self.StabilityModel = He2019
         self.OrbitModel = Random
         self.AlbedoModel = Uniform
-        #ExozodiModel = Ertel2018
         self.ExozodiModel = Ertel2020
 
         # Select whether you want to display summary plots, test draws, and saving of plots

@@ -69,7 +69,10 @@ def get_rejection_reason(row, scenario='best'):
         elif f'flux_ratio_{scenario}' in row.index and not row[f'flux_ratio_{scenario}']:
             failure_reasons.append('Flux Ratio')
         if not row[f'min_photons_pass_{scenario}']:
-            failure_reasons.append('Number of photons hitting detector')
+            failure_reasons.append('# photons hitting detector')
+        # Add exozodi constraint check
+        if f'exozodi_pass_{scenario}' in row.index and not row[f'exozodi_pass_{scenario}']:
+            failure_reasons.append('Exozodi')
         
         if failure_reasons:
             return ' + '.join(failure_reasons)
@@ -84,7 +87,10 @@ def get_rejection_reason(row, scenario='best'):
         elif 'flux_ratio' in row.index and not row['flux_ratio']:
             failure_reasons.append('Flux Ratio')
         if not row['min_photons_pass']:
-            failure_reasons.append('Number of photons hitting detector')
+            failure_reasons.append('# photons hitting detector')
+        # Add exozodi constraint check
+        if 'exozodi_pass' in row.index and not row['exozodi_pass']:
+            failure_reasons.append('Exozodi')
         
         if failure_reasons:
             return ' + '.join(failure_reasons)

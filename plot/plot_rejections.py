@@ -88,14 +88,14 @@ class PlanetRejectionPlotter:
                 rejection_counts = pd.Series()
             
             # Create bar plot
-            reasons = ['# photons hitting detector', 'Flux Ratio', 'IWA']
+            reasons = ['# photons hitting detector', 'Flux Ratio', 'IWA', 'Exozodi']
             bar_height = total_planets
             
             # Plot the total bar (light gray)
-            axs[i].bar(reasons, [bar_height] * 3, color='lightgray', alpha=0.7, label='Total planets')
+            axs[i].bar(reasons, [bar_height] * 4, color='lightgray', alpha=0.7, label='Total planets')
             
             # Plot rejection sections (colored)
-            bottom = np.zeros(3)
+            bottom = np.zeros(4)
             for j, reason in enumerate(reasons):
                 if reason in rejection_counts.index:
                     count = rejection_counts[reason]
@@ -140,10 +140,11 @@ class PlanetRejectionPlotter:
         column_mapping = {
             '# photons hitting detector': 'photon_rate_value_best',
             'Flux Ratio': 'flux_ratio_value_best', 
-            'IWA': 'maxangsep'
+            'IWA': 'maxangsep',
+            'Exozodi': 'exozodi_flux_ratio_best'
         }
         
-        _, axs = plt.subplots(1, 3, figsize=(18, 5), sharey=True)
+        _, axs = plt.subplots(1, 4, figsize=(24, 5), sharey=True)
         
         for ax, (reason, column) in zip(axs, column_mapping.items()):
             # Check if column exists
@@ -178,6 +179,9 @@ class PlanetRejectionPlotter:
             elif reason == 'IWA':
                 pass_col_best = 'iwa_pass_best'
                 pass_col_worst = 'iwa_pass_worst'
+            elif reason == 'Exozodi':
+                pass_col_best = 'exozodi_pass_best'
+                pass_col_worst = 'exozodi_pass_worst'
             
             # Calculate rejection percentages
             if pass_col_best in df.columns and pass_col_worst in df.columns:
@@ -199,10 +203,16 @@ class PlanetRejectionPlotter:
                 '# photons hitting detector': 'min_photons',
                 'Flux Ratio': 'min_planet_flux_star_ratio',
                 'IWA': 'iwa',
+                'Exozodi': 'exozodi_threshold'
             }[reason]
             
-            best_threshold = getattr(hwo_best, threshold_name)
-            worst_threshold = getattr(hwo_worst, threshold_name)
+            # Handle exozodi threshold (fixed at 1.0)
+            if reason == 'Exozodi':
+                best_threshold = 1.0
+                worst_threshold = 1.0
+            else:
+                best_threshold = getattr(hwo_best, threshold_name)
+                worst_threshold = getattr(hwo_worst, threshold_name)
             
             # Plot cutoff lines
             if isinstance(best_threshold, tuple):

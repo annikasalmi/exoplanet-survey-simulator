@@ -6,6 +6,7 @@ from typing import List, Optional
 
 from tools.paths import PLOTS_DIR
 import tools.physics_constants as const
+# from debug_categories import debug_category_assignment
 
 def make_output_dir(name, nruns, star_catalog):
     out_dir = os.path.join(PLOTS_DIR, str(name)+'_'+str(nruns)+'_'+str(star_catalog))
@@ -16,10 +17,10 @@ def make_output_dir(name, nruns, star_catalog):
 def temp_zone(temp):
     '''
     Assigns a temperature zone based on the temperature value.'''
-    if temp > 600:
+    if temp > 390:
         return 'hot'
-    elif temp > 300:
-        return 'warm'
+    elif 390>temp > 270:
+        return 'habitable'
     else:
         return 'cold'
 
@@ -29,17 +30,26 @@ def assign_category(row):
     r = row['radius_p']
     hab = row['habitable']
     stype = row['stype']
+    temp = row['temp_p']
 
-    if r < 1.5 and hab:
-        return 'Rocky eHZ'
-    elif r < 1.8 and hab and stype in ['G', 'K']:
+    if r < 1.5 and 390>temp > 270:
+        return 'Habitable Rocky'
+    if r < 1.5:
+        return 'Rocky'
+    if 0.8 < r < 1.5 and 390>temp > 270 and stype in ['G', 'K']:
         return 'Exo-Earth Candidates'
-    elif 1.0 <= r < 2.0:
-        return 'Rocky + Super-Earths'
-    elif 2.0 <= r < 4.0:
+    if 1.5 <= r < 1.8:
+        return 'Super-Earths'
+    if 390>temp > 270 and 1.5 <= r < 1.8:
+        return 'Habitable Super-Earths'
+    if 390>temp > 270 and 1.8 <= r < 4.0:
+        return 'Habitable Sub-Neptunes'
+    if 1.8 <= r < 4.0:
         return 'Sub-Neptunes'
-    elif 4.0 <= r < 8.0:
+    if 4.0 <= r < 8.0:
         return 'Sub-Jovians'
+    elif r > 8.0:
+        return 'Giant planets'
     else:
         return None
     

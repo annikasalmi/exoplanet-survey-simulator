@@ -8,7 +8,7 @@ from plot.helpers import (
     bar_plot_with_errors, overlay_best_worst, output_filename, get_detection_masks
 )
 from tools.plotting_constants import (
-    STAR_ORDER, BIN_LABELS, CATEGORY_LABELS, TEMP_ZONES, DISTANCE_LABELS,
+    STAR_ORDER, BIN_LABELS, TEMP_ZONES, DISTANCE_LABELS,
     STAR_COLORS, STAR_HATCHES, TEMP_COLORS, BAR_WIDTH_STAR, BAR_WIDTH_TEMP, BAR_WIDTH_DIST
 )
 
@@ -179,17 +179,38 @@ class PlotPlanetType:
         df['temp_zone'] = df['temp_p'].apply(temp_zone)
         df['category'] = df.apply(assign_category, axis=1)
         df = df.dropna(subset=['category'])
-        x = np.arange(len(CATEGORY_LABELS))
+        
+        # Define all possible categories from assign_category function
+        all_possible_categories = [
+            'Habitable Rocky',
+            'Rocky', 
+            'Exo-Earth Candidates',
+            'Super-Earths',
+            'Habitable Super-Earths',
+            'Habitable Sub-Neptunes',
+            'Sub-Neptunes',
+            'Sub-Jovians',
+            'Giant planets'
+        ]
+        
+        # Get categories that actually exist in the data
+        detected_categories = sorted(df['category'].unique())
+        print(f"Detected categories in data: {detected_categories}")
+        
+        # Use all possible categories for consistent plotting
+        plot_categories = all_possible_categories
+        x = np.arange(len(plot_categories))
+        
         # Total
         total_stats = pivot_stats(df, ['category', 'temp_zone'])
         heights_list, errors_list = [], []
         for zone in TEMP_ZONES:
-            data = total_stats[total_stats['temp_zone'] == zone].set_index('category').reindex(CATEGORY_LABELS)
+            data = total_stats[total_stats['temp_zone'] == zone].set_index('category').reindex(plot_categories)
             heights_list.append(data['count'].fillna(0).values)
             errors_list.append(data['error'].fillna(0).values)
         bar_plot_with_errors(
             x, heights_list, errors_list, BAR_WIDTH_TEMP, TEMP_ZONES, colors=TEMP_COLORS,
-            xticks=x, xticklabels=CATEGORY_LABELS, ylabel='Planet Count',
+            xticks=x, xticklabels=plot_categories, ylabel='Planet Count',
             title=f'Total Planets by Type and Temp Zone\n{self.name}, {self.nruns} Runs — {self.star_catalog}',
             legend_title='Temp Zone', filename=os.path.join(self.data_dir, output_filename('planets_by_type_total', self.name, self.nruns, self.star_catalog)),
             text_offset=1
@@ -199,48 +220,65 @@ class PlotPlanetType:
             mask_best, mask_worst = get_detection_masks(df, self.name)
             if self.name == 'HWO':
                 df['detected_flag_best'] = mask_best.astype(bool)
-                detected_stats = pivot_stats(df[df['detected_flag_best']], ['category', 'temp_zone'])
+                df['detected_flag_worst'] = mask_worst.astype(bool)
+                detected_df_best = df[df['detected_flag_best']]
+                detected_df_worst = df[df['detected_flag_worst']]
+                
+                # Best case
+                best_stats = pivot_stats(detected_df_best, ['category', 'temp_zone'])
+                heights_list_best, errors_list_best = [], []
+                for zone in TEMP_ZONES:
+                    data = best_stats[best_stats['temp_zone'] == zone].set_index('category').reindex(plot_categories)
+                    heights_list_best.append(data['count'].fillna(0).values)
+                    errors_list_best.append(data['error'].fillna(0).values)
+                
+                # Worst case
+                worst_stats = pivot_stats(detected_df_worst, ['category', 'temp_zone'])
+                heights_list_worst, errors_list_worst = [], []
+                for zone in TEMP_ZONES:
+                    data = worst_stats[worst_stats['temp_zone'] == zone].set_index('category').reindex(plot_categories)
+                    heights_list_worst.append(data['count'].fillna(0).values)
+                    errors_list_worst.append(data['error'].fillna(0).values)
+                
+                # Create overlay plot
+                fig, ax = plt.subplots(figsize=(15, 8))
+                bar_width = BAR_WIDTH_TEMP
+                
+                for i, zone in enumerate(TEMP_ZONES):
+                    overlay_best_worst(
+                        ax, x + i * bar_width * 3, bar_width,
+                        [heights_list_best[i], heights_list_worst[i]],
+                        [TEMP_COLORS[i], TEMP_COLORS[i]],
+                        [f'{zone} (Best)', f'{zone} (Worst)']
+                    )
+                
+                ax.set_xlabel('Planet Category')
+                ax.set_ylabel('Detected Planet Count')
+                ax.set_title(f'Detected Planets by Type and Temp Zone\n{self.name}, {self.nruns} Runs — {self.star_catalog}')
+                ax.set_xticks(x + bar_width * 3)
+                ax.set_xticklabels(plot_categories, rotation=45, ha='right')
+                ax.legend(title='Temp Zone')
+                plt.tight_layout()
+                plt.savefig(os.path.join(self.data_dir, 
+                                        output_filename('planets_by_type_detected', self.name, self.nruns, self.star_catalog)), 
+                           dpi=300, bbox_inches='tight')
+                plt.close(fig)
             else:
                 df['detected_flag'] = mask_best.astype(bool)
-                detected_stats = pivot_stats(df[df['detected_flag']], ['category', 'temp_zone'])
-            heights_list, errors_list = [], []
-            for zone in TEMP_ZONES:
-                data = detected_stats[detected_stats['temp_zone'] == zone].set_index('category').reindex(CATEGORY_LABELS)
-                heights_list.append(data['count'].fillna(0).values)
-                errors_list.append(data['error'].fillna(0).values)
-            bar_plot_with_errors(
-                x, heights_list, errors_list, BAR_WIDTH_TEMP, TEMP_ZONES, colors=TEMP_COLORS,
-                xticks=x, xticklabels=CATEGORY_LABELS, ylabel='Detected Planet Count',
-                title=f'Detected Planets by Type and Temp Zone\n{self.name}, {self.nruns} Runs — {self.star_catalog}',
-                legend_title='Temp Zone', filename=os.path.join(self.data_dir, output_filename('planets_by_type_detected', self.name, self.nruns, self.star_catalog)),
-                text_offset=1
-            )
-            # Best/worst overlays if HWO
-            if self.name == 'HWO' and mask_worst is not None:
-                df['detected_flag_worst'] = mask_worst.astype(bool)
-                worst_stats = pivot_stats(df[df['detected_flag_worst']], ['category', 'temp_zone'])
-                best_stats = pivot_stats(df[df['detected_flag_best']], ['category', 'temp_zone'])
-                worst_list, best_list = [], []
+                detected_df = df[df['detected_flag']]
+                detected_stats = pivot_stats(detected_df, ['category', 'temp_zone'])
+                heights_list, errors_list = [], []
                 for zone in TEMP_ZONES:
-                    data_worst = worst_stats[worst_stats['temp_zone'] == zone].set_index('category').reindex(CATEGORY_LABELS)
-                    data_best = best_stats[best_stats['temp_zone'] == zone].set_index('category').reindex(CATEGORY_LABELS)
-                    worst_list.append(data_worst['count'].fillna(0).values)
-                    best_list.append(data_best['count'].fillna(0).values)
-                fig, ax = plt.subplots(figsize=(10, 6))
-                overlay_best_worst(
-                    ax, x, BAR_WIDTH_TEMP,
-                    worst_list + best_list,
-                    ['green'] * len(worst_list) + ['lightgreen'] * len(best_list),
-                    ['Worst Case (Green)'] * len(worst_list) + ['Best Case (Light Green)'] * len(best_list)
+                    data = detected_stats[detected_stats['temp_zone'] == zone].set_index('category').reindex(plot_categories)
+                    heights_list.append(data['count'].fillna(0).values)
+                    errors_list.append(data['error'].fillna(0).values)
+                bar_plot_with_errors(
+                    x, heights_list, errors_list, BAR_WIDTH_TEMP, TEMP_ZONES, colors=TEMP_COLORS,
+                    xticks=x, xticklabels=plot_categories, ylabel='Detected Planet Count',
+                    title=f'Detected Planets by Type and Temp Zone\n{self.name}, {self.nruns} Runs — {self.star_catalog}',
+                    legend_title='Temp Zone', filename=os.path.join(self.data_dir, output_filename('planets_by_type_detected', self.name, self.nruns, self.star_catalog)),
+                    text_offset=1
                 )
-                ax.set_xticks(x)
-                ax.set_xticklabels(CATEGORY_LABELS, rotation=15, ha='right')
-                ax.set_ylabel('Detected Planets (Best/Worst)')
-                ax.set_title(f'Best/Worst Detected Planets by Type and Temp Zone\n{self.name}, {self.nruns} Runs — {self.star_catalog}')
-                ax.legend(title='Overlay', fontsize=9)
-                plt.tight_layout()
-                plt.savefig(os.path.join(self.data_dir, output_filename('planets_by_type_detected', self.name, self.nruns, self.star_catalog, 'best_worst')), dpi=300, bbox_inches='tight')
-                plt.close(fig)
 
     def plot_distances(self, detected_only=False) -> None:
         """Bar plots by distance bin. Best/worst overlays for HWO."""

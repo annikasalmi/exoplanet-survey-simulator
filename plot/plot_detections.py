@@ -36,10 +36,10 @@ class PlanetDetectionPlotter:
                     (self.df['habitable'] == True) &
                     (self.df['radius_p'] < 1.5)
                 ],
-                'HZ Earth-like around Sun-like': self.df[
+                'HZ Rocky around G-type (Sun-like) stars': self.df[
                     (self.df['habitable'] == True) &
-                    (self.df['radius_p'] >= 0.8) & (self.df['radius_p'] <= 1.5) &
-                    (self.df['mass_s'] >= 0.8) & (self.df['mass_s'] <= 1.2)
+                    (self.df['radius_p'] <= 1.5) &
+                    (self.df['stype'].str.contains('G'))
                 ],
                 'HZ around M dwarfs': self.df[
                     (self.df['habitable'] == True) &

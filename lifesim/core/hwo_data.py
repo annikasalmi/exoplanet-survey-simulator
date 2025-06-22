@@ -186,6 +186,62 @@ class HWOData():
         iwa_constraint = self.catalog.maxangsep
         return iwa_constraint
 
+    def calc_exozodi_surface_brightness_constraint(self, case: str, exozodi_scenario: str = 'baseline'):
+        """
+        Calculate exozodi surface brightness constraint using the criterion:
+        L_zodi(θ) ≥ C_inst · L_⋆, where C_inst = min_planet_flux_star_ratio from HWOConstants
+        
+        Parameters
+        ----------
+        case : str
+            'best' or 'worst' case scenario
+        exozodi_scenario : str
+            'baseline', 'pessimistic', or 'optimistic' exozodi scenario
+            
+        Returns
+        -------
+        is_rejected : array
+            Boolean array indicating which planets are rejected due to exozodi surface brightness
+        surface_brightness_ratios : array
+            Ratio of exozodi surface brightness to (contrast_limit * star_surface_brightness)
+        """
+        # Initialize exozodi model
+        rng = np.random.default_rng(42)  # Fixed seed for reproducibility
+        exozodi_model = ExozodiModel(exozodi_scenario, rng)
+        
+        # Get the instrument contrast limit for this case
+        instrument_contrast_limit = HWO(case).min_planet_flux_star_ratio
+        
+        # Calculate angular separations for each planet
+        angular_separations = self.catalog['maxangsep'].values  # arcseconds
+        
+        # Calculate surface brightness constraint for each planet
+        is_rejected = []
+        surface_brightness_ratios = []
+        
+        for i in range(len(self.catalog)):
+            # Get planet properties
+            star_temp = self.catalog.iloc[i]['temp_s']
+            star_radius = self.catalog.iloc[i]['radius_s']
+            distance = self.catalog.iloc[i]['distance_s']
+            angular_sep = angular_separations[i]
+            
+            # Check surface brightness criterion
+            rejected, exozodi_sb, star_sb, _ = exozodi_model.checkExozodiSurfaceBrightnessCriterion(
+                star_temp, star_radius, distance, angular_sep, instrument_contrast_limit
+            )
+            
+            is_rejected.append(rejected)
+            
+            # Calculate ratio for analysis
+            if star_sb > 0:
+                ratio = exozodi_sb / (instrument_contrast_limit * star_sb)
+            else:
+                ratio = np.inf
+            surface_brightness_ratios.append(ratio)
+        
+        return np.array(is_rejected), np.array(surface_brightness_ratios)
+
     def calc_exozodi_constraint(self, case: str, exozodi_scenario: str = 'baseline'):
         """
         Calculate exozodi flux constraint for each planet.
@@ -272,7 +328,8 @@ class HWOData():
         
         return flux_ratios
     
-    def determine_detectable(self, use_exozodi_constraint: bool = True, exozodi_scenario: str = 'baseline'):
+    def determine_detectable(self, use_exozodi_constraint: bool = True, exozodi_scenario: str = 'baseline',
+                           use_surface_brightness_criterion: bool = True, ignore_exozodi_rejections: bool = False):
         """
         Determine which planets are detectable based on all constraints.
         
@@ -282,6 +339,12 @@ class HWOData():
             Whether to include exozodi constraint in detection logic
         exozodi_scenario : str
             Exozodi scenario to use ('baseline', 'pessimistic', 'optimistic')
+        use_surface_brightness_criterion : bool
+            Whether to use the new surface brightness criterion (L_zodi(θ) ≥ C_inst · L_⋆)
+            If False, uses the old flux ratio approach
+        ignore_exozodi_rejections : bool
+            If True, exozodi rejections are calculated but not applied to final detection
+            (useful for analyzing other rejection criteria)
         """
         # Evaluate individual constraints
         cases = ['best', 'worst']
@@ -302,15 +365,34 @@ class HWOData():
 
             # Calculate exozodi constraint if requested
             if use_exozodi_constraint:
-                exozodi_flux_ratios = self.calc_exozodi_constraint(c, exozodi_scenario)
-                # Planet flux should be greater than exozodi flux (ratio > 1)
-                exozodi_condition = exozodi_flux_ratios > 1.0
-                self.catalog['exozodi_pass_' + c] = exozodi_condition
-                self.catalog['exozodi_flux_ratio_' + c] = exozodi_flux_ratios
+                if use_surface_brightness_criterion:
+                    # Use new surface brightness criterion
+                    exozodi_rejected, surface_brightness_ratios = self.calc_exozodi_surface_brightness_constraint(
+                        c, exozodi_scenario
+                    )
+                    # Planet is rejected if exozodi surface brightness exceeds the criterion
+                    exozodi_condition = ~exozodi_rejected  # Invert because we want planets that pass
+                    self.catalog['exozodi_pass_' + c] = exozodi_condition
+                    self.catalog['exozodi_surface_brightness_ratio_' + c] = surface_brightness_ratios
+                    
+                    # Store the rejection reason for analysis
+                    self.catalog['exozodi_surface_brightness_rejected_' + c] = exozodi_rejected
+                else:
+                    # Use old flux ratio approach
+                    exozodi_flux_ratios = self.calc_exozodi_constraint(c, exozodi_scenario)
+                    # Planet flux should be greater than exozodi flux (ratio > 1)
+                    exozodi_condition = exozodi_flux_ratios > 1.0
+                    self.catalog['exozodi_pass_' + c] = exozodi_condition
+                    self.catalog['exozodi_flux_ratio_' + c] = exozodi_flux_ratios
                 
-                # Total combined detection condition including exozodi
-                total_condition = (iwa_condition & flux_condition & 
-                                 min_photon_rate_condition & exozodi_condition)
+                # Apply exozodi constraint to final detection only if not ignored
+                if ignore_exozodi_rejections:
+                    # Total combined detection condition excluding exozodi
+                    total_condition = iwa_condition & flux_condition & min_photon_rate_condition
+                else:
+                    # Total combined detection condition including exozodi
+                    total_condition = (iwa_condition & flux_condition & 
+                                     min_photon_rate_condition & exozodi_condition)
             else:
                 # Total combined detection condition without exozodi
                 total_condition = iwa_condition & flux_condition & min_photon_rate_condition

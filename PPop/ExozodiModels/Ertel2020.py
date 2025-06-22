@@ -158,6 +158,11 @@ class ExozodiModel():
             """Spectral radiance per unit wavelength (W·sr⁻¹·m⁻³)"""
             a = 2.0 * h * c**2
             b = h * c / (wavelength * k * T)
+            
+            # Handle overflow for very small wavelengths or high temperatures
+            if np.any(b > 700):  # exp(700) is close to overflow
+                return np.zeros_like(wavelength)
+            
             return a / (wavelength**5 * (np.exp(b) - 1.0))
         
         # Total blackbody flux integrated over all wavelengths (Stefan-Boltzmann law)
@@ -559,3 +564,144 @@ class ExozodiModel():
             exozodi_temperatures.append(temp)
         
         return np.array(distances_au), np.array(exozodi_temperatures)
+
+    def getExozodiSurfaceBrightness(self, star_temp_K, star_radius_Rsun, distance_pc, 
+                                   angular_separation_arcsec, exozodi_level=None):
+        """
+        Calculate exozodi surface brightness at a given angular separation.
+        
+        Parameters
+        ----------
+        star_temp_K : float
+            Star effective temperature in Kelvin
+        star_radius_Rsun : float
+            Star radius in solar radii
+        distance_pc : float
+            Distance to star in parsecs
+        angular_separation_arcsec : float
+            Angular separation from star in arcseconds
+        exozodi_level : float, optional
+            Exozodi level (if None, will draw from model)
+            
+        Returns
+        -------
+        surface_brightness : float
+            Exozodi surface brightness at the given angular separation (W/m²/arcsec²)
+        exozodi_level : float
+            The exozodi level used for calculation
+        """
+        if exozodi_level is None:
+            exozodi_level = self.getExozodiLevel()
+        
+        # Convert angular separation to physical distance
+        angular_separation_rad = angular_separation_arcsec * np.pi / (180 * 3600)  # Convert arcsec to radians
+        physical_distance_au = angular_separation_rad * distance_pc * 206265  # Convert to AU
+        
+        # Calculate star luminosity in solar units
+        star_luminosity_solar = (star_radius_Rsun**2) * (star_temp_K / temp_sun)**4
+        
+        # Kennedy+2015 parameters for radial profile
+        alpha = 0.34
+        r_in = 0.034422617777777775 * np.sqrt(star_luminosity_solar)  # Inner radius in AU
+        r_0 = np.sqrt(star_luminosity_solar)  # Reference radius in AU
+        sigma_zero = 7.11889e-8  # Sigma_{m,0} from Kennedy+2015
+        
+        # Check if the angular separation is within the exozodi disk
+        if physical_distance_au < r_in:
+            return 0.0, exozodi_level
+        
+        # Calculate temperature at this distance (Kennedy+2015 Eq. 2)
+        temp_dust = 278.3 * (star_luminosity_solar**0.25) / np.sqrt(physical_distance_au)
+        
+        # Calculate surface density (Kennedy+2015 Eq. 3)
+        sigma = sigma_zero * exozodi_level * (physical_distance_au / r_0)**(-alpha)
+        
+        # Calculate blackbody emission in HWO band
+        fraction_in_band = self._blackbody_flux_in_band(
+            temp_dust, 
+            self.hwo_min_wavelength, 
+            self.hwo_max_wavelength
+        )
+        
+        # Calculate surface brightness
+        # Surface brightness = sigma * blackbody_emission * fraction_in_band
+        # Convert to W/m²/arcsec²
+        # Note: sigma is in kg/m², we need to convert to proper units
+        # The surface brightness should be proportional to the dust emission
+        # and inversely proportional to the angular area
+        
+        # Calculate the dust emission per unit area
+        dust_emission_per_area = sigma * sigma * temp_dust**4 * fraction_in_band
+        
+        # Convert to surface brightness at Earth
+        # Surface brightness = emission_per_area / (distance² * angular_area)
+        distance_m = distance_pc * pc_to_m
+        angular_area_arcsec2 = np.pi * (angular_separation_arcsec * 4.848e-6)**2  # Convert arcsec² to sr
+        
+        surface_brightness = dust_emission_per_area / (distance_m**2 * angular_area_arcsec2)
+        
+        return surface_brightness, exozodi_level
+    
+    def checkExozodiSurfaceBrightnessCriterion(self, star_temp_K, star_radius_Rsun, distance_pc,
+                                              angular_separation_arcsec, instrument_contrast_limit,
+                                              exozodi_level=None):
+        """
+        Check if exozodi surface brightness exceeds the instrument contrast limit.
+        
+        Parameters
+        ----------
+        star_temp_K : float
+            Star effective temperature in Kelvin
+        star_radius_Rsun : float
+            Star radius in solar radii
+        distance_pc : float
+            Distance to star in parsecs
+        angular_separation_arcsec : float
+            Angular separation from star in arcseconds
+        instrument_contrast_limit : float
+            Instrument contrast limit at the given angular separation
+        exozodi_level : float, optional
+            Exozodi level (if None, will draw from model)
+            
+        Returns
+        -------
+        is_rejected : bool
+            True if planet should be rejected due to exozodi surface brightness
+        surface_brightness : float
+            Exozodi surface brightness at the given angular separation
+        star_brightness : float
+            Star brightness for comparison
+        exozodi_level : float
+            The exozodi level used for calculation
+        """
+        if exozodi_level is None:
+            exozodi_level = self.getExozodiLevel()
+        
+        # Calculate exozodi surface brightness
+        exozodi_surface_brightness, exozodi_level = self.getExozodiSurfaceBrightness(
+            star_temp_K, star_radius_Rsun, distance_pc, angular_separation_arcsec, exozodi_level
+        )
+        
+        # Calculate star brightness in HWO band
+        star_luminosity = 4 * np.pi * (star_radius_Rsun * R_sun)**2 * sigma * star_temp_K**4
+        star_flux_at_earth = star_luminosity / (4 * np.pi * (distance_pc * pc_to_m)**2)
+        
+        # Calculate fraction of star emission in HWO band
+        star_fraction_in_band = self._blackbody_flux_in_band(
+            star_temp_K, 
+            self.hwo_min_wavelength, 
+            self.hwo_max_wavelength
+        )
+        
+        # Star brightness in HWO band
+        star_brightness_hwo = star_flux_at_earth * star_fraction_in_band
+        
+        # Convert to surface brightness (assuming point source)
+        # For a point source, surface brightness = flux / (angular_area)
+        # We'll use a reference angular area of 1 arcsec²
+        star_surface_brightness = star_brightness_hwo / (np.pi * (1.0 * 4.848e-6)**2)  # W/m²/arcsec²
+        
+        # Check the criterion: L_zodi(θ) ≥ C_inst · L_⋆
+        is_rejected = exozodi_surface_brightness >= (instrument_contrast_limit * star_surface_brightness)
+        
+        return is_rejected, exozodi_surface_brightness, star_surface_brightness, exozodi_level

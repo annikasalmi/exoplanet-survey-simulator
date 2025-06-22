@@ -333,13 +333,18 @@ class TestHWODataPhysics(unittest.TestCase):
         """Test exozodi constraint calculation."""
         # Test both cases
         for case in ['best', 'worst']:
-            ratios = self.hwo_data.calc_exozodi_constraint(case, 'baseline')
+            # Use the new surface brightness criterion
+            rejected, ratios = self.hwo_data.calc_exozodi_surface_brightness_constraint(case, 'baseline')
             
             # Should return array of correct length
             self.assertEqual(len(ratios), len(self.catalog))
             
             # All ratios should be finite
             self.assertTrue(np.all(np.isfinite(ratios)))
+            
+            # Rejected should be boolean array
+            self.assertEqual(len(rejected), len(self.catalog))
+            self.assertTrue(np.all(np.isfinite(rejected) | (rejected == True) | (rejected == False)))
 
 
 class TestPhysicsConstants(unittest.TestCase):

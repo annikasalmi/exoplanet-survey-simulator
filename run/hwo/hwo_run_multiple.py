@@ -38,7 +38,13 @@ def run_single(i, star_catalog='Gaia'):
     # PPopObj.catalog_remove_distance(stype='M', mode='larger', dist=10.0)
 
     hwo_data = HWOData(PPopObj.catalog)
-    hwo_data.determine_detectable()
+    # Explicitly enable exozodi implementation
+    hwo_data.determine_detectable(
+        use_exozodi_constraint=True,           # Enable exozodi constraint
+        exozodi_scenario='baseline',           # Use baseline exozodi scenario
+        use_surface_brightness_criterion=True, # Use new surface brightness criterion
+        ignore_exozodi_rejections=False        # Apply exozodi rejections to final detection
+    )
 
     df = hwo_data.catalog
     df.to_csv(os.path.join(HWO_DATA_DIR, star_catalog, f'hwo_catalog_{i}.csv'), index=False)

@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.colors
 from plot.helpers import make_output_dir, output_filename, scatter_best_worst_overlay, get_detection_masks
 
 class PlanetDetectionPlotter:
@@ -22,6 +23,7 @@ class PlanetDetectionPlotter:
         self.plot_efficiency_multipanel()
         self.plot_detection_mr()
         self.plot_detection_vs_temp_color()
+        self.plot_detection_efficiency_radius()
 
     def plot_efficiency_multipanel(self) -> None:
         """Plot detection efficiency for several planet types in a multipanel figure, with best/worst overlays for HWO, or just detected for others."""
@@ -163,7 +165,6 @@ class PlanetDetectionPlotter:
                 ax1.set_xlim(bins[0], bins[-1])
                 ax2 = ax1.twinx()
                 ax2.plot(bin_centers, efficiency, 'r--', linewidth=2, label='Detection efficiency')
-                ax2.set_ylabel("Detection efficiency")
                 ax2.set_ylim(0, 1.0)
             h1, l1 = ax1.get_legend_handles_labels()
             h2, l2 = ax2.get_legend_handles_labels()
@@ -181,6 +182,128 @@ class PlanetDetectionPlotter:
             outfile = output_filename(f'detection_efficiency_{x_axis}', self.name, self.nruns, self.star_catalog)
             plt.savefig(os.path.join(self.data_dir, outfile), dpi=300, bbox_inches='tight')
             plt.close()
+    
+
+    def plot_detection_efficiency_radius(self, category_column=None, category_label=None) -> None:
+        """Plot detection efficiency as a 2D temperature vs radius plot with best/worst overlays for HWO."""
+        df = self.df.copy()
+        if category_column and category_label:
+            df = df[df[category_column] == category_label]
+        
+        # Define temperature and radius ranges
+        temp_range = (125, 500)
+        radius_range = (0, 8)
+        
+        # Create 2D bins
+        temp_bins = np.linspace(temp_range[0], temp_range[1], 40)
+        radius_bins = np.linspace(radius_range[0], radius_range[1], 30)
+        
+        # Calculate total counts in each 2D bin
+        total_counts, _, _ = np.histogram2d(df['temp_p'], df['radius_p'], bins=[temp_bins, radius_bins])
+        
+        # Get detection masks
+        mask_best, mask_worst = get_detection_masks(df, self.name)
+        
+        # Calculate total and detected countsx
+        total_planets = len(df)
+        detected_best = np.sum(mask_best)
+        detected_worst = np.sum(mask_worst) if mask_worst is not None else 0
+        
+        if self.name == 'HWO':
+            # Calculate detected counts for best and worst cases
+            detected_counts_best, _, _ = np.histogram2d(df[mask_best]['temp_p'], df[mask_best]['radius_p'], 
+                                                       bins=[temp_bins, radius_bins])
+            
+            # Create a mask for bins that have total planets but no detected planets
+            zero_detection_mask = (total_counts > 0) & (detected_counts_best == 0)
+            
+            # Create single plot for best case
+            fig, ax = plt.subplots(figsize=(10, 8))
+            
+            # Plot best case (number of detected planets)
+            vmax_best = max(detected_counts_best.max(), 1.0)  # Ensure vmax is at least 1.0
+            if detected_counts_best.max() == 0:
+                # No detected planets - use linear scale with dark red for zeros
+                norm_best = matplotlib.colors.Normalize(vmin=0, vmax=1)
+                # Create a custom colormap that goes from dark red to green
+                colors_best = ['darkred', 'green']
+                cmap_best = matplotlib.colors.LinearSegmentedColormap.from_list('custom_red_green_best', colors_best)
+                # Set zero detection bins to a special value to show as dark red
+                plot_data = detected_counts_best.copy()
+                plot_data[zero_detection_mask] = 0.5  # Special value for dark red
+            else:
+                # Use log scale for detected planets
+                norm_best = matplotlib.colors.LogNorm(vmin=0.1, vmax=vmax_best)
+                cmap_best = 'RdYlGn'
+                plot_data = detected_counts_best.copy()
+                # Set zero detection bins to a special value to show as dark red
+                plot_data[zero_detection_mask] = 0.05  # Special value for dark red in log scale
+            im = ax.imshow(plot_data.T, origin='lower', aspect='auto', 
+                            extent=[temp_bins[0], temp_bins[-1], radius_bins[0], radius_bins[-1]],
+                            cmap=cmap_best, norm=norm_best)
+            ax.set_xlabel('Temperature [K]')
+            ax.set_ylabel('Radius [Rearth]')
+            ax.set_title(f'Number of Detected Planets (Best Case)\n{detected_best}/{total_planets} planets detected')
+            cbar = plt.colorbar(im, ax=ax)
+            cbar.set_label('Number of detected planets')
+            
+            # Add reference lines
+            ax.axhline(y=1.5, color='black', linestyle='--', alpha=0.5, label='Rocky/Super-Earth boundary')
+            ax.axhline(y=4.0, color='black', linestyle=':', alpha=0.5, label='Sub-Neptune boundary')
+            ax.axvline(x=270, color='blue', linestyle='--', alpha=0.5, label='Cold/Habitable boundary')
+            ax.axvline(x=390, color='red', linestyle='--', alpha=0.5, label='Habitable/Hot boundary')
+            ax.legend(loc='upper right', fontsize=10)
+        else:
+            # Non-HWO case - single plot
+            detected_counts, _, _ = np.histogram2d(df[mask_best]['temp_p'], df[mask_best]['radius_p'], 
+                                                  bins=[temp_bins, radius_bins])
+            
+            # Create a mask for bins that have total planets but no detected planets
+            zero_detection_mask = (total_counts > 0) & (detected_counts == 0)
+            
+            vmax_detected = max(detected_counts.max(), 1.0)  # Ensure vmax is at least 1.0
+            if detected_counts.max() == 0:
+                # No detected planets - use linear scale with dark red for zeros
+                norm_detected = matplotlib.colors.Normalize(vmin=0, vmax=1)
+                # Create a custom colormap that goes from dark red to green
+                colors_detected = ['darkred', 'green']
+                cmap_detected = matplotlib.colors.LinearSegmentedColormap.from_list('custom_red_green_detected', colors_detected)
+                # Set zero detection bins to a special value to show as dark red
+                plot_data = detected_counts.copy()
+                plot_data[zero_detection_mask] = 0.5  # Special value for dark red
+            else:
+                # Use log scale for detected planets
+                norm_detected = matplotlib.colors.LogNorm(vmin=0.1, vmax=vmax_detected)
+                cmap_detected = 'RdYlGn'
+                plot_data = detected_counts.copy()
+                # Set zero detection bins to a special value to show as dark red
+                plot_data[zero_detection_mask] = 0.05  # Special value for dark red in log scale
+            fig, ax = plt.subplots(figsize=(10, 8))
+            im = ax.imshow(plot_data.T, origin='lower', aspect='auto',
+                          extent=[temp_bins[0], temp_bins[-1], radius_bins[0], radius_bins[-1]],
+                          cmap=cmap_detected, norm=norm_detected)
+            ax.set_xlabel('Temperature [K]')
+            ax.set_ylabel('Radius [Rearth]')
+            ax.set_title(f'Number of Detected Planets\n{detected_best}/{total_planets} planets detected')
+            cbar = plt.colorbar(im, ax=ax)
+            cbar.set_label('Number of detected planets')
+            
+            # Add reference lines
+            ax.axhline(y=1.5, color='black', linestyle='--', alpha=0.5, label='Rocky/Super-Earth boundary')
+            ax.axhline(y=4.0, color='black', linestyle=':', alpha=0.5, label='Sub-Neptune boundary')
+            ax.axvline(x=270, color='blue', linestyle='--', alpha=0.5, label='Cold/Habitable boundary')
+            ax.axvline(x=390, color='red', linestyle='--', alpha=0.5, label='Habitable/Hot boundary')
+            ax.legend(loc='upper right', fontsize=10)
+        
+        # Add category information to title
+        category_str = f" ({category_label})" if category_label else ""
+        fig.suptitle(f'Detection Efficiency: Temperature vs Radius{category_str} for {self.name} ({self.nruns} runs)\nStar Catalog: {self.star_catalog}', 
+                     fontsize=14, y=0.98)
+        
+        plt.tight_layout()
+        outfile = output_filename('detection_efficiency_temp_radius', self.name, self.nruns, self.star_catalog)
+        plt.savefig(os.path.join(self.data_dir, outfile), dpi=300, bbox_inches='tight')
+        plt.close()
 
     def plot_detection_mr(self) -> None:
         """Plot detection likelihood by planet radius and mass (log scale), with best/worst overlays for HWO, or just detected for others."""

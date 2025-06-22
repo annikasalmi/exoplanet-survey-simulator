@@ -240,7 +240,7 @@ class PlotPlanetType:
             plt.savefig(os.path.join(self.data_dir, output_filename('planets_by_type_detected', self.name, self.nruns, self.star_catalog, 'best_worst')), dpi=300, bbox_inches='tight')
             plt.close(fig)
 
-    def plot_distances(self) -> None:
+    def plot_distances(self, detected_only=False) -> None:
         """Bar plots by distance bin. Best/worst overlays for HWO."""
         df = self.df.copy()
         bins = [0, 3, 5, 7, 9, 11, 13, 15, np.inf]
@@ -273,32 +273,34 @@ class PlotPlanetType:
             legend_title=None, filename=os.path.join(self.data_dir, output_filename('planet_distance', self.name, self.nruns, self.star_catalog)),
             stacked=True, bottom_list=bottom_list, alpha_list=alpha_list, text_offset=2
         )
-        # Detected-only bar plot
-        heights_list = [detected_mean.values]
-        errors_list = [detected_std.values]
-        bar_plot_with_errors(
-            x, heights_list, errors_list, BAR_WIDTH_DIST, ['Detected'], colors=['seagreen'],
-            xticks=x, xticklabels=DISTANCE_LABELS, ylabel='Detected Planet Count',
-            title=f'Detected Planets by Distance Bin\n{self.name}, {self.nruns} Runs — {self.star_catalog}',
-            legend_title=None, filename=os.path.join(self.data_dir, output_filename('planet_distance_detected', self.name, self.nruns, self.star_catalog)),
-            text_offset=2
-        )
+        if detected_only:
+            # Detected-only bar plot
+            heights_list = [detected_mean.values]
+            errors_list = [detected_std.values]
+            bar_plot_with_errors(
+                x, heights_list, errors_list, BAR_WIDTH_DIST, ['Detected'], colors=['seagreen'],
+                xticks=x, xticklabels=DISTANCE_LABELS, ylabel='Detected Planet Count',
+                title=f'Detected Planets by Distance Bin\n{self.name}, {self.nruns} Runs — {self.star_catalog}',
+                legend_title=None, filename=os.path.join(self.data_dir, output_filename('planet_distance_detected', self.name, self.nruns, self.star_catalog)),
+                text_offset=2
+            )
         # Best/worst overlays if HWO
-        if self.name == 'HWO' and mask_worst is not None:
-            df['detected_flag_worst'] = mask_worst.astype(bool)
-            detected_worst_per_run = df[df['detected_flag_worst']].groupby(['run', 'distance_bin']).size().unstack(fill_value=0).reindex(columns=DISTANCE_LABELS, fill_value=0)
-            detected_best_per_run = df[df['detected_flag_best']].groupby(['run', 'distance_bin']).size().unstack(fill_value=0).reindex(columns=DISTANCE_LABELS, fill_value=0)
-            detected_worst_mean = detected_worst_per_run.mean()
-            detected_best_mean = detected_best_per_run.mean()
-            fig, ax = plt.subplots(figsize=(10, 6))
-            ax.bar(x, detected_worst_mean.values, width=BAR_WIDTH_DIST, color='green', label='Worst Case (Green)', edgecolor='black', alpha=0.7)
-            ax.bar(x, detected_best_mean.values, width=BAR_WIDTH_DIST, color='lightgreen', label='Best Case (Light Green)', edgecolor='black', alpha=0.8)
-            ax.set_ylabel('Detected Planet Count (Best/Worst)')
-            ax.set_xlabel('Distance [pc]')
-            ax.set_xticks(x)
-            ax.set_xticklabels(DISTANCE_LABELS)
-            ax.set_title(f'Best/Worst Detected Planets by Distance Bin\n{self.name}, {self.nruns} Runs — {self.star_catalog}')
-            ax.legend(title='Overlay', fontsize=9)
-            plt.tight_layout()
-            plt.savefig(os.path.join(self.data_dir, output_filename('planet_distance_detected', self.name, self.nruns, self.star_catalog, 'best_worst')), dpi=300, bbox_inches='tight')
-            plt.close(fig)
+        if detected_only:
+            if self.name == 'HWO' and mask_worst is not None:
+                df['detected_flag_worst'] = mask_worst.astype(bool)
+                detected_worst_per_run = df[df['detected_flag_worst']].groupby(['run', 'distance_bin']).size().unstack(fill_value=0).reindex(columns=DISTANCE_LABELS, fill_value=0)
+                detected_best_per_run = df[df['detected_flag_best']].groupby(['run', 'distance_bin']).size().unstack(fill_value=0).reindex(columns=DISTANCE_LABELS, fill_value=0)
+                detected_worst_mean = detected_worst_per_run.mean()
+                detected_best_mean = detected_best_per_run.mean()
+                fig, ax = plt.subplots(figsize=(10, 6))
+                ax.bar(x, detected_worst_mean.values, width=BAR_WIDTH_DIST, color='green', label='Worst Case (Green)', edgecolor='black', alpha=0.7)
+                ax.bar(x, detected_best_mean.values, width=BAR_WIDTH_DIST, color='lightgreen', label='Best Case (Light Green)', edgecolor='black', alpha=0.8)
+                ax.set_ylabel('Detected Planet Count (Best/Worst)')
+                ax.set_xlabel('Distance [pc]')
+                ax.set_xticks(x)
+                ax.set_xticklabels(DISTANCE_LABELS)
+                ax.set_title(f'Best/Worst Detected Planets by Distance Bin\n{self.name}, {self.nruns} Runs — {self.star_catalog}')
+                ax.legend(title='Overlay', fontsize=9)
+                plt.tight_layout()
+                plt.savefig(os.path.join(self.data_dir, output_filename('planet_distance_detected', self.name, self.nruns, self.star_catalog, 'best_worst')), dpi=300, bbox_inches='tight')
+                plt.close(fig)

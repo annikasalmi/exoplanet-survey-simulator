@@ -44,40 +44,50 @@ def assign_category(row):
         return None
     
 
-def get_rejection_reason(row):
+def get_rejection_reason(row, scenario='best'):
     '''
     Returns the rejection reason for a given row.
-    If the row has HWO-style columns (with best/worst suffixes), it will use the best case for rejection reasons.
+    If the row has HWO-style columns (with best/worst suffixes), it will use the specified scenario for rejection reasons.
     Otherwise, it will use the standard column names.
+    Returns all failure reasons, not just the first one.
 
     Args:
         row: pd.Series, a row of a DataFrame
+        scenario: str, either 'best' or 'worst' for HWO scenarios
     Returns:
-        str, the rejection reason
+        str, the rejection reason(s) - multiple reasons separated by ' + ' if applicable
     '''
+    failure_reasons = []
+    
     # Check if we have HWO-style columns (with best/worst suffixes)
-    if 'iwa_pass_best' in row.index:
-        # HWO scenario - use best case for rejection reasons
-        if not row['iwa_pass_best']:
-            return 'IWA'
-        elif 'flux_pass_best' in row.index and not row['flux_pass_best']:
-            return 'Flux Ratio'
-        elif 'flux_ratio_best' in row.index and not row['flux_ratio_best']:
-            return 'Flux Ratio'
-        elif not row['min_photons_pass_best']:
-            return 'Min Photons'
+    if f'iwa_pass_{scenario}' in row.index:
+        # HWO scenario - use specified scenario for rejection reasons
+        if not row[f'iwa_pass_{scenario}']:
+            failure_reasons.append('IWA')
+        if f'flux_pass_{scenario}' in row.index and not row[f'flux_pass_{scenario}']:
+            failure_reasons.append('Flux Ratio')
+        elif f'flux_ratio_{scenario}' in row.index and not row[f'flux_ratio_{scenario}']:
+            failure_reasons.append('Flux Ratio')
+        if not row[f'min_photons_pass_{scenario}']:
+            failure_reasons.append('Number of photons hitting detector')
+        
+        if failure_reasons:
+            return ' + '.join(failure_reasons)
         else:
             return 'Detected'
     elif 'iwa_pass' in row.index:
         # Non-HWO scenario - use standard column names
         if not row['iwa_pass']:
-            return 'IWA'
-        elif 'flux_pass' in row.index and not row['flux_pass']:
-            return 'Flux Ratio'
+            failure_reasons.append('IWA')
+        if 'flux_pass' in row.index and not row['flux_pass']:
+            failure_reasons.append('Flux Ratio')
         elif 'flux_ratio' in row.index and not row['flux_ratio']:
-            return 'Flux Ratio'
-        elif not row['min_photons_pass']:
-            return 'Min Photons'
+            failure_reasons.append('Flux Ratio')
+        if not row['min_photons_pass']:
+            failure_reasons.append('Number of photons hitting detector')
+        
+        if failure_reasons:
+            return ' + '.join(failure_reasons)
         else:
             return 'Detected'
     else:

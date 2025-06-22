@@ -143,11 +143,11 @@ class HWOData():
         photons_per_second_per_m2 = flux_w_m2 / energy_per_photon
 
         # Convert to photons/hour/m²
-        photons_per_hour_per_m2 = photons_per_second_per_m2 / 3600
+        photons_per_hour_per_m2 = photons_per_second_per_m2 * 3600
 
         # Convert to photons/hour/μm (assuming 1 μm bandwidth)
         # This is a spectral density, so we multiply by wavelength bandwidth
-        wavelength_um = wavelength_m / 1e6  # convert m to μm
+        wavelength_um = wavelength_m * 1e6  # convert m to μm
         photons_per_hour_per_um = photons_per_hour_per_m2 * wavelength_um
 
         return photons_per_hour_per_um
@@ -192,7 +192,7 @@ class HWOData():
         for c in cases:
             iwa_condition = self.calc_iwa_constraint() >= HWO(c).iwa
             flux_condition = self.calc_flux_ratio(c) >= HWO(c).min_planet_flux_star_ratio
-            min_photon_rate_condition = self.calc_photons(c) >= HWO(c).min_photons
+            min_photon_rate_condition = self.calc_photons(c) <= HWO(c).min_photons
 
             # Store individual condition results (boolean)
             self.catalog['iwa_pass_' + c] = iwa_condition

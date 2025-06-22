@@ -72,20 +72,6 @@ class PlanetDetectionPlotter:
                     ax1.bar(bin_centers, detected_counts_worst, width=np.diff(bins), color='green', alpha=0.4, align='center', label='Detected (Worst)')
                     ax1.bar(bin_centers, detected_counts_best, width=np.diff(bins), color='green', alpha=0.8, align='center', label='Detected (Best)')
                     
-                    # Add text annotations for counts
-                    for j, (total, best, worst) in enumerate(zip(total_counts, detected_counts_best, detected_counts_worst)):
-                        if total > 0:
-                            # Show total count
-                            total_display = int(total) if not np.isnan(total) else 0
-                            ax1.text(bin_centers[j], total + 0.5, f'{total_display}', ha='center', va='bottom', fontsize=8)
-                            # Show detected counts
-                            if best > 0:
-                                best_display = int(best) if not np.isnan(best) else 0
-                                ax1.text(bin_centers[j], best + 0.5, f'{best_display}', ha='center', va='bottom', fontsize=8, color='darkgreen')
-                            if worst > 0 and worst != best:
-                                worst_display = int(worst) if not np.isnan(worst) else 0
-                                ax1.text(bin_centers[j], worst + 0.5, f'{worst_display}', ha='center', va='bottom', fontsize=8, color='green')
-                    
                     ax1.set_xlabel(x_label)
                     ax1.set_xlim(bins[0], bins[-1])
                     ax1.set_title(f"{label}\nTotal: {total_planets}, Best: {detected_best}, Worst: {detected_worst}")
@@ -100,17 +86,6 @@ class PlanetDetectionPlotter:
                         efficiency[np.isnan(efficiency)] = 0.0
                     ax1.bar(bin_centers, total_counts, width=np.diff(bins), color='lightgrey', align='center', label='Total')
                     ax1.bar(bin_centers, detected_counts, width=np.diff(bins), color='green', alpha=0.8, align='center', label='Detected')
-                    
-                    # Add text annotations for counts
-                    for j, (total, detected) in enumerate(zip(total_counts, detected_counts)):
-                        if total > 0:
-                            # Show total count
-                            total_display = int(total) if not np.isnan(total) else 0
-                            ax1.text(bin_centers[j], total + 0.5, f'{total_display}', ha='center', va='bottom', fontsize=8)
-                            # Show detected count
-                            if detected > 0:
-                                detected_display = int(detected) if not np.isnan(detected) else 0
-                                ax1.text(bin_centers[j], detected + 0.5, f'{detected_display}', ha='center', va='bottom', fontsize=8, color='darkgreen')
                     
                     ax1.set_xlabel(x_label)
                     ax1.set_xlim(bins[0], bins[-1])
@@ -166,20 +141,6 @@ class PlanetDetectionPlotter:
                 ax1.bar(bin_centers, detected_counts_worst, width=np.diff(bins), align='center', color='green', alpha=0.4, label='Planets detectable (Worst)')
                 ax1.bar(bin_centers, detected_counts_best, width=np.diff(bins), color='green', alpha=0.8, align='center', label='Planets detectable (Best)')
                 
-                # Add text annotations for counts
-                for j, (total, best, worst) in enumerate(zip(total_counts, detected_counts_best, detected_counts_worst)):
-                    if total > 0:
-                        # Show total count
-                        total_display = int(total) if not np.isnan(total) else 0
-                        ax1.text(bin_centers[j], total + 0.5, f'{total_display}', ha='center', va='bottom', fontsize=8)
-                        # Show detected counts
-                        if best > 0:
-                            best_display = int(best) if not np.isnan(best) else 0
-                            ax1.text(bin_centers[j], best + 0.5, f'{best_display}', ha='center', va='bottom', fontsize=8, color='darkgreen')
-                        if worst > 0 and worst != best:
-                            worst_display = int(worst) if not np.isnan(worst) else 0
-                            ax1.text(bin_centers[j], worst + 0.5, f'{worst_display}', ha='center', va='bottom', fontsize=8, color='green')
-                
                 ax1.set_ylabel("Number of planets")
                 ax1.set_xlabel(x_label)
                 ax1.set_xlim(bins[0], bins[-1])
@@ -196,17 +157,6 @@ class PlanetDetectionPlotter:
                 _, ax1 = plt.subplots(figsize=(10, 6))
                 ax1.bar(bin_centers, total_counts, width=np.diff(bins), align='center', color='lightgrey', label='All planets present')
                 ax1.bar(bin_centers, detected_counts, width=np.diff(bins), color='green', alpha=0.8, align='center', label='Detected')
-                
-                # Add text annotations for counts
-                for j, (total, detected) in enumerate(zip(total_counts, detected_counts)):
-                    if total > 0:
-                        # Show total count
-                        total_display = int(total) if not np.isnan(total) else 0
-                        ax1.text(bin_centers[j], total + 0.5, f'{total_display}', ha='center', va='bottom', fontsize=8)
-                        # Show detected count
-                        if detected > 0:
-                            detected_display = int(detected) if not np.isnan(detected) else 0
-                            ax1.text(bin_centers[j], detected + 0.5, f'{detected_display}', ha='center', va='bottom', fontsize=8, color='darkgreen')
                 
                 ax1.set_ylabel("Number of planets")
                 ax1.set_xlabel(x_label)
@@ -272,8 +222,12 @@ class PlanetDetectionPlotter:
 
     def plot_detection_vs_temp_color(self) -> None:
         """Plot temperature vs. distance to star, colored by detection status, with best/worst overlays for HWO, or just detected for others."""
-        xtitles = {'temp_p': 'Planet Temperature ($K$)'}
-        xvars = ['temp_p']
+        if self.name == 'HWO':
+            xtitles = {'maxangsep': 'Max angular separation (arcsec)', 'flux_ratio_value_best': 'Flux ratio', 'photon_rate_value_best': 'Number of photons hitting detector'}
+            xvars = ['maxangsep', 'flux_ratio_value_best', 'photon_rate_value_best']
+        else:
+            xtitles = {'maxangsep': 'Max angular separation (arcsec)'}
+            xvars = ['maxangsep']
         for var in xvars:
             df_plot = self.df[(self.df[var] > 0) & (self.df['distance_s'] > 0)]
             plt.figure(figsize=(8,6))

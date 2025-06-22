@@ -20,10 +20,11 @@ class PlanetRejectionPlotter:
         self.name = name
         self.data_dir = make_output_dir(name, nruns, star_catalog)
 
-    def plot_all(self) -> None:
+    def plot_all(self, plot_percentages=False) -> None:
         """Generate all rejection/failure plots."""
         self.plot_failures_histogram()
-        self.plot_failures_percentages()
+        if plot_percentages:
+            self.plot_failures_percentages()
 
     def _get_rejection_df(self, scenario: str = 'best') -> pd.DataFrame:
         """
@@ -243,9 +244,19 @@ class PlanetRejectionPlotter:
             ax.set_title(f"{reason}")
             ax.set_xlabel(reason.replace('_', ' ').capitalize())
             ax.set_ylabel("Number of planets")
-            ax.legend(fontsize=8)
+            ax.legend(fontsize=8, loc='upper right')
             
-        suptitle = "Actual Values vs. Cutoff Thresholds for Planet Rejection"
+        # Calculate overall rejection percentages for subtitle
+        total_planets = len(df)
+        if 'detected_best' in df.columns and 'detected_worst' in df.columns:
+            rejected_best = len(df[~df['detected_best']])
+            rejected_worst = len(df[~df['detected_worst']])
+            pct_best = (rejected_best / total_planets) * 100
+            pct_worst = (rejected_worst / total_planets) * 100
+            suptitle = f"Actual Values vs. Cutoff Thresholds for Planet Rejection\nBest case: {pct_best:.1f}% rejected, Worst case: {pct_worst:.1f}% rejected"
+        else:
+            suptitle = "Actual Values vs. Cutoff Thresholds for Planet Rejection"
+        
         plt.suptitle(suptitle, fontsize=14)
         plt.tight_layout(rect=[0, 0, 1, 0.95])
         filename = output_filename('failure_multipanel', self.name, self.nruns, self.star_catalog, 'actual_values')

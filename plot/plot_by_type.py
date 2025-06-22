@@ -165,6 +165,7 @@ class PlotPlanetType:
         ax.set_title(f'Detected Planets by Star Type for {self.name} ({self.nruns} Runs)\nStar Catalog: {self.star_catalog}')
         ax.set_xticks(x + 1.5 * bar_width)
         ax.set_xticklabels(STAR_ORDER)
+        ax.set_ylim(bottom=0)  # Set y-axis to start at 0
         ax.legend(title='Radius Bin')
         plt.tight_layout()
         plt.savefig(os.path.join(self.data_dir, 
@@ -172,7 +173,7 @@ class PlotPlanetType:
                    dpi=300, bbox_inches='tight')
         plt.close(fig)
 
-    def plot_by_planet(self) -> None:
+    def plot_by_planet(self, detected_only=False) -> None:
         """Bar plots by planet category and temperature zone. Best/worst overlays for HWO."""
         df = self.df.copy()
         df['temp_zone'] = df['temp_p'].apply(temp_zone)
@@ -193,52 +194,53 @@ class PlotPlanetType:
             legend_title='Temp Zone', filename=os.path.join(self.data_dir, output_filename('planets_by_type_total', self.name, self.nruns, self.star_catalog)),
             text_offset=1
         )
-        # Detected
-        mask_best, mask_worst = get_detection_masks(df, self.name)
-        if self.name == 'HWO':
-            df['detected_flag_best'] = mask_best.astype(bool)
-            detected_stats = pivot_stats(df[df['detected_flag_best']], ['category', 'temp_zone'])
-        else:
-            df['detected_flag'] = mask_best.astype(bool)
-            detected_stats = pivot_stats(df[df['detected_flag']], ['category', 'temp_zone'])
-        heights_list, errors_list = [], []
-        for zone in TEMP_ZONES:
-            data = detected_stats[detected_stats['temp_zone'] == zone].set_index('category').reindex(CATEGORY_LABELS)
-            heights_list.append(data['count'].fillna(0).values)
-            errors_list.append(data['error'].fillna(0).values)
-        bar_plot_with_errors(
-            x, heights_list, errors_list, BAR_WIDTH_TEMP, TEMP_ZONES, colors=TEMP_COLORS,
-            xticks=x, xticklabels=CATEGORY_LABELS, ylabel='Detected Planet Count',
-            title=f'Detected Planets by Type and Temp Zone\n{self.name}, {self.nruns} Runs — {self.star_catalog}',
-            legend_title='Temp Zone', filename=os.path.join(self.data_dir, output_filename('planets_by_type_detected', self.name, self.nruns, self.star_catalog)),
-            text_offset=1
-        )
-        # Best/worst overlays if HWO
-        if self.name == 'HWO' and mask_worst is not None:
-            df['detected_flag_worst'] = mask_worst.astype(bool)
-            worst_stats = pivot_stats(df[df['detected_flag_worst']], ['category', 'temp_zone'])
-            best_stats = pivot_stats(df[df['detected_flag_best']], ['category', 'temp_zone'])
-            worst_list, best_list = [], []
+        if detected_only:
+            # Detected
+            mask_best, mask_worst = get_detection_masks(df, self.name)
+            if self.name == 'HWO':
+                df['detected_flag_best'] = mask_best.astype(bool)
+                detected_stats = pivot_stats(df[df['detected_flag_best']], ['category', 'temp_zone'])
+            else:
+                df['detected_flag'] = mask_best.astype(bool)
+                detected_stats = pivot_stats(df[df['detected_flag']], ['category', 'temp_zone'])
+            heights_list, errors_list = [], []
             for zone in TEMP_ZONES:
-                data_worst = worst_stats[worst_stats['temp_zone'] == zone].set_index('category').reindex(CATEGORY_LABELS)
-                data_best = best_stats[best_stats['temp_zone'] == zone].set_index('category').reindex(CATEGORY_LABELS)
-                worst_list.append(data_worst['count'].fillna(0).values)
-                best_list.append(data_best['count'].fillna(0).values)
-            fig, ax = plt.subplots(figsize=(10, 6))
-            overlay_best_worst(
-                ax, x, BAR_WIDTH_TEMP,
-                worst_list + best_list,
-                ['green'] * len(worst_list) + ['lightgreen'] * len(best_list),
-                ['Worst Case (Green)'] * len(worst_list) + ['Best Case (Light Green)'] * len(best_list)
+                data = detected_stats[detected_stats['temp_zone'] == zone].set_index('category').reindex(CATEGORY_LABELS)
+                heights_list.append(data['count'].fillna(0).values)
+                errors_list.append(data['error'].fillna(0).values)
+            bar_plot_with_errors(
+                x, heights_list, errors_list, BAR_WIDTH_TEMP, TEMP_ZONES, colors=TEMP_COLORS,
+                xticks=x, xticklabels=CATEGORY_LABELS, ylabel='Detected Planet Count',
+                title=f'Detected Planets by Type and Temp Zone\n{self.name}, {self.nruns} Runs — {self.star_catalog}',
+                legend_title='Temp Zone', filename=os.path.join(self.data_dir, output_filename('planets_by_type_detected', self.name, self.nruns, self.star_catalog)),
+                text_offset=1
             )
-            ax.set_xticks(x)
-            ax.set_xticklabels(CATEGORY_LABELS, rotation=15, ha='right')
-            ax.set_ylabel('Detected Planets (Best/Worst)')
-            ax.set_title(f'Best/Worst Detected Planets by Type and Temp Zone\n{self.name}, {self.nruns} Runs — {self.star_catalog}')
-            ax.legend(title='Overlay', fontsize=9)
-            plt.tight_layout()
-            plt.savefig(os.path.join(self.data_dir, output_filename('planets_by_type_detected', self.name, self.nruns, self.star_catalog, 'best_worst')), dpi=300, bbox_inches='tight')
-            plt.close(fig)
+            # Best/worst overlays if HWO
+            if self.name == 'HWO' and mask_worst is not None:
+                df['detected_flag_worst'] = mask_worst.astype(bool)
+                worst_stats = pivot_stats(df[df['detected_flag_worst']], ['category', 'temp_zone'])
+                best_stats = pivot_stats(df[df['detected_flag_best']], ['category', 'temp_zone'])
+                worst_list, best_list = [], []
+                for zone in TEMP_ZONES:
+                    data_worst = worst_stats[worst_stats['temp_zone'] == zone].set_index('category').reindex(CATEGORY_LABELS)
+                    data_best = best_stats[best_stats['temp_zone'] == zone].set_index('category').reindex(CATEGORY_LABELS)
+                    worst_list.append(data_worst['count'].fillna(0).values)
+                    best_list.append(data_best['count'].fillna(0).values)
+                fig, ax = plt.subplots(figsize=(10, 6))
+                overlay_best_worst(
+                    ax, x, BAR_WIDTH_TEMP,
+                    worst_list + best_list,
+                    ['green'] * len(worst_list) + ['lightgreen'] * len(best_list),
+                    ['Worst Case (Green)'] * len(worst_list) + ['Best Case (Light Green)'] * len(best_list)
+                )
+                ax.set_xticks(x)
+                ax.set_xticklabels(CATEGORY_LABELS, rotation=15, ha='right')
+                ax.set_ylabel('Detected Planets (Best/Worst)')
+                ax.set_title(f'Best/Worst Detected Planets by Type and Temp Zone\n{self.name}, {self.nruns} Runs — {self.star_catalog}')
+                ax.legend(title='Overlay', fontsize=9)
+                plt.tight_layout()
+                plt.savefig(os.path.join(self.data_dir, output_filename('planets_by_type_detected', self.name, self.nruns, self.star_catalog, 'best_worst')), dpi=300, bbox_inches='tight')
+                plt.close(fig)
 
     def plot_distances(self, detected_only=False) -> None:
         """Bar plots by distance bin. Best/worst overlays for HWO."""
@@ -284,8 +286,7 @@ class PlotPlanetType:
                 legend_title=None, filename=os.path.join(self.data_dir, output_filename('planet_distance_detected', self.name, self.nruns, self.star_catalog)),
                 text_offset=2
             )
-        # Best/worst overlays if HWO
-        if detected_only:
+            # Best/worst overlays if HWO
             if self.name == 'HWO' and mask_worst is not None:
                 df['detected_flag_worst'] = mask_worst.astype(bool)
                 detected_worst_per_run = df[df['detected_flag_worst']].groupby(['run', 'distance_bin']).size().unstack(fill_value=0).reindex(columns=DISTANCE_LABELS, fill_value=0)

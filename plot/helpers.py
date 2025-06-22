@@ -26,32 +26,33 @@ def temp_zone(temp):
 
 def assign_category(row):
     '''
-    Assigns a category based on the planet's radius, habitability, and star type.'''
+    Assigns categories based on the planet's radius, habitability, and star type.
+    Returns a list of all categories that the planet fulfills.'''
     r = row['radius_p']
     hab = row['habitable']
     stype = row['stype']
     temp = row['temp_p']
 
-    if r < 1.5 and 390>temp > 270:
-        return 'Habitable Rocky'
+    categories = []
+    
+    # Rocky planets with star type specificity
+    if r < 1.5 and stype in ['G', 'K']:
+        categories.append('Rocky planets around G and K-type stars')
+    if r < 1.5 and stype in ['M']:
+        categories.append('Rocky planets around M-type stars')
     if r < 1.5:
-        return 'Rocky'
-    if 0.8 < r < 1.5 and 390>temp > 270 and stype in ['G', 'K']:
-        return 'Exo-Earth Candidates'
+        categories.append('Rocky')
+    # Other planet types
     if 1.5 <= r < 1.8:
-        return 'Super-Earths'
-    if 390>temp > 270 and 1.5 <= r < 1.8:
-        return 'Habitable Super-Earths'
-    if 390>temp > 270 and 1.8 <= r < 4.0:
-        return 'Habitable Sub-Neptunes'
+        categories.append('Super-Earths')
     if 1.8 <= r < 4.0:
-        return 'Sub-Neptunes'
+        categories.append('Sub-Neptunes')
     if 4.0 <= r < 8.0:
-        return 'Sub-Jovians'
-    elif r > 8.0:
-        return 'Giant planets'
-    else:
-        return None
+        categories.append('Sub-Jovians')
+    if r >= 8.0:
+        categories.append('Giant planets')
+    
+    return categories if categories else None
     
 
 def get_rejection_reason(row, scenario='best'):

@@ -177,32 +177,52 @@ class PlotPlanetType:
         """Bar plots by planet category and temperature zone. Best/worst overlays for HWO."""
         df = self.df.copy()
         df['temp_zone'] = df['temp_p'].apply(temp_zone)
-        df['category'] = df.apply(assign_category, axis=1)
-        df = df.dropna(subset=['category'])
+        # Get categories for each planet (now returns a list)
+        df['categories'] = df.apply(assign_category, axis=1)
+        df = df.dropna(subset=['categories'])
         
-        # Define all possible categories from assign_category function
-        all_possible_categories = [
-            'Habitable Rocky',
-            'Rocky', 
-            'Exo-Earth Candidates',
+        # Expand DataFrame so each planet appears in all its applicable categories
+        expanded_rows = []
+        for idx, row in df.iterrows():
+            categories = row['categories']
+            if categories:  # Check if categories is not None
+                for category in categories:
+                    new_row = row.copy()
+                    new_row['category'] = category
+                    expanded_rows.append(new_row)
+        
+        # Create expanded DataFrame
+        df_expanded = pd.DataFrame(expanded_rows)
+        if len(df_expanded) == 0:
+            print("No planets found with valid categories")
+            return
+        
+        # Get categories that actually exist in the data
+        detected_categories = sorted(df_expanded['category'].unique())
+        print(f"Detected categories in data: {detected_categories}")
+        
+        # Define the desired order for categories
+        desired_order = [
+            'Rocky',
+            'Rocky planets around M-type stars', 
+            'Rocky planets around G and K-type stars',
             'Super-Earths',
-            'Habitable Super-Earths',
-            'Habitable Sub-Neptunes',
             'Sub-Neptunes',
             'Sub-Jovians',
             'Giant planets'
         ]
         
-        # Get categories that actually exist in the data
-        detected_categories = sorted(df['category'].unique())
-        print(f"Detected categories in data: {detected_categories}")
+        # Use desired order, but only include categories that exist in the data
+        plot_categories = [cat for cat in desired_order if cat in detected_categories]
         
-        # Use all possible categories for consistent plotting
-        plot_categories = all_possible_categories
+        # Add any remaining categories that weren't in the desired order
+        remaining_categories = [cat for cat in detected_categories if cat not in plot_categories]
+        plot_categories.extend(remaining_categories)
+        
         x = np.arange(len(plot_categories))
         
         # Total
-        total_stats = pivot_stats(df, ['category', 'temp_zone'])
+        total_stats = pivot_stats(df_expanded, ['category', 'temp_zone'])
         heights_list, errors_list = [], []
         for zone in TEMP_ZONES:
             data = total_stats[total_stats['temp_zone'] == zone].set_index('category').reindex(plot_categories)
@@ -217,12 +237,12 @@ class PlotPlanetType:
         )
         if detected_only:
             # Detected
-            mask_best, mask_worst = get_detection_masks(df, self.name)
+            mask_best, mask_worst = get_detection_masks(df_expanded, self.name)
             if self.name == 'HWO':
-                df['detected_flag_best'] = mask_best.astype(bool)
-                df['detected_flag_worst'] = mask_worst.astype(bool)
-                detected_df_best = df[df['detected_flag_best']]
-                detected_df_worst = df[df['detected_flag_worst']]
+                df_expanded['detected_flag_best'] = mask_best.astype(bool)
+                df_expanded['detected_flag_worst'] = mask_worst.astype(bool)
+                detected_df_best = df_expanded[df_expanded['detected_flag_best']]
+                detected_df_worst = df_expanded[df_expanded['detected_flag_worst']]
                 
                 # Best case
                 best_stats = pivot_stats(detected_df_best, ['category', 'temp_zone'])
@@ -264,8 +284,8 @@ class PlotPlanetType:
                            dpi=300, bbox_inches='tight')
                 plt.close(fig)
             else:
-                df['detected_flag'] = mask_best.astype(bool)
-                detected_df = df[df['detected_flag']]
+                df_expanded['detected_flag'] = mask_best.astype(bool)
+                detected_df = df_expanded[df_expanded['detected_flag']]
                 detected_stats = pivot_stats(detected_df, ['category', 'temp_zone'])
                 heights_list, errors_list = [], []
                 for zone in TEMP_ZONES:

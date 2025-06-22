@@ -130,6 +130,17 @@ class System():
         # Draw system exozodiacal dust level.
         self.z = ExozodiModel.getExozodiLevel()
         
+        # Compute the other properties of the drawn planets.
+        self.ap = self.getap() # au
+        self.rp = self.getrp() # au
+        self.rpproj = self.getrpproj() # au
+        self.AngSep = self.getAngSep() # arcsec
+        self.maxrpproj = self.getmaxrpproj() # au
+        self.maxAngSep = self.getmaxAngSep() # arcsec
+        self.Fp = self.getFp() # Searth
+        self.fp = self.getfp()
+        self.Tp = self.getTp() # K
+        
         # Calculate exozodi flux in HWO band for each planet
         self.exozodi_flux_hwo = []
         self.exozodi_planet_flux_ratio = []
@@ -160,17 +171,6 @@ class System():
         # Convert to numpy arrays for consistency
         self.exozodi_flux_hwo = np.array(self.exozodi_flux_hwo)
         self.exozodi_planet_flux_ratio = np.array(self.exozodi_planet_flux_ratio)
-        
-        # Compute the other properties of the drawn planets.
-        self.ap = self.getap() # au
-        self.rp = self.getrp() # au
-        self.rpproj = self.getrpproj() # au
-        self.AngSep = self.getAngSep() # arcsec
-        self.maxrpproj = self.getmaxrpproj() # au
-        self.maxAngSep = self.getmaxAngSep() # arcsec
-        self.Fp = self.getFp() # Searth
-        self.fp = self.getfp()
-        self.Tp = self.getTp() # K
         
         pass
     

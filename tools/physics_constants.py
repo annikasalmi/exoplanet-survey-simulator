@@ -6,6 +6,7 @@ R_earth = 6.371e6        # Earth's radius in meters
 pc_to_m = 3.0857e16      # 1 parsec in meters
 temp_sun = 5772         # temp of Sun in Kelvin
 R_sun = 6.957e8         # Solar radius in meters
+au_to_m = 1.496e11      # 1 au in meters
 
 # HWO specific
 class HWOConstants():

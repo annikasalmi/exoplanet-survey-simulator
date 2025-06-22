@@ -34,14 +34,6 @@ def assign_category(row):
     temp = row['temp_p']
     stype = row['stype']
     
-    # Temperature zone categories (using ranges for efficiency)
-    if temp < 125:
-        categories.append('Cold planets')
-    elif temp <= 305:  # Combined condition for efficiency
-        categories.append('Habitable planets')
-    else:  # temp > 305
-        categories.append('Hot planets')
-    
     # Radius-based categories (using if-elif for efficiency)
     if r < 1.5:
         categories.append('Rocky')

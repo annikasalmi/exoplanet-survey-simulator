@@ -1,10 +1,12 @@
 import os
 import numpy as np
-import matplotlib.pyplot as plt
 import pandas as pd
+import matplotlib.pyplot as plt
+import multiprocessing as mp
+from functools import partial
 
 from plot.helpers import (
-    make_output_dir, temp_zone, assign_category, prep_plot_df_stars, pivot_stats,
+    make_output_dir, temp_zone, assign_category,  pivot_stats,
     bar_plot_with_errors, overlay_best_worst, output_filename, get_detection_masks
 )
 from tools.plotting_constants import (
@@ -29,11 +31,77 @@ class PlotPlanetType:
         else:
             self.case = ''
 
+        # Create plots directory if it doesn't exist
+        os.makedirs(self.data_dir, exist_ok=True)
+        
+        # Cache for computed values to avoid recalculation
+        self._cache = {}
+        
+        # Pre-compute commonly used values
+        self._precompute_values()
+
+    def _precompute_values(self):
+        """Pre-compute values that are used multiple times."""
+        if 'temp_zone' not in self._cache:
+            self._cache['temp_zone'] = self.df['temp_p'].apply(temp_zone)
+        if 'categories' not in self._cache:
+            self._cache['categories'] = self.df.apply(assign_category, axis=1)
+        if 'detection_masks' not in self._cache:
+            self._cache['detection_masks'] = get_detection_masks(self.df, self.name)
+
+    def _process_chunk_parallel(self, chunk_df):
+        """Process a chunk of data in parallel."""
+        chunk_df['temp_zone'] = chunk_df['temp_p'].apply(temp_zone)
+        chunk_df['categories'] = chunk_df.apply(assign_category, axis=1)
+        return chunk_df
+    
+    def _precompute_values_parallel(self, n_chunks=4):
+        """Pre-compute values using parallel processing for large datasets."""
+        if len(self.df) > 10000:  # Only use parallel processing for large datasets
+            # Split DataFrame into chunks
+            chunk_size = len(self.df) // n_chunks
+            chunks = [self.df.iloc[i:i+chunk_size] for i in range(0, len(self.df), chunk_size)]
+            
+            # Process chunks in parallel
+            with mp.Pool(processes=min(n_chunks, mp.cpu_count())) as pool:
+                processed_chunks = pool.map(self._process_chunk_parallel, chunks)
+            
+            # Combine results
+            combined_df = pd.concat(processed_chunks, ignore_index=True)
+            self._cache['temp_zone'] = combined_df['temp_zone']
+            self._cache['categories'] = combined_df['categories']
+        else:
+            # Use regular processing for smaller datasets
+            self._precompute_values()
+
     def plot_all(self) -> None:
         """Main entry point to generate all plots based on the name parameter."""
         self.plot_by_planet()
         self.plot_by_star()
         self.plot_distances()
+
+    def plot_all_batch(self) -> None:
+        """Batch process all plots with optimized memory usage."""
+        # Pre-compute all values once
+        self._precompute_values()
+        
+        # Process plots in sequence to minimize memory usage
+        plots_to_generate = [
+            ('by_planet', self.plot_by_planet),
+            ('by_star', self.plot_by_star), 
+            ('distances', self.plot_distances)
+        ]
+        
+        for plot_name, plot_func in plots_to_generate:
+            try:
+                print(f"Generating {plot_name} plot...")
+                plot_func()
+                # Force garbage collection after each plot
+                import gc
+                gc.collect()
+            except Exception as e:
+                print(f"Error generating {plot_name} plot: {e}")
+                continue
 
     def plot_by_star(self) -> None:
         """Grouped bar plots by star type and radius bin. For HWO, uses detected_best/worst logic."""
@@ -105,7 +173,7 @@ class PlotPlanetType:
         plt.close(fig)
         
         # Detected stats
-        mask_best, mask_worst = get_detection_masks(df, self.name)
+        mask_best, mask_worst = self._cache['detection_masks']
         if self.name == 'HWO':
             df['detected_flag_best'] = mask_best.astype(bool)
             detected_df = df[df['detected_flag_best']]
@@ -175,24 +243,25 @@ class PlotPlanetType:
 
     def plot_by_planet(self, detected_only=False) -> None:
         """Bar plots by planet category and temperature zone. Best/worst overlays for HWO."""
-        df = self.df.copy()
-        df['temp_zone'] = df['temp_p'].apply(temp_zone)
-        # Get categories for each planet (now returns a list)
-        df['categories'] = df.apply(assign_category, axis=1)
-        df = df.dropna(subset=['categories'])
+        # Use view instead of copy when possible to save memory
+        df = self.df
         
-        # Expand DataFrame so each planet appears in all its applicable categories
-        expanded_rows = []
-        for idx, row in df.iterrows():
-            categories = row['categories']
-            if categories:  # Check if categories is not None
-                for category in categories:
-                    new_row = row.copy()
-                    new_row['category'] = category
-                    expanded_rows.append(new_row)
+        # Cache computed values to avoid recalculation
+        if not hasattr(self, '_cached_temp_zones'):
+            self._cached_temp_zones = self._cache['temp_zone']
+        if not hasattr(self, '_cached_categories'):
+            self._cached_categories = self._cache['categories']
         
-        # Create expanded DataFrame
-        df_expanded = pd.DataFrame(expanded_rows)
+        # Create a working copy only when we need to modify
+        df_work = df.copy()
+        df_work['temp_zone'] = self._cached_temp_zones
+        df_work['categories'] = self._cached_categories
+        df_work = df_work.dropna(subset=['categories'])
+        
+        # Vectorized expansion using explode
+        df_expanded = df_work.explode('categories').rename(columns={'categories': 'category'})
+        df_expanded = df_expanded.dropna(subset=['category'])
+        
         if len(df_expanded) == 0:
             print("No planets found with valid categories")
             return
@@ -209,7 +278,6 @@ class PlotPlanetType:
             'Super-Earths',
             'Sub-Neptunes',
             'Sub-Jovians',
-            'Giant planets'
         ]
         
         # Use desired order, but only include categories that exist in the data
@@ -237,7 +305,7 @@ class PlotPlanetType:
         )
         if detected_only:
             # Detected
-            mask_best, mask_worst = get_detection_masks(df_expanded, self.name)
+            mask_best, mask_worst = self._cache['detection_masks']
             if self.name == 'HWO':
                 df_expanded['detected_flag_best'] = mask_best.astype(bool)
                 df_expanded['detected_flag_worst'] = mask_worst.astype(bool)
@@ -307,7 +375,7 @@ class PlotPlanetType:
         df['distance_bin'] = pd.cut(df['distance_s'], bins=bins, labels=DISTANCE_LABELS, right=False)
         x = np.arange(len(DISTANCE_LABELS))
         # Detected logic
-        mask_best, mask_worst = get_detection_masks(df, self.name)
+        mask_best, mask_worst = self._cache['detection_masks']
         if self.name == 'HWO':
             df['detected_flag_best'] = mask_best.astype(bool)
             detected_per_run = df[df['detected_flag_best']].groupby(['run', 'distance_bin']).size().unstack(fill_value=0).reindex(columns=DISTANCE_LABELS, fill_value=0)

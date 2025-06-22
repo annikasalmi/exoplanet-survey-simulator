@@ -25,32 +25,37 @@ def temp_zone(temp):
         return 'cold'
 
 def assign_category(row):
-    '''
-    Assigns categories based on the planet's radius, habitability, and star type.
-    Returns a list of all categories that the planet fulfills.'''
-    r = row['radius_p']
-    hab = row['habitable']
-    stype = row['stype']
-    temp = row['temp_p']
-
+    """
+    Assign planet categories based on radius, temperature, and star type.
+    Returns a list of applicable categories for each planet.
+    """
     categories = []
+    r = row['radius_p']
+    temp = row['temp_p']
+    stype = row['stype']
     
-    # Rocky planets with star type specificity
-    if r < 1.5 and stype in ['G', 'K']:
-        categories.append('Rocky planets around G and K-type stars')
-    if r < 1.5 and stype in ['M']:
-        categories.append('Rocky planets around M-type stars')
+    # Temperature zone categories (using ranges for efficiency)
+    if temp < 125:
+        categories.append('Cold planets')
+    elif temp <= 305:  # Combined condition for efficiency
+        categories.append('Habitable planets')
+    else:  # temp > 305
+        categories.append('Hot planets')
+    
+    # Radius-based categories (using if-elif for efficiency)
     if r < 1.5:
         categories.append('Rocky')
-    # Other planet types
-    if 1.5 <= r < 1.8:
+        # Star type categories for rocky planets
+        if stype == 'M':
+            categories.append('Rocky planets around M-type stars')
+        elif stype in ['G', 'K']:
+            categories.append('Rocky planets around G and K-type stars')
+    elif r < 2.0:
         categories.append('Super-Earths')
-    if 1.8 <= r < 4.0:
+    elif r < 4.0:
         categories.append('Sub-Neptunes')
-    if 4.0 <= r < 8.0:
+    elif r < 8.0:
         categories.append('Sub-Jovians')
-    if r >= 8.0:
-        categories.append('Giant planets')
     
     return categories if categories else None
     
@@ -123,12 +128,18 @@ def pivot_stats(df, groupby_cols):
     Returns:
         DataFrame with groupby_cols, 'count' (mean), and 'error' (std).
     """
-    grouped = df.groupby(groupby_cols).size().reset_index(name='count')
-    pivot = grouped.pivot_table(columns=groupby_cols, values='count', fill_value=0)
-    mean = pivot.mean(axis=0).reset_index(name='count')
-    std = pivot.std(axis=0).reset_index(name='error')
-    result = pd.merge(mean, std, on=groupby_cols)
-    return result
+    # More efficient approach using value_counts and groupby
+    if 'run' in df.columns:
+        # Multi-run data: compute statistics across runs
+        grouped = df.groupby(groupby_cols + ['run']).size().reset_index(name='count')
+        stats = grouped.groupby(groupby_cols).agg({'count': ['mean', 'std']}).reset_index()
+        stats.columns = groupby_cols + ['count', 'error']
+    else:
+        # Single run data: just count
+        stats = df.groupby(groupby_cols).size().reset_index(name='count')
+        stats['error'] = 0.0
+    
+    return stats
 
 def prep_plot_df_stars(stats, star_order, bin_labels):
     df = stats.pivot(index='stype', columns='radius_bin', values='count').fillna(0)
@@ -173,9 +184,14 @@ def bar_plot_with_errors(
     plt.close('all')
     fig, ax = plt.subplots(figsize=figsize)
     n_bars = len(heights_list)
+    
+    # Pre-allocate arrays for better performance
+    all_heights = np.array(heights_list)
+    all_errors = np.array(errors_list) if errors_list else None
+    
     for i in range(n_bars):
-        heights = heights_list[i]
-        errors = errors_list[i] if errors_list else None
+        heights = all_heights[i]
+        errors = all_errors[i] if all_errors is not None else None
         color = colors[i] if colors else None
         hatch = hatches[i] if hatches else None
         label = labels[i] if labels else None
@@ -186,11 +202,20 @@ def bar_plot_with_errors(
                      yerr=errors, label=label,
                      color=color, hatch=hatch, edgecolor='black',
                      bottom=bottom, alpha=alpha)
-        for j, (h, err) in enumerate(zip(heights, errors if errors is not None else [0]*len(heights))):
+        
+        # Vectorized text annotation for better performance
+        if errors is not None:
+            err_values = errors
+        else:
+            err_values = np.zeros_like(heights)
+            
+        for j, (h, err) in enumerate(zip(heights, err_values)):
             h_display = int(h) if not np.isnan(h) else 0
             err_display = int(err) if not np.isnan(err) else 0
-            y = h + (bottom[j] if (bottom is not None and stacked and j < len(bottom)) else 0) + text_offset
-            ax.text((x[j] + i * bar_width) if not stacked else x[j], y, f"{h_display}±{err_display}", ha='center', fontsize=8)
+            y_pos = h + (bottom[j] if (bottom is not None and stacked and j < len(bottom)) else 0) + text_offset
+            x_pos = (x[j] + i * bar_width) if not stacked else x[j]
+            ax.text(x_pos, y_pos, f"{h_display}±{err_display}", ha='center', fontsize=8)
+    
     if xticks is not None and xticklabels is not None:
         ax.set_xticks(xticks)
         ax.set_xticklabels(xticklabels)

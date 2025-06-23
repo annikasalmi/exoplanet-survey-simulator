@@ -138,7 +138,7 @@ class PlanetRejectionPlotter:
             
         # 2x2 subplot: best & worst for all except Exozodi (only best)
         nrows, ncols = 2, 2
-        fig, axs = plt.subplots(nrows, ncols, figsize=(16, 16), sharey=True)
+        fig, axs = plt.subplots(nrows, ncols, figsize=(12, 10), sharey=True)
         axs = axs.flatten()
         
         column_mapping = {

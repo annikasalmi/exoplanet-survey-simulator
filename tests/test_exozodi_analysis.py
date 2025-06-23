@@ -80,11 +80,12 @@ def calculate_exozodi_effects(star_data, planet_data, exozodi_scenario='baseline
         exozodi_level = exozodi_model.getExozodiLevel()
         
         # Calculate exozodi flux
-        exozodi_flux, _ = exozodi_model.getExozodiFlux(
+        exozodi_flux, _ = exozodi_model.getExozodiFluxAtPlanetAU(
             star_temp_K=planet['star_temp'],
             star_radius_Rsun=planet['star_radius'],
             distance_pc=planet['distance'],
-            exozodi_level=exozodi_level
+            exozodi_level=exozodi_level,
+            planet_semi_major_axis_au=None
         )
         
         # Calculate planet flux

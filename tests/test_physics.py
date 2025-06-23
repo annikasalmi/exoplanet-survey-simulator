@@ -176,7 +176,7 @@ class TestExozodiTemperature(unittest.TestCase):
         star_temp = 5778
         star_radius = 1.0
         
-        distances, temperatures = self.exozodi_model.getExozodiTemperatureProfile(
+        distances, temperatures = self.exozodi_model.getExozodiTemperatureProfileAtPlanetAU(
             star_temp, star_radius
         )
         

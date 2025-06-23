@@ -273,22 +273,23 @@ def test_comparison_with_old_model():
     distances_au = np.logspace(-1, 1.7, 20)
     
     # Calculate with old model (system-wide)
-    old_exozodi_flux, _ = exozodi_model.getExozodiFlux(
+    old_exozodi_flux, _ = exozodi_model.getExozodiFluxAtPlanetAU(
         star_temp_K=test_star.Teff,
         star_radius_Rsun=test_star.Rad,
         distance_pc=test_star.Dist,
-        exozodi_level=exozodi_level
+        exozodi_level=exozodi_level,
+        planet_semi_major_axis_au=None
     )
     
     # Calculate with new model (radial-dependent)
     new_exozodi_fluxes = []
     for dist_au in distances_au:
-        flux, _ = exozodi_model.getExozodiFluxAtPlanetDistance(
+        flux, _ = exozodi_model.getExozodiFluxAtPlanetAU(
             star_temp_K=test_star.Teff,
             star_radius_Rsun=test_star.Rad,
             distance_pc=test_star.Dist,
-            planet_semi_major_axis_au=dist_au,
-            exozodi_level=exozodi_level
+            exozodi_level=exozodi_level,
+            planet_semi_major_axis_au=dist_au
         )
         new_exozodi_fluxes.append(flux)
     

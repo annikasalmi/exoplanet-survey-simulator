@@ -72,9 +72,9 @@ class ExozodiModel():
         
         return z
     
-    def getExozodiFlux(self, star_temp_K, star_radius_Rsun, distance_pc, exozodi_level=None):
+    def getExozodiFluxAtPlanetAU(self, star_temp_K, star_radius_Rsun, distance_pc, exozodi_level=None, planet_semi_major_axis_au=None):
         """
-        Calculate the exozodi flux that would be observed by HWO.
+        Calculate the exozodi flux that would be observed by HWO at a given planet semi-major axis (AU).
         
         Parameters
         ----------
@@ -86,7 +86,9 @@ class ExozodiModel():
             Distance to star in parsecs
         exozodi_level : float, optional
             Exozodi level (if None, will draw from model)
-            
+        planet_semi_major_axis_au : float, optional
+            Planet's semi-major axis in AU. If None, uses reference distance (10 AU)
+        
         Returns
         -------
         exozodi_flux_hwo : float
@@ -96,7 +98,6 @@ class ExozodiModel():
         """
         if exozodi_level is None:
             exozodi_level = self.getExozodiLevel()
-    
         
         # Convert star properties to SI units
         star_radius_m = star_radius_Rsun * R_sun
@@ -105,17 +106,8 @@ class ExozodiModel():
         # Calculate star's bolometric luminosity
         star_luminosity = 4 * np.pi * star_radius_m**2 * sigma * star_temp_K**4
         
-        # Exozodi flux is proportional to star luminosity and exozodi level
-        # The exozodi level z represents the ratio of exozodi to stellar flux
-        # at a reference wavelength (typically ~10 μm)
-        
-        # For HWO wavelength range, we need to account for the spectral distribution
-        # Exozodi emission peaks in the infrared, so we use a scaling factor
-        # This is a simplified model - could be refined with more detailed spectral modeling
-        
         # Calculate the fraction of exozodi emission in HWO band
-        # Exozodi emission is roughly blackbody-like with temperature calculated from radiative equilibrium
-        exozodi_temp = self._calculate_exozodi_temperature(star_temp_K, star_radius_Rsun, distance_pc)
+        exozodi_temp = self._calculate_exozodi_temperature_at_planet_au(star_temp_K, star_radius_Rsun, distance_pc, planet_semi_major_axis_au)
         
         # Calculate blackbody flux in HWO band for exozodi
         exozodi_flux_hwo = self._blackbody_flux_in_band(
@@ -125,8 +117,6 @@ class ExozodiModel():
         )
         
         # Calculate total exozodi flux at Earth
-        # exozodi_level * star_flux gives the total exozodi flux
-        # We scale by the fraction in HWO band
         star_flux_at_earth = star_luminosity / (4 * np.pi * distance_m**2)
         total_exozodi_flux = exozodi_level * star_flux_at_earth
         
@@ -213,7 +203,7 @@ class ExozodiModel():
         star_luminosity = 4 * np.pi * star_radius_m**2 * sigma * star_temp_K**4
         
         # Calculate the fraction of exozodi emission in HWO band
-        exozodi_temp = self._calculate_exozodi_temperature(star_temp_K, star_radius_Rsun, distance_pc, 
+        exozodi_temp = self._calculate_exozodi_temperature_at_planet_au(star_temp_K, star_radius_Rsun, distance_pc, 
                                                           planet_semi_major_axis_au)
         
         # Calculate blackbody flux in HWO band for exozodi
@@ -320,27 +310,18 @@ class ExozodiModel():
         """
         if exozodi_level is None:
             exozodi_level = self.getExozodiLevel()
-        
         if distances_au is None:
-            # Default distance range
             distances_au = np.logspace(-1, 2, 100)  # 0.1 to 100 AU
         
-        # Calculate system-wide exozodi flux
-        exozodi_flux_system, _ = self.getExozodiFlux(
-            star_temp_K, star_radius_Rsun, distance_pc, exozodi_level
-        )
-        
-        # Apply radial dependence
-        alpha = 1.5  # Radial power law index
-        reference_distance_au = 10.0
-        
-        # Calculate radial scaling for each distance
-        radial_scaling = (reference_distance_au / distances_au) ** alpha
-        
         # Calculate exozodi flux at each distance
-        exozodi_fluxes = exozodi_flux_system * radial_scaling
+        exozodi_fluxes = []
+        for dist in distances_au:
+            exozodi_flux, _ = self.getExozodiFluxAtPlanetAU(
+                star_temp_K, star_radius_Rsun, distance_pc, exozodi_level, planet_semi_major_axis_au=dist
+            )
+            exozodi_fluxes.append(exozodi_flux)
         
-        return distances_au, exozodi_fluxes
+        return np.array(distances_au), np.array(exozodi_fluxes)
     
     def getOptimalPlanetDistance(self, star_temp_K, star_radius_Rsun, distance_pc,
                                 planet_radius_Rearth, planet_temp_K, exozodi_level=None,
@@ -481,8 +462,7 @@ class ExozodiModel():
         
         pass
 
-    def _calculate_exozodi_temperature(self, star_temp_K, star_radius_Rsun, distance_pc, 
-                                      planet_semi_major_axis_au=None):
+    def _calculate_exozodi_temperature_at_planet_au(self, star_temp_K, star_radius_Rsun, distance_pc, planet_semi_major_axis_au=None):
         """
         Calculate exozodi dust temperature based on radiative equilibrium with the star.
         
@@ -497,14 +477,13 @@ class ExozodiModel():
         planet_semi_major_axis_au : float, optional
             Distance from star in AU where exozodi temperature is calculated
             If None, uses a reference distance of 10 AU
-            
+        
         Returns
         -------
         exozodi_temp : float
             Exozodi dust temperature in Kelvin
         """
         if planet_semi_major_axis_au is None:
-            # Use reference distance where exozodi level is typically measured
             planet_semi_major_axis_au = 10.0
         
         # Convert to SI units
@@ -533,7 +512,7 @@ class ExozodiModel():
         
         return exozodi_temp
     
-    def getExozodiTemperatureProfile(self, star_temp_K, star_radius_Rsun, distances_au=None):
+    def getExozodiTemperatureProfileAtPlanetAU(self, star_temp_K, star_radius_Rsun, distances_au=None):
         """
         Calculate exozodi temperature as a function of distance from the star.
         
@@ -560,7 +539,7 @@ class ExozodiModel():
         # Calculate temperature at each distance
         exozodi_temperatures = []
         for dist in distances_au:
-            temp = self._calculate_exozodi_temperature(star_temp_K, star_radius_Rsun, 10.0, dist)
+            temp = self._calculate_exozodi_temperature_at_planet_au(star_temp_K, star_radius_Rsun, 10.0, dist)
             exozodi_temperatures.append(temp)
         
         return np.array(distances_au), np.array(exozodi_temperatures)

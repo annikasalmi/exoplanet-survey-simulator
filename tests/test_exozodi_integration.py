@@ -22,6 +22,7 @@ def test_exozodi_flux_calculation():
     
     # Create a test star (similar to what P-POP generates)
     test_star = Star(
+        Name='TestStar',
         Teff=5772,  # Solar temperature
         Rad=1.0,    # Solar radius
         Mass=1.0,   # Solar mass
@@ -39,11 +40,12 @@ def test_exozodi_flux_calculation():
     print(f"✓ Exozodi level: {exozodi_level:.2e}")
     
     # Test exozodi flux calculation
-    exozodi_flux, _ = exozodi_model.getExozodiFlux(
+    exozodi_flux, _ = exozodi_model.getExozodiFluxAtPlanetAU(
         star_temp_K=test_star.Teff,
         star_radius_Rsun=test_star.Rad,
         distance_pc=test_star.Dist,
-        exozodi_level=exozodi_level
+        exozodi_level=exozodi_level,
+        planet_semi_major_axis_au=None
     )
     print(f"✓ Exozodi flux in HWO band: {exozodi_flux:.2e} W/m²")
     
@@ -51,12 +53,13 @@ def test_exozodi_flux_calculation():
     planet_radius = 1.0  # Earth radius
     planet_temp = 300    # 300 K planet
     
-    flux_ratio, exozodi_flux, planet_flux = exozodi_model.getExozodiFluxRatio(
+    flux_ratio, exozodi_flux, planet_flux = exozodi_model.getExozodiFluxRatioAtPlanetDistance(
         star_temp_K=test_star.Teff,
         star_radius_Rsun=test_star.Rad,
         distance_pc=test_star.Dist,
         planet_radius_Rearth=planet_radius,
         planet_temp_K=planet_temp,
+        planet_semi_major_axis_au=None,
         exozodi_level=exozodi_level
     )
     
@@ -75,6 +78,7 @@ def test_system_integration():
     
     # Create a minimal test star
     test_star = Star(
+        Name='TestStar',
         Teff=5772,
         Rad=1.0,
         Mass=1.0,
@@ -93,11 +97,12 @@ def test_system_integration():
         exozodi_level = exozodi_model.getExozodiLevel()
         
         # Test exozodi flux
-        exozodi_flux, _ = exozodi_model.getExozodiFlux(
+        exozodi_flux, _ = exozodi_model.getExozodiFluxAtPlanetAU(
             star_temp_K=test_star.Teff,
             star_radius_Rsun=test_star.Rad,
             distance_pc=test_star.Dist,
-            exozodi_level=exozodi_level
+            exozodi_level=exozodi_level,
+            planet_semi_major_axis_au=None
         )
         
         print(f"✓ System integration test passed")

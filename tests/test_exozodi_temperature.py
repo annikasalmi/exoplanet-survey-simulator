@@ -42,7 +42,7 @@ def test_exozodi_temperature_calculation():
     
     # Test temperature profile
     print("=== Temperature Profile ===")
-    distances_au, temperatures = exozodi_model.getExozodiTemperatureProfile(
+    distances_au, temperatures = exozodi_model.getExozodiTemperatureProfileAtPlanetAU(
         star_temp_K, star_radius_Rsun
     )
     

@@ -42,7 +42,6 @@ def run_single(i, star_catalog='Gaia'):
     hwo_data.determine_detectable(
         use_exozodi_constraint=True,           # Enable exozodi constraint
         exozodi_scenario='baseline',           # Use baseline exozodi scenario
-        use_surface_brightness_criterion=True, # Use new surface brightness criterion
         ignore_exozodi_rejections=False        # Apply exozodi rejections to final detection
     )
 

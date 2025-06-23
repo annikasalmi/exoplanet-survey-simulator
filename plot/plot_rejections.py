@@ -141,7 +141,7 @@ class PlanetRejectionPlotter:
             '# photons hitting detector': 'photon_rate_value_best',
             'Flux Ratio': 'flux_ratio_value_best', 
             'IWA': 'maxangsep',
-            'Exozodi': 'exozodi_flux_ratio_best'
+            'Exozodi': 'exozodi_surface_brightness_ratio_best'
         }
         
         _, axs = plt.subplots(1, 4, figsize=(24, 5), sharey=True)
@@ -153,8 +153,8 @@ class PlanetRejectionPlotter:
                 continue
             
             # Use better binning for wide ranges
-            if reason in ['Flux Ratio', 'Min Photons']:
-                # Use log-spaced bins for flux ratio and photon rates
+            if reason in ['Flux Ratio', 'Min Photons', 'Exozodi']:
+                # Use log-spaced bins for flux ratio, photon rates, and exozodi surface brightness ratios
                 min_val = float(df[column].min())
                 max_val = float(df[column].max())
                 bins = np.logspace(np.log10(min_val), np.log10(max_val), 40)
@@ -199,18 +199,16 @@ class PlanetRejectionPlotter:
             hwo_best = HWOConstants('best')
             hwo_worst = HWOConstants('worst')
             
-            threshold_name = {
-                '# photons hitting detector': 'min_photons',
-                'Flux Ratio': 'min_planet_flux_star_ratio',
-                'IWA': 'iwa',
-                'Exozodi': 'exozodi_threshold'
-            }[reason]
-            
             # Handle exozodi threshold (fixed at 1.0)
             if reason == 'Exozodi':
                 best_threshold = 1.0
                 worst_threshold = 1.0
             else:
+                threshold_name = {
+                    '# photons hitting detector': 'min_photons',
+                    'Flux Ratio': 'min_planet_flux_star_ratio',
+                    'IWA': 'iwa',
+                }[reason]
                 best_threshold = getattr(hwo_best, threshold_name)
                 worst_threshold = getattr(hwo_worst, threshold_name)
             

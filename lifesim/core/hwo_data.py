@@ -186,7 +186,7 @@ class HWOData():
         iwa_constraint = self.catalog.maxangsep
         return iwa_constraint
 
-    def calc_exozodi_surface_brightness_constraint(self, case: str, exozodi_scenario: str = 'baseline', M: float = 0.1):
+    def calc_exozodi_surface_brightness_constraint(self, case: str, exozodi_scenario: str = 'baseline'):
         """
         Calculate exozodi surface brightness constraint using the criterion:
         L_zodi(θ) ≥ C_inst · L_⋆, where C_inst = min_planet_flux_star_ratio from HWOConstants
@@ -197,8 +197,6 @@ class HWOData():
             'best' or 'worst' case scenario
         exozodi_scenario : str
             'baseline', 'pessimistic', or 'optimistic' exozodi scenario
-        M : float
-            Scaling factor for exozodi fluxes (default: 0.1 = 10% of original flux)
             
         Returns
         -------
@@ -233,30 +231,21 @@ class HWOData():
                 star_temp, star_radius, distance, angular_sep, instrument_contrast_limit
             )
             
-            # Apply scaling factor M to exozodi surface brightness
-            exozodi_sb_scaled = exozodi_sb * M
-            
-            # Re-evaluate rejection with scaled exozodi surface brightness
+            # Evaluate rejection with original exozodi surface brightness
             if star_sb > 0:
-                scaled_ratio = exozodi_sb_scaled / (instrument_contrast_limit * star_sb)
-                rejected_scaled = scaled_ratio >= 1.0  # Rejected if exozodi SB >= criterion
-            else:
-                scaled_ratio = np.inf
-                rejected_scaled = True
-            
-            is_rejected.append(rejected_scaled)
-            
-            # Calculate ratio for analysis (using scaled value)
-            if star_sb > 0:
-                ratio = exozodi_sb_scaled / (instrument_contrast_limit * star_sb)
+                ratio = exozodi_sb / (instrument_contrast_limit * star_sb)
+                rejected_final = ratio >= 1.0  # Rejected if exozodi SB >= criterion
             else:
                 ratio = np.inf
+                rejected_final = True
+            
+            is_rejected.append(rejected_final)
             surface_brightness_ratios.append(ratio)
         
         return np.array(is_rejected), np.array(surface_brightness_ratios)
 
     def determine_detectable(self, use_exozodi_constraint: bool = True, exozodi_scenario: str = 'baseline',
-                           M: float = 0.1, ignore_exozodi_rejections: bool = False):
+                           ignore_exozodi_rejections: bool = False):
         """
         Determine which planets are detectable based on all constraints.
         
@@ -266,8 +255,6 @@ class HWOData():
             Whether to include exozodi constraint in detection logic
         exozodi_scenario : str
             Exozodi scenario to use ('baseline', 'pessimistic', 'optimistic')
-        M : float
-            Scaling factor for exozodi fluxes (default: 0.1 = 10% of original flux)
         ignore_exozodi_rejections : bool
             If True, exozodi rejections are calculated but not applied to final detection
             (useful for analyzing other rejection criteria)
@@ -291,9 +278,9 @@ class HWOData():
 
             # Calculate exozodi constraint if requested
             if use_exozodi_constraint:
-                # Use surface brightness criterion with scaling factor M
+                # Use surface brightness criterion
                 exozodi_rejected, surface_brightness_ratios = self.calc_exozodi_surface_brightness_constraint(
-                    c, exozodi_scenario, M
+                    c, exozodi_scenario
                 )
                 # Planet is rejected if exozodi surface brightness exceeds the criterion
                 exozodi_condition = ~exozodi_rejected  # Invert because we want planets that pass

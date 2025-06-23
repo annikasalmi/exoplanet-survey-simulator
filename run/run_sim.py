@@ -110,7 +110,7 @@ if __name__ == "__main__":
 
     PARALLEL = True  # Set to True if you want to run in parallel
     STAR_CATALOG = 'Gaia'  # or 'ExoCat_1'
-    NRUNS = np.arange(500)
+    NRUNS = np.arange(60,500)
     
     run_sim(func=main_hwo, name = 'hwo', parallel=True, nruns=NRUNS, star_catalog=STAR_CATALOG, run_anew=False)
     # run_sim(func=main_lifesim, name='lifesim',parallel=PARALLEL, nruns=NRUNS, star_catalog=STAR_CATALOG, run_anew=False)

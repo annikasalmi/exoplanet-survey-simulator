@@ -136,39 +136,47 @@ class PlanetRejectionPlotter:
         if df.empty:
             return
             
-        # Map rejection reasons to actual column names (without best/worst suffixes)
+        # 2x2 subplot: best & worst for all except Exozodi (only best)
+        nrows, ncols = 2, 2
+        fig, axs = plt.subplots(nrows, ncols, figsize=(16, 16), sharey=True)
+        axs = axs.flatten()
+        
         column_mapping = {
-            '# photons hitting detector': 'photon_rate_value_best',
-            'Flux Ratio': 'flux_ratio_value_best', 
-            'IWA': 'maxangsep',
-            'Exozodi': 'exozodi_surface_brightness_ratio_best'
+            '# photons hitting detector': ('photon_rate_value_best', 'photon_rate_value_worst'),
+            'Flux Ratio': ('flux_ratio_value_best', 'flux_ratio_value_worst'),
+            'IWA': ('maxangsep', 'maxangsep'),
+            'Exozodi': ('exozodi_surface_brightness_ratio_best', None),  # Only best for Exozodi
         }
         
-        _, axs = plt.subplots(1, 4, figsize=(24, 5), sharey=True)
-        
-        for ax, (reason, column) in zip(axs, column_mapping.items()):
+        for i, (reason, (col_best, col_worst)) in enumerate(column_mapping.items()):
+            ax = axs[i]
             # Check if column exists
-            if column not in df.columns:
-                print(f"Warning: Column '{column}' not found in DataFrame. Available columns: {list(df.columns)}")
+            if col_best not in df.columns:
+                print(f"Warning: Column '{col_best}' not found in DataFrame. Available columns: {list(df.columns)}")
                 continue
             
             # Use better binning for wide ranges
-            if reason in ['Flux Ratio', 'Min Photons', 'Exozodi']:
-                # Use log-spaced bins for flux ratio, photon rates, and exozodi surface brightness ratios
-                min_val = float(df[column].min())
-                max_val = float(df[column].max())
+            if reason in ['Flux Ratio', 'Min Photons']:
+                min_val = float(df[col_best].min())
+                max_val = float(df[col_best].max())
                 bins = np.logspace(np.log10(min_val), np.log10(max_val), 40)
             else:
-                # Use linear bins for IWA
                 bins = 40
             
-            # Plot histogram of all planets
-            ax.hist(df[column], bins=bins, color='lightblue', alpha=0.7, edgecolor='black', 
-                   log=True, label='All planets')
+            if reason == 'IWA':
+                # Only plot the distribution of maxangsep, no best/worst bars
+                ax.hist(df['maxangsep'], bins=bins, color='lightblue', alpha=0.7, edgecolor='black',
+                        log=True, label='Maximum angular separation')
+            else:
+                # Plot best case
+                ax.hist(df[col_best], bins=bins, color='lightblue', alpha=0.7, edgecolor='black', 
+                        log=True, label='Best case')
+                # Plot worst case if applicable (not for Exozodi)
+                if col_worst and col_worst in df.columns:
+                    ax.hist(df[col_worst], bins=bins, color='orange', alpha=0.5, edgecolor='black', 
+                            log=True, label='Worst case')
             
-            # Calculate and display rejection percentages
             total_planets = len(df)
-            
             # Get the appropriate pass/fail columns based on the reason
             if reason == '# photons hitting detector':
                 pass_col_best = 'min_photons_pass_best'
@@ -181,28 +189,30 @@ class PlanetRejectionPlotter:
                 pass_col_worst = 'iwa_pass_worst'
             elif reason == 'Exozodi':
                 pass_col_best = 'exozodi_pass_best'
-                pass_col_worst = 'exozodi_pass_worst'
+                pass_col_worst = None
             
-            # Calculate rejection percentages
-            if pass_col_best in df.columns and pass_col_worst in df.columns:
-                rejected_best = len(df[~df[pass_col_best]])
-                rejected_worst = len(df[~df[pass_col_worst]])
-                pct_best = (rejected_best / total_planets) * 100
-                pct_worst = (rejected_worst / total_planets) * 100
-                
-                # Add text annotation with rejection percentages
-                ax.text(0.05, 0.95, f'Best case: {pct_best:.1f}% rejected\nWorst case: {pct_worst:.1f}% rejected', 
-                       transform=ax.transAxes, verticalalignment='top', 
-                       bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+            # Calculate rejection percentages (skip for IWA)
+            if reason != 'IWA':
+                if pass_col_best in df.columns:
+                    rejected_best = len(df[~df[pass_col_best]])
+                    pct_best = (rejected_best / total_planets) * 100
+                    ax.text(0.05, 0.95, f'Best: {pct_best:.1f}% rejected',
+                            transform=ax.transAxes, verticalalignment='top',
+                            bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+                if col_worst and pass_col_worst and pass_col_worst in df.columns:
+                    rejected_worst = len(df[~df[pass_col_worst]])
+                    pct_worst = (rejected_worst / total_planets) * 100
+                    ax.text(0.05, 0.85, f'Worst: {pct_worst:.1f}% rejected',
+                            transform=ax.transAxes, verticalalignment='top',
+                            bbox=dict(boxstyle='round', facecolor='white', alpha=0.5))
             
-            # Draw cutoff lines for both best and worst case scenarios
+            # Draw cutoff lines for best and worst case scenario
             hwo_best = HWOConstants('best')
             hwo_worst = HWOConstants('worst')
-            
-            # Handle exozodi threshold (fixed at 1.0)
             if reason == 'Exozodi':
                 best_threshold = 1.0
-                worst_threshold = 1.0
+                ax.axvline(best_threshold, color='green', linestyle='--', alpha=0.7, 
+                          label=f'Best case cutoff = {best_threshold:.2e}')
             else:
                 threshold_name = {
                     '# photons hitting detector': 'min_photons',
@@ -211,60 +221,57 @@ class PlanetRejectionPlotter:
                 }[reason]
                 best_threshold = getattr(hwo_best, threshold_name)
                 worst_threshold = getattr(hwo_worst, threshold_name)
-            
-            # Plot cutoff lines
-            if isinstance(best_threshold, tuple):
-                if reason == '# photons hitting detector':
-                    thresh_0 = f'{best_threshold[0]:.2f}'
-                    thresh_1 = f'{best_threshold[1]:.2f}'
+                if isinstance(best_threshold, tuple):
+                    if reason == '# photons hitting detector':
+                        thresh_0 = f'{best_threshold[0]:.2f}'
+                        thresh_1 = f'{best_threshold[1]:.2f}'
+                    else:
+                        thresh_0 = f'{best_threshold[0]:.2e}'
+                        thresh_1 = f'{best_threshold[1]:.2e}'
+                    ax.axvline(best_threshold[0], color='green', linestyle='--', alpha=0.7, 
+                              label=f'Best case cutoff = {thresh_0}')
+                    ax.axvline(best_threshold[1], color='green', linestyle=':', alpha=0.7, 
+                              label=f'Best case max = {thresh_1}')
                 else:
-                    thresh_0 = f'{best_threshold[0]:.2e}'
-                    thresh_1 = f'{best_threshold[1]:.2e}'
-                ax.axvline(best_threshold[0], color='green', linestyle='--', alpha=0.7, 
-                          label=f'Best case cutoff = {thresh_0}')
-                ax.axvline(best_threshold[1], color='green', linestyle=':', alpha=0.7, 
-                          label=f'Best case max = {thresh_1}')
-            else:
-                ax.axvline(best_threshold, color='green', linestyle='--', alpha=0.7, 
-                          label=f'Best case cutoff = {best_threshold:.2e}')
-                
-            if isinstance(worst_threshold, tuple):
-                if reason == '# photons hitting detector':
-                    thresh_0 = f'{worst_threshold[0]:.2f}'
-                    thresh_1 = f'{worst_threshold[1]:.2f}'
+                    ax.axvline(best_threshold, color='green', linestyle='--', alpha=0.7, 
+                              label=f'Best case cutoff = {best_threshold:.2e}')
+                if isinstance(worst_threshold, tuple):
+                    if reason == '# photons hitting detector':
+                        thresh_0 = f'{worst_threshold[0]:.2f}'
+                        thresh_1 = f'{worst_threshold[1]:.2f}'
+                    else:
+                        thresh_0 = f'{worst_threshold[0]:.2e}'
+                        thresh_1 = f'{worst_threshold[1]:.2e}'
+                    ax.axvline(worst_threshold[0], color='red', linestyle='--', alpha=0.7, 
+                              label=f'Worst case cutoff = {thresh_0}')
+                    ax.axvline(worst_threshold[1], color='red', linestyle=':', alpha=0.7, 
+                              label=f'Worst case max = {thresh_1}')
                 else:
-                    thresh_0 = f'{worst_threshold[0]:.2e}'
-                    thresh_1 = f'{worst_threshold[1]:.2e}'
-                ax.axvline(worst_threshold[0], color='red', linestyle='--', alpha=0.7, 
-                          label=f'Worst case cutoff = {thresh_0}')
-                ax.axvline(worst_threshold[1], color='red', linestyle=':', alpha=0.7, 
-                          label=f'Worst case max = {thresh_1}')
-            else:
-                ax.axvline(worst_threshold, color='red', linestyle='--', alpha=0.7, 
-                          label=f'Worst case cutoff = {worst_threshold:.2e}')
-            
-            # Set logarithmic x-axis for flux ratio
+                    ax.axvline(worst_threshold, color='red', linestyle='--', alpha=0.7, 
+                              label=f'Worst case cutoff = {worst_threshold:.2e}')
+            # Set logarithmic x-axis for all except IWA
             if reason == 'IWA':
                 pass
             else:
                 ax.set_xscale('log')
-            
             ax.set_title(f"{reason}")
-            ax.set_xlabel(reason.replace('_', ' ').capitalize())
+            if reason == 'IWA':
+                ax.set_xlabel('Maximum angular separation')
+            else:
+                ax.set_xlabel(reason.replace('_', ' ').capitalize())
             ax.set_ylabel("Number of planets")
             ax.legend(fontsize=8, loc='upper right')
-            
+        # Remove any unused subplots (if fewer than 4)
+        for j in range(i+1, nrows*ncols):
+            fig.delaxes(axs[j])
         # Calculate overall rejection percentages for subtitle
         total_planets = len(df)
-        if 'detected_best' in df.columns and 'detected_worst' in df.columns:
+        if 'detected_best' in df.columns:
             rejected_best = len(df[~df['detected_best']])
-            rejected_worst = len(df[~df['detected_worst']])
             pct_best = (rejected_best / total_planets) * 100
-            pct_worst = (rejected_worst / total_planets) * 100
-            suptitle = f"Actual Values vs. Cutoff Thresholds for Planet Rejection\nBest case: {pct_best:.1f}% rejected, Worst case: {pct_worst:.1f}% rejected"
+            suptitle = f"Actual Values vs. Cutoff Thresholds for Planet Rejection\nBest case: {pct_best:.1f}% rejected"
         else:
             suptitle = "Actual Values vs. Cutoff Thresholds for Planet Rejection"
-        
         plt.suptitle(suptitle, fontsize=14)
         plt.tight_layout(rect=[0, 0, 1, 0.95])
         filename = output_filename('failure_multipanel', self.name, self.nruns, self.star_catalog, 'actual_values')

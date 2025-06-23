@@ -101,6 +101,8 @@ def run_sim(func, name, parallel, nruns, star_catalog, run_anew=True):
     df_concat = pd.concat([df_concat, rocky_hz], ignore_index=True)
 
     start_time = time.time()
+    print("Columns in DataFrame:", list(df_concat.columns))
+    print(df_concat[['exozodi_surface_brightness_ratio_best']].head())
     plot_all(df=df_concat, sim_name=name, nruns=len(nruns), star_catalog=star_catalog, use_multiprocessing=True)
     end_time = time.time()
     print(f"Time taken to plot: {end_time - start_time} seconds")
@@ -110,7 +112,7 @@ if __name__ == "__main__":
 
     PARALLEL = True  # Set to True if you want to run in parallel
     STAR_CATALOG = 'Gaia'  # or 'ExoCat_1'
-    NRUNS = np.arange(60,500)
+    NRUNS = np.arange(500)
     
     run_sim(func=main_hwo, name = 'hwo', parallel=True, nruns=NRUNS, star_catalog=STAR_CATALOG, run_anew=False)
     # run_sim(func=main_lifesim, name='lifesim',parallel=PARALLEL, nruns=NRUNS, star_catalog=STAR_CATALOG, run_anew=False)

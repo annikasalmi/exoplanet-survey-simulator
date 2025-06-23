@@ -59,7 +59,7 @@ class ExozodiModel():
         self.hwo_max_wavelength = 2500e-9  # 2.5 μm
         
         pass
-    
+   
     def getExozodiLevel(self):
         """
         Returns

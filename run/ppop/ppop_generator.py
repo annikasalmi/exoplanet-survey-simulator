@@ -28,7 +28,7 @@ from PPop.EccentricityModels import Circular
 from PPop.StabilityModels import He2019
 from PPop.OrbitModels import Random
 from PPop.AlbedoModels import Uniform
-from PPop.ExozodiModels import Ertel2020, Ertel2018
+from PPop.ExozodiModels import Ertel2020
 
 class PPop():
     '''
@@ -122,7 +122,11 @@ class PPop():
         """
         # turn df data into the correct format
         if df is not None:
-            original_cols = df.columns
+            columns_to_drop = [
+                    'Rp', 'Porb', 'Mp', 'ep', 'ip', 'Omegap', 'omegap', 'thetap',
+                    'Abond', 'AgeomVIS', 'AgeomMIR', 'ap', 'rp', 'AngSep', 'maxAngSep',
+                    'Fp', 'Tp', 'Msun', 'Nuniverse', 'Nstar'
+                ]
             df['radius_p'] = df['Rp']
             df['p_orb'] = df['Porb']
             df['mass_p'] = df['Mp']
@@ -153,7 +157,7 @@ class PPop():
             df['stype'] = [df['Star'][i].Stype for i in range(len(df))]
             df['id'] = np.arange(0, len(df['dec']), 1)
             df['name_s'] =  [df['Star'][i].Name for i in range(len(df))]
-            df = df.drop(columns=original_cols, axis=1)
+            df = df.drop(columns=columns_to_drop, axis=1)
 
             self.catalog = df
 

@@ -74,7 +74,7 @@ def run_with_progress(func, name, estimated_minutes=12, *args, **kwargs):
 
     return result
 
-def run_sim(func, name, parallel, nruns, star_catalog, run_anew=True):
+def run_sim(func=main_hwo, name='hwo', parallel=True, nruns=500, star_catalog='Gaia', run_anew=True, plot=True):
     '''
     Runs the simulation with the provided function, name, parallel execution flag,
     number of runs, and star catalog.'''
@@ -99,20 +99,20 @@ def run_sim(func, name, parallel, nruns, star_catalog, run_anew=True):
 
     # Combine all rows
     df_concat = pd.concat([df_concat, rocky_hz], ignore_index=True)
-
-    start_time = time.time()
-    plot_all(df=df_concat, sim_name=name, nruns=len(nruns), star_catalog=star_catalog)
-    end_time = time.time()
-    print(f"Time taken to plot: {end_time - start_time} seconds")
+    if plot:
+        start_time = time.time()
+        plot_all(df=df_concat, sim_name=name, nruns=len(nruns), star_catalog=star_catalog)
+        end_time = time.time()
+        print(f"Time taken to plot: {end_time - start_time} seconds")
+    return df_concat
 
 # Run the whole thing
 if __name__ == "__main__":
 
-    PARALLEL = True  # Set to True if you want to run in parallel
     STAR_CATALOG = 'Gaia'  # or 'ExoCat_1'
     NRUNS = np.arange(500)
     
-    run_sim(func=main_hwo, name = 'hwo', parallel=PARALLEL, nruns=NRUNS, star_catalog=STAR_CATALOG, run_anew=False)
+    run_sim(func=main_hwo, name = 'hwo', parallel=True, nruns=NRUNS, star_catalog=STAR_CATALOG, run_anew=False)
     # run_sim(func=main_lifesim, name='lifesim',parallel=PARALLEL, nruns=NRUNS, star_catalog=STAR_CATALOG, run_anew=False)
     # run_sim(func=main_lifesim, name='lifesim', parallel=PARALLEL, nruns=NRUNS, star_catalog='LTC_3', run_anew=False)
     print('done')

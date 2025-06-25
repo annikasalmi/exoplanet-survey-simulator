@@ -20,7 +20,7 @@ class PlanetRejectionPlotter:
         self.name = name
         self.data_dir = make_output_dir(name, nruns, star_catalog)
 
-    def plot_all(self, plot_percentages=False) -> None:
+    def plot_all(self, plot_percentages=True) -> None:
         """Generate all rejection/failure plots."""
         self.plot_failures_histogram()
         if plot_percentages:
@@ -87,6 +87,15 @@ class PlanetRejectionPlotter:
             else:
                 rejection_counts = pd.Series()
             
+            # Calculate Exozodi (z) rejection count and add to rejection_counts if not present
+            if scenario == 'best':
+                z_mask = df['z'] > HWOConstants('best').max_z
+            else:
+                z_mask = df['z'] > HWOConstants('worst').max_z
+            exozodi_count = z_mask.sum()
+            if 'Exozodi' not in rejection_counts:
+                rejection_counts['Exozodi'] = exozodi_count
+            
             # Create bar plot
             reasons = ['# photons hitting detector', 'Flux Ratio', 'IWA', 'Exozodi']
             bar_height = total_planets
@@ -145,20 +154,26 @@ class PlanetRejectionPlotter:
             '# photons hitting detector': ('photon_rate_value_best', 'photon_rate_value_worst'),
             'Flux Ratio': ('flux_ratio_value_best', 'flux_ratio_value_worst'),
             'IWA': ('maxangsep', 'maxangsep'),
-            'Exozodi': ('exozodi_surface_brightness_ratio_best', None),  # Only best for Exozodi
+            'Exozodi': ('z', None),  # Now mapping z for Exozodi
         }
         
         for i, (reason, (col_best, col_worst)) in enumerate(column_mapping.items()):
             ax = axs[i]
-            # Check if column exists
-            if col_best not in df.columns:
+            # Only check for column existence for reasons other than Exozodi
+            if reason != 'Exozodi' and col_best not in df.columns:
                 print(f"Warning: Column '{col_best}' not found in DataFrame. Available columns: {list(df.columns)}")
                 continue
             
             # Use better binning for wide ranges
             if reason in ['Flux Ratio', 'Min Photons']:
-                min_val = float(df[col_best].min())
-                max_val = float(df[col_best].max())
+                arr = np.asarray(pd.to_numeric(df[col_best], errors='coerce'))
+                min_val = np.nanmin(arr)
+                max_val = np.nanmax(arr)
+                # If not finite or <=0, set to a small positive value or default
+                if not np.isfinite(min_val) or min_val <= 0:
+                    min_val = 1e-10
+                if not np.isfinite(max_val) or max_val <= 0:
+                    max_val = 1.0
                 bins = np.logspace(np.log10(min_val), np.log10(max_val), 40)
             else:
                 bins = 40
@@ -188,19 +203,27 @@ class PlanetRejectionPlotter:
                 pass_col_best = 'iwa_pass_best'
                 pass_col_worst = 'iwa_pass_worst'
             elif reason == 'Exozodi':
-                pass_col_best = 'exozodi_pass_best'
-                pass_col_worst = None
+                pass_col_best = 'z_pass_best'
+                pass_col_worst = 'z_pass_worst'
             
             # Calculate rejection percentages (skip for IWA)
             if reason != 'IWA':
                 if pass_col_best in df.columns:
-                    rejected_best = len(df[~df[pass_col_best]])
+                    if reason == 'Exozodi':
+                        mask_best = (df['z'] <= HWOConstants('best').max_z)
+                    else:
+                        mask_best = df[pass_col_best].astype(bool)
+                    rejected_best = len(df[~mask_best])
                     pct_best = (rejected_best / total_planets) * 100
                     ax.text(0.05, 0.95, f'Best: {pct_best:.1f}% rejected',
                             transform=ax.transAxes, verticalalignment='top',
                             bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
                 if col_worst and pass_col_worst and pass_col_worst in df.columns:
-                    rejected_worst = len(df[~df[pass_col_worst]])
+                    if reason == 'Exozodi':
+                        mask_worst = (df['z'] <= HWOConstants('worst').max_z)
+                    else:
+                        mask_worst = df[pass_col_worst].astype(bool)
+                    rejected_worst = len(df[~mask_worst])
                     pct_worst = (rejected_worst / total_planets) * 100
                     ax.text(0.05, 0.85, f'Worst: {pct_worst:.1f}% rejected',
                             transform=ax.transAxes, verticalalignment='top',
@@ -210,9 +233,12 @@ class PlanetRejectionPlotter:
             hwo_best = HWOConstants('best')
             hwo_worst = HWOConstants('worst')
             if reason == 'Exozodi':
-                best_threshold = 1.0
+                best_threshold = HWOConstants('best').max_z
+                worst_threshold = HWOConstants('worst').max_z
                 ax.axvline(best_threshold, color='green', linestyle='--', alpha=0.7, 
                           label=f'Best case cutoff = {best_threshold:.2e}')
+                ax.axvline(worst_threshold, color='red', linestyle='--', alpha=0.7, 
+                          label=f'Worst case cutoff = {worst_threshold:.2e}')
             else:
                 threshold_name = {
                     '# photons hitting detector': 'min_photons',
@@ -249,14 +275,18 @@ class PlanetRejectionPlotter:
                 else:
                     ax.axvline(worst_threshold, color='red', linestyle='--', alpha=0.7, 
                               label=f'Worst case cutoff = {worst_threshold:.2e}')
-            # Set logarithmic x-axis for all except IWA
+            # Set logarithmic x-axis for all except IWA and Exozodi
             if reason == 'IWA':
                 pass
+            elif reason == 'Exozodi':
+                pass  # Do not set log scale for Exozodi
             else:
                 ax.set_xscale('log')
             ax.set_title(f"{reason}")
             if reason == 'IWA':
                 ax.set_xlabel('Maximum angular separation')
+            elif reason == 'Exozodi':
+                ax.set_xlabel('z (zodis)')
             else:
                 ax.set_xlabel(reason.replace('_', ' ').capitalize())
             ax.set_ylabel("Number of planets")
@@ -267,7 +297,8 @@ class PlanetRejectionPlotter:
         # Calculate overall rejection percentages for subtitle
         total_planets = len(df)
         if 'detected_best' in df.columns:
-            rejected_best = len(df[~df['detected_best']])
+            mask_detected_best = df['detected_best'].astype(bool)
+            rejected_best = len(df[~mask_detected_best])
             pct_best = (rejected_best / total_planets) * 100
             suptitle = f"Actual Values vs. Cutoff Thresholds for Planet Rejection\nBest case: {pct_best:.1f}% rejected"
         else:

@@ -301,7 +301,6 @@ class System():
         
         pass
 
-     
     def write_df(self):
         """
         Write out to a dataframe

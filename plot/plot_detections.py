@@ -163,7 +163,6 @@ class PlanetDetectionPlotter:
                 ax1.set_xlim(bins[0], bins[-1])
                 ax2 = ax1.twinx()
                 ax2.plot(bin_centers, efficiency, 'r--', linewidth=2, label='Detection efficiency')
-                ax2.set_ylabel("Detection efficiency")
                 ax2.set_ylim(0, 1.0)
             h1, l1 = ax1.get_legend_handles_labels()
             h2, l2 = ax2.get_legend_handles_labels()

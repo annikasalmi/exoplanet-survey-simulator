@@ -1,14 +1,16 @@
 import os
 import numpy as np
-import matplotlib.pyplot as plt
 import pandas as pd
+import matplotlib.pyplot as plt
+import multiprocessing as mp
+from functools import partial
 
 from plot.helpers import (
-    make_output_dir, temp_zone, assign_category, prep_plot_df_stars, pivot_stats,
+    make_output_dir, temp_zone, assign_category,  pivot_stats,
     bar_plot_with_errors, overlay_best_worst, output_filename, get_detection_masks
 )
 from tools.plotting_constants import (
-    STAR_ORDER, BIN_LABELS, CATEGORY_LABELS, TEMP_ZONES, DISTANCE_LABELS,
+    STAR_ORDER, BIN_LABELS, TEMP_ZONES, DISTANCE_LABELS,
     STAR_COLORS, STAR_HATCHES, TEMP_COLORS, BAR_WIDTH_STAR, BAR_WIDTH_TEMP, BAR_WIDTH_DIST
 )
 
@@ -29,11 +31,77 @@ class PlotPlanetType:
         else:
             self.case = ''
 
+        # Create plots directory if it doesn't exist
+        os.makedirs(self.data_dir, exist_ok=True)
+        
+        # Cache for computed values to avoid recalculation
+        self._cache = {}
+        
+        # Pre-compute commonly used values
+        self._precompute_values()
+
+    def _precompute_values(self):
+        """Pre-compute values that are used multiple times."""
+        if 'temp_zone' not in self._cache:
+            self._cache['temp_zone'] = self.df['temp_p'].apply(temp_zone)
+        if 'categories' not in self._cache:
+            self._cache['categories'] = self.df.apply(assign_category, axis=1)
+        if 'detection_masks' not in self._cache:
+            self._cache['detection_masks'] = get_detection_masks(self.df, self.name)
+
+    def _process_chunk_parallel(self, chunk_df):
+        """Process a chunk of data in parallel."""
+        chunk_df['temp_zone'] = chunk_df['temp_p'].apply(temp_zone)
+        chunk_df['categories'] = chunk_df.apply(assign_category, axis=1)
+        return chunk_df
+    
+    def _precompute_values_parallel(self, n_chunks=4):
+        """Pre-compute values using parallel processing for large datasets."""
+        if len(self.df) > 10000:  # Only use parallel processing for large datasets
+            # Split DataFrame into chunks
+            chunk_size = len(self.df) // n_chunks
+            chunks = [self.df.iloc[i:i+chunk_size] for i in range(0, len(self.df), chunk_size)]
+            
+            # Process chunks in parallel
+            with mp.Pool(processes=min(n_chunks, mp.cpu_count())) as pool:
+                processed_chunks = pool.map(self._process_chunk_parallel, chunks)
+            
+            # Combine results
+            combined_df = pd.concat(processed_chunks, ignore_index=True)
+            self._cache['temp_zone'] = combined_df['temp_zone']
+            self._cache['categories'] = combined_df['categories']
+        else:
+            # Use regular processing for smaller datasets
+            self._precompute_values()
+
     def plot_all(self) -> None:
         """Main entry point to generate all plots based on the name parameter."""
         self.plot_by_planet()
         self.plot_by_star()
         self.plot_distances()
+
+    def plot_all_batch(self) -> None:
+        """Batch process all plots with optimized memory usage."""
+        # Pre-compute all values once
+        self._precompute_values()
+        
+        # Process plots in sequence to minimize memory usage
+        plots_to_generate = [
+            ('by_planet', self.plot_by_planet),
+            ('by_star', self.plot_by_star), 
+            ('distances', self.plot_distances)
+        ]
+        
+        for plot_name, plot_func in plots_to_generate:
+            try:
+                print(f"Generating {plot_name} plot...")
+                plot_func()
+                # Force garbage collection after each plot
+                import gc
+                gc.collect()
+            except Exception as e:
+                print(f"Error generating {plot_name} plot: {e}")
+                continue
 
     def plot_by_star(self) -> None:
         """Grouped bar plots by star type and radius bin. For HWO, uses detected_best/worst logic."""
@@ -105,7 +173,7 @@ class PlotPlanetType:
         plt.close(fig)
         
         # Detected stats
-        mask_best, mask_worst = get_detection_masks(df, self.name)
+        mask_best, mask_worst = self._cache['detection_masks']
         if self.name == 'HWO':
             df['detected_flag_best'] = mask_best.astype(bool)
             detected_df = df[df['detected_flag_best']]
@@ -175,72 +243,130 @@ class PlotPlanetType:
 
     def plot_by_planet(self, detected_only=False) -> None:
         """Bar plots by planet category and temperature zone. Best/worst overlays for HWO."""
-        df = self.df.copy()
-        df['temp_zone'] = df['temp_p'].apply(temp_zone)
-        df['category'] = df.apply(assign_category, axis=1)
-        df = df.dropna(subset=['category'])
-        x = np.arange(len(CATEGORY_LABELS))
+        # Use view instead of copy when possible to save memory
+        df = self.df
+        
+        # Cache computed values to avoid recalculation
+        if not hasattr(self, '_cached_temp_zones'):
+            self._cached_temp_zones = self._cache['temp_zone']
+        if not hasattr(self, '_cached_categories'):
+            self._cached_categories = self._cache['categories']
+        
+        # Create a working copy only when we need to modify
+        df_work = df.copy()
+        df_work['temp_zone'] = self._cached_temp_zones
+        df_work['categories'] = self._cached_categories
+        df_work = df_work.dropna(subset=['categories'])
+        
+        # Vectorized expansion using explode
+        df_expanded = df_work.explode('categories').rename(columns={'categories': 'category'})
+        df_expanded = df_expanded.dropna(subset=['category'])
+        
+        if len(df_expanded) == 0:
+            print("No planets found with valid categories")
+            return
+        
+        # Get categories that actually exist in the data
+        detected_categories = sorted(df_expanded['category'].unique())
+        print(f"Detected categories in data: {detected_categories}")
+        
+        # Define the desired order for categories
+        desired_order = [
+            'Rocky',
+            'Rocky planets around M-type stars', 
+            'Rocky planets around G and K-type stars',
+            'Super-Earths',
+            'Sub-Neptunes',
+            'Sub-Jovians',
+        ]
+        
+        # Use desired order, but only include categories that exist in the data
+        plot_categories = [cat for cat in desired_order if cat in detected_categories]
+        
+        # Add any remaining categories that weren't in the desired order
+        remaining_categories = [cat for cat in detected_categories if cat not in plot_categories]
+        plot_categories.extend(remaining_categories)
+        
+        x = np.arange(len(plot_categories))
+        
         # Total
-        total_stats = pivot_stats(df, ['category', 'temp_zone'])
+        total_stats = pivot_stats(df_expanded, ['category', 'temp_zone'])
         heights_list, errors_list = [], []
         for zone in TEMP_ZONES:
-            data = total_stats[total_stats['temp_zone'] == zone].set_index('category').reindex(CATEGORY_LABELS)
+            data = total_stats[total_stats['temp_zone'] == zone].set_index('category').reindex(plot_categories)
             heights_list.append(data['count'].fillna(0).values)
             errors_list.append(data['error'].fillna(0).values)
         bar_plot_with_errors(
             x, heights_list, errors_list, BAR_WIDTH_TEMP, TEMP_ZONES, colors=TEMP_COLORS,
-            xticks=x, xticklabels=CATEGORY_LABELS, ylabel='Planet Count',
+            xticks=x, xticklabels=plot_categories, ylabel='Planet Count',
             title=f'Total Planets by Type and Temp Zone\n{self.name}, {self.nruns} Runs — {self.star_catalog}',
             legend_title='Temp Zone', filename=os.path.join(self.data_dir, output_filename('planets_by_type_total', self.name, self.nruns, self.star_catalog)),
             text_offset=1
         )
         if detected_only:
             # Detected
-            mask_best, mask_worst = get_detection_masks(df, self.name)
+            mask_best, mask_worst = self._cache['detection_masks']
             if self.name == 'HWO':
-                df['detected_flag_best'] = mask_best.astype(bool)
-                detected_stats = pivot_stats(df[df['detected_flag_best']], ['category', 'temp_zone'])
-            else:
-                df['detected_flag'] = mask_best.astype(bool)
-                detected_stats = pivot_stats(df[df['detected_flag']], ['category', 'temp_zone'])
-            heights_list, errors_list = [], []
-            for zone in TEMP_ZONES:
-                data = detected_stats[detected_stats['temp_zone'] == zone].set_index('category').reindex(CATEGORY_LABELS)
-                heights_list.append(data['count'].fillna(0).values)
-                errors_list.append(data['error'].fillna(0).values)
-            bar_plot_with_errors(
-                x, heights_list, errors_list, BAR_WIDTH_TEMP, TEMP_ZONES, colors=TEMP_COLORS,
-                xticks=x, xticklabels=CATEGORY_LABELS, ylabel='Detected Planet Count',
-                title=f'Detected Planets by Type and Temp Zone\n{self.name}, {self.nruns} Runs — {self.star_catalog}',
-                legend_title='Temp Zone', filename=os.path.join(self.data_dir, output_filename('planets_by_type_detected', self.name, self.nruns, self.star_catalog)),
-                text_offset=1
-            )
-            # Best/worst overlays if HWO
-            if self.name == 'HWO' and mask_worst is not None:
-                df['detected_flag_worst'] = mask_worst.astype(bool)
-                worst_stats = pivot_stats(df[df['detected_flag_worst']], ['category', 'temp_zone'])
-                best_stats = pivot_stats(df[df['detected_flag_best']], ['category', 'temp_zone'])
-                worst_list, best_list = [], []
+                df_expanded['detected_flag_best'] = mask_best.astype(bool)
+                df_expanded['detected_flag_worst'] = mask_worst.astype(bool)
+                detected_df_best = df_expanded[df_expanded['detected_flag_best']]
+                detected_df_worst = df_expanded[df_expanded['detected_flag_worst']]
+                
+                # Best case
+                best_stats = pivot_stats(detected_df_best, ['category', 'temp_zone'])
+                heights_list_best, errors_list_best = [], []
                 for zone in TEMP_ZONES:
-                    data_worst = worst_stats[worst_stats['temp_zone'] == zone].set_index('category').reindex(CATEGORY_LABELS)
-                    data_best = best_stats[best_stats['temp_zone'] == zone].set_index('category').reindex(CATEGORY_LABELS)
-                    worst_list.append(data_worst['count'].fillna(0).values)
-                    best_list.append(data_best['count'].fillna(0).values)
-                fig, ax = plt.subplots(figsize=(10, 6))
-                overlay_best_worst(
-                    ax, x, BAR_WIDTH_TEMP,
-                    worst_list + best_list,
-                    ['green'] * len(worst_list) + ['lightgreen'] * len(best_list),
-                    ['Worst Case (Green)'] * len(worst_list) + ['Best Case (Light Green)'] * len(best_list)
-                )
-                ax.set_xticks(x)
-                ax.set_xticklabels(CATEGORY_LABELS, rotation=15, ha='right')
-                ax.set_ylabel('Detected Planets (Best/Worst)')
-                ax.set_title(f'Best/Worst Detected Planets by Type and Temp Zone\n{self.name}, {self.nruns} Runs — {self.star_catalog}')
-                ax.legend(title='Overlay', fontsize=9)
+                    data = best_stats[best_stats['temp_zone'] == zone].set_index('category').reindex(plot_categories)
+                    heights_list_best.append(data['count'].fillna(0).values)
+                    errors_list_best.append(data['error'].fillna(0).values)
+                
+                # Worst case
+                worst_stats = pivot_stats(detected_df_worst, ['category', 'temp_zone'])
+                heights_list_worst, errors_list_worst = [], []
+                for zone in TEMP_ZONES:
+                    data = worst_stats[worst_stats['temp_zone'] == zone].set_index('category').reindex(plot_categories)
+                    heights_list_worst.append(data['count'].fillna(0).values)
+                    errors_list_worst.append(data['error'].fillna(0).values)
+                
+                # Create overlay plot
+                fig, ax = plt.subplots(figsize=(15, 8))
+                bar_width = BAR_WIDTH_TEMP
+                
+                for i, zone in enumerate(TEMP_ZONES):
+                    overlay_best_worst(
+                        ax, x + i * bar_width * 3, bar_width,
+                        [heights_list_best[i], heights_list_worst[i]],
+                        [TEMP_COLORS[i], TEMP_COLORS[i]],
+                        [f'{zone} (Best)', f'{zone} (Worst)']
+                    )
+                
+                ax.set_xlabel('Planet Category')
+                ax.set_ylabel('Detected Planet Count')
+                ax.set_title(f'Detected Planets by Type and Temp Zone\n{self.name}, {self.nruns} Runs — {self.star_catalog}')
+                ax.set_xticks(x + bar_width * 3)
+                ax.set_xticklabels(plot_categories, rotation=45, ha='right')
+                ax.legend(title='Temp Zone')
                 plt.tight_layout()
-                plt.savefig(os.path.join(self.data_dir, output_filename('planets_by_type_detected', self.name, self.nruns, self.star_catalog, 'best_worst')), dpi=300, bbox_inches='tight')
+                plt.savefig(os.path.join(self.data_dir, 
+                                        output_filename('planets_by_type_detected', self.name, self.nruns, self.star_catalog)), 
+                           dpi=300, bbox_inches='tight')
                 plt.close(fig)
+            else:
+                df_expanded['detected_flag'] = mask_best.astype(bool)
+                detected_df = df_expanded[df_expanded['detected_flag']]
+                detected_stats = pivot_stats(detected_df, ['category', 'temp_zone'])
+                heights_list, errors_list = [], []
+                for zone in TEMP_ZONES:
+                    data = detected_stats[detected_stats['temp_zone'] == zone].set_index('category').reindex(plot_categories)
+                    heights_list.append(data['count'].fillna(0).values)
+                    errors_list.append(data['error'].fillna(0).values)
+                bar_plot_with_errors(
+                    x, heights_list, errors_list, BAR_WIDTH_TEMP, TEMP_ZONES, colors=TEMP_COLORS,
+                    xticks=x, xticklabels=plot_categories, ylabel='Detected Planet Count',
+                    title=f'Detected Planets by Type and Temp Zone\n{self.name}, {self.nruns} Runs — {self.star_catalog}',
+                    legend_title='Temp Zone', filename=os.path.join(self.data_dir, output_filename('planets_by_type_detected', self.name, self.nruns, self.star_catalog)),
+                    text_offset=1
+                )
 
     def plot_distances(self, detected_only=False) -> None:
         """Bar plots by distance bin. Best/worst overlays for HWO."""
@@ -249,7 +375,7 @@ class PlotPlanetType:
         df['distance_bin'] = pd.cut(df['distance_s'], bins=bins, labels=DISTANCE_LABELS, right=False)
         x = np.arange(len(DISTANCE_LABELS))
         # Detected logic
-        mask_best, mask_worst = get_detection_masks(df, self.name)
+        mask_best, mask_worst = self._cache['detection_masks']
         if self.name == 'HWO':
             df['detected_flag_best'] = mask_best.astype(bool)
             detected_per_run = df[df['detected_flag_best']].groupby(['run', 'distance_bin']).size().unstack(fill_value=0).reindex(columns=DISTANCE_LABELS, fill_value=0)

@@ -234,7 +234,7 @@ def overlay_best_worst(
     """Overlay best/worst bars on an axis."""
     for i, (overlay, color, label) in enumerate(zip(overlay_lists, colors, labels)):
         xpos = x + i * bar_width
-        ax.bar(xpos, overlay, width=bar_width, color=color, label=label if i == 0 else "", edgecolor='black', alpha=0.7 if 'Worst' in label else 0.8)
+        ax.bar(xpos, overlay, width=bar_width, color=color, label=label if i == 0 else "", edgecolor='black', alpha=0.5 if 'Worst' in label else 0.9)
 
 def output_filename(plot_type: str, name: str, nruns: int, star_catalog: str, suffix: Optional[str] = None) -> str:
     """Centralize output filename formatting."""

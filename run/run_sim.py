@@ -101,9 +101,7 @@ def run_sim(func, name, parallel, nruns, star_catalog, run_anew=True):
     df_concat = pd.concat([df_concat, rocky_hz], ignore_index=True)
 
     start_time = time.time()
-    print("Columns in DataFrame:", list(df_concat.columns))
-    print(df_concat[['exozodi_surface_brightness_ratio_best']].head())
-    plot_all(df=df_concat, sim_name=name, nruns=len(nruns), star_catalog=star_catalog, use_multiprocessing=True)
+    plot_all(df=df_concat, sim_name=name, nruns=len(nruns), star_catalog=star_catalog)
     end_time = time.time()
     print(f"Time taken to plot: {end_time - start_time} seconds")
 

@@ -42,12 +42,7 @@ bus.data.catalog_remove_distance(stype='M', mode='larger', dist=10.)  # remove M
 # speed up calculation
 
 hwo_data = HWOData(bus.data)
-hwo_data.determine_detectable(
-    use_exozodi_constraint=True,           # Enable exozodi constraint
-    exozodi_scenario='baseline',           # Use baseline exozodi scenario
-    use_surface_brightness_criterion=True, # Use new surface brightness criterion
-    ignore_exozodi_rejections=False        # Apply exozodi rejections to final detection
-)
+hwo_data.determine_detectable()
 
 df_size = hwo_data.catalog.groupby(['stype','habitable']).size().reset_index()
 df_size['count_overall'] = df_size[0]

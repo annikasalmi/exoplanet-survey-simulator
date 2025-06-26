@@ -5,6 +5,7 @@ import os
 from plot.plot_by_type import PlotPlanetType
 from plot.plot_detections import PlanetDetectionPlotter
 from plot.plot_rejections import PlanetRejectionPlotter
+from plot.plot_mdwarf_hz_limits import PlotMdwarfHZLimits
 
 
 def _run_plotter_class(plotter_class, df, nruns, star_catalog, sim_name, **kwargs):
@@ -49,6 +50,7 @@ def plot_all(df, nruns=1, star_catalog='Gaia', sim_name='HWO', use_multiprocessi
     # Add rejection plotting only for HWO
     if sim_name == 'HWO':
         plotting_tasks.append((PlanetRejectionPlotter, {}))
+        plotting_tasks.append((PlotMdwarfHZLimits, {}))
     
     if use_multiprocessing and len(plotting_tasks) > 1:
         # Use multiprocessing for parallel execution
@@ -96,14 +98,12 @@ def plot_all(df, nruns=1, star_catalog='Gaia', sim_name='HWO', use_multiprocessi
 def _run_sequential(plotting_tasks, df, nruns, star_catalog, sim_name):
     """Helper function for sequential execution."""
     for plotter_class, kwargs in plotting_tasks:
-        try:
-            print(f"Running {plotter_class.__name__}...")
-            plotter = plotter_class(df=df, name=sim_name, nruns=nruns, 
-                                  star_catalog=star_catalog, **kwargs)
-            plotter.plot_all()
-            print(f"{plotter_class.__name__} completed successfully")
-        except Exception as e:
-            print(f"{plotter_class.__name__} failed: {str(e)}")
+
+        print(f"Running {plotter_class.__name__}...")
+        plotter = plotter_class(df=df, name=sim_name, nruns=nruns, 
+                                star_catalog=star_catalog, **kwargs)
+        plotter.plot_all()
+        print(f"{plotter_class.__name__} completed successfully")
 
 
 def plot_all_sequential(df, nruns=1, star_catalog='Gaia', sim_name='HWO'):

@@ -101,7 +101,7 @@ def run_sim(func=main_hwo, name='hwo', parallel=True, nruns=500, star_catalog='G
     df_concat = pd.concat([df_concat, rocky_hz], ignore_index=True)
     if plot:
         start_time = time.time()
-        plot_all(df=df_concat, sim_name=name, nruns=len(nruns), star_catalog=star_catalog, use_multiprocessing=True)
+        plot_all(df=df_concat, sim_name=name, nruns=len(nruns), star_catalog=star_catalog, use_multiprocessing=False)
         end_time = time.time()
         print(f"Time taken to plot: {end_time - start_time} seconds")
     return df_concat
@@ -109,10 +109,8 @@ def run_sim(func=main_hwo, name='hwo', parallel=True, nruns=500, star_catalog='G
 # Run the whole thing
 if __name__ == "__main__":
 
-    STAR_CATALOG = 'Gaia'  # or 'ExoCat_1'
     NRUNS = np.arange(500)
     
-    run_sim(func=main_hwo, name = 'hwo', parallel=True, nruns=NRUNS, star_catalog=STAR_CATALOG, run_anew=False)
-    # run_sim(func=main_lifesim, name='lifesim',parallel=PARALLEL, nruns=NRUNS, star_catalog=STAR_CATALOG, run_anew=False)
-    # run_sim(func=main_lifesim, name='lifesim', parallel=PARALLEL, nruns=NRUNS, star_catalog='LTC_3', run_anew=False)
+    run_sim(func=main_hwo, name = 'hwo', parallel=True, nruns=NRUNS, star_catalog='Gaia', run_anew=False)
+    # run_sim(func=main_lifesim, name='lifesim', parallel=True, nruns=NRUNS, star_catalog='LTC_3', run_anew=False)
     print('done')

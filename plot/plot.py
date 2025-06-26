@@ -42,8 +42,8 @@ def plot_all(df, nruns=1, star_catalog='Gaia', sim_name='HWO', use_multiprocessi
     
     # Define plotting tasks
     plotting_tasks = [
-        # (PlotPlanetType, {}),
-        # (PlanetDetectionPlotter, {}),
+        (PlotPlanetType, {}),
+        (PlanetDetectionPlotter, {}),
     ]
     
     # Add rejection plotting only for HWO

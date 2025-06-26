@@ -101,7 +101,7 @@ def run_sim(func=main_hwo, name='hwo', parallel=True, nruns=500, star_catalog='G
     df_concat = pd.concat([df_concat, rocky_hz], ignore_index=True)
     if plot:
         start_time = time.time()
-        plot_all(df=df_concat, sim_name=name, nruns=len(nruns), star_catalog=star_catalog)
+        plot_all(df=df_concat, sim_name=name, nruns=len(nruns), star_catalog=star_catalog, use_multiprocessing=True)
         end_time = time.time()
         print(f"Time taken to plot: {end_time - start_time} seconds")
     return df_concat

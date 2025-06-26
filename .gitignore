@@ -35,6 +35,7 @@ TestPlanetPopulation.txt
 /run/hwo/__pycache__/*.pyc
 /run/lifesim/__pycache__/*.pyc
 /plot/__pycache__/*.pyc
+/plot/*/.DS_Store
 /tools/__pycache__/*.pyc
 __pycache__/*.pyc
 /lifesim/core/__pycache__/*.pyc

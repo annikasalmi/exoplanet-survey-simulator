@@ -405,13 +405,20 @@ class PlotPlanetType:
             # Detected-only bar plot
             heights_list = [detected_mean.values]
             errors_list = [detected_std.values]
-            bar_plot_with_errors(
+            fig, ax = bar_plot_with_errors(
                 x, heights_list, errors_list, BAR_WIDTH_DIST, ['Detected'], colors=['seagreen'],
                 xticks=x, xticklabels=DISTANCE_LABELS, ylabel='Detected Planet Count',
                 title=f'Detected Planets by Distance Bin\n{self.name}, {self.nruns} Runs — {self.star_catalog}',
-                legend_title=None, filename=os.path.join(self.data_dir, output_filename('planet_distance_detected', self.name, self.nruns, self.star_catalog)),
+                legend_title=None, filename=None,  # Don't save yet
                 text_offset=2
             )
+            # Add percentage labels above detected bars
+            for i, (det, tot) in enumerate(zip(detected_mean.values, total_mean.values)):
+                if tot > 0:
+                    pct = int(round(100 * det / tot))
+                    ax.text(x[i], det + detected_std.values[i] + 2, f'{pct}%', ha='center', va='bottom', fontsize=10, color='black')
+            fig.savefig(os.path.join(self.data_dir, output_filename('planet_distance_detected', self.name, self.nruns, self.star_catalog, 'percent_labels')), dpi=300, bbox_inches='tight')
+            plt.close(fig)
             # Best/worst overlays if HWO
             if self.name == 'HWO' and mask_worst is not None:
                 df['detected_flag_worst'] = mask_worst.astype(bool)

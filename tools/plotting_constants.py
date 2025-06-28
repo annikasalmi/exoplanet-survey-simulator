@@ -62,5 +62,5 @@ REJECTION_COLUMN_MAPPING = {
     'Exozodi': 'z',
 }
 REJECTION_LABELS = ['Maximum angular separation', 'Flux Ratio', 'IWA', 'Exozodi']
-REJECTION_COLORS = ['green', 'red', 'yellow', 'blue']
+REJECTION_COLORS = ['green', 'red', 'blue', 'yellow']
 REJECTION_SCENARIO_LABELS = {'best': 'Best Case Scenario'}

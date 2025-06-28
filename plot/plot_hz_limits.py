@@ -1,494 +1,274 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from typing import Optional
+from matplotlib.patches import Rectangle
+import pandas as pd
+from typing import Optional, Tuple
 from plot.base_plotter import BasePlotter
 from tools import physics_constants as const
+# For boundary plotting
+from scipy.spatial import ConvexHull
+# For smoother, non-convex boundaries
+import alphashape
+from shapely.geometry import Polygon
 
 class PlotHZLimits(BasePlotter):
     """
-    Plotter for:
-    1. Flux ratio vs. distance for a habitable M-dwarf exoplanet, with HWO flux ratio limits.
-    2. IWA vs. distance, with HWO IWA limits and HZ overlay.
+    Plotter for M-dwarf HZ limits and related plots.
+    
+    Features:
+    1. IWA vs flux ratio plots with rejection reasons
+    2. Temperature vs semi-major axis plots with rejection reasons
+    3. Temperature vs semi-major axis boundaries plot
+    4. Earth analog detectability plots
     """
     
-    def __init__(self, df=None, name='HWO', nruns=1, star_catalog='Gaia', **kwargs):
+    def __init__(self, df: Optional[pd.DataFrame] = None, name: str = 'HWO', 
+                 nruns: int = 1, star_catalog: str = 'Gaia', **kwargs):
         """Initialize with optional dataframe and parameters."""
-        # Create a minimal dataframe if none provided
         if df is None:
             df = self._create_minimal_dataframe()
-        
         super().__init__(df, nruns, star_catalog, name)
+        
+        # Cache HWO constants to avoid repeated instantiation
+        self.hwo_best = const.HWOConstants('best')
+        self.hwo_worst = const.HWOConstants('worst')
+        self.best_flux_limit = float(self.hwo_best.min_planet_flux_star_ratio)
+        self.iwa_limit = float(self.hwo_best.iwa)
+        self.max_z = float(self.hwo_best.max_z)
+        self.theta_limit_rad = self.iwa_limit * const.arcsec_to_radians
 
-    def _create_minimal_dataframe(self):
+    def plot_all(self) -> None:
+        """Generate all M-dwarf HZ limit plots."""
+        if not self._validate_data():
+            return
+            
+        self.plot_temperature_vs_au_with_boundaries()
+        self.plot_earth_analog_detectability()
+        print("M-dwarf HZ limits plots generated!")
+
+    def plot_boundary(self, data, xcol, ycol, ax, alpha_shape=True, alpha=0.01, **kwargs):
+        """
+        Plot the boundary around a group of 2D points.
+
+        Parameters:
+            data (pd.DataFrame): Subset of points.
+            xcol, ycol (str): Column names for X and Y.
+            ax (matplotlib axis): Axis to plot on.
+            alpha_shape (bool): Whether to use concave alphashape (True) or convex hull (False).
+            alpha (float): Alpha parameter for alphashape. Smaller values = tighter fit.
+            **kwargs: Extra plotting args including facecolor, alpha_fill, and hatch for filled regions.
+        """
+        points = data[[xcol, ycol]].dropna().values
+
+        if len(points) < 3:
+            return  # Need at least 3 points to make a boundary
+
+        # Extract fill parameters
+        facecolor = kwargs.pop('facecolor', None)
+        alpha_fill = kwargs.pop('alpha_fill', 0.3)
+        hatch = kwargs.pop('hatch', None)
+        linewidth = kwargs.get('linewidth', 3)  # Default linewidth
+
+        if alpha_shape:
+            shape = alphashape.alphashape(points, alpha)
+            if isinstance(shape, Polygon):
+                x, y = shape.exterior.xy
+                # Plot filled region if facecolor is specified
+                if facecolor:
+                    ax.fill(x, y, facecolor=facecolor, alpha=alpha_fill, hatch=hatch, **kwargs)
+                # Plot boundary line only if linewidth > 0
+                if linewidth > 0:
+                    ax.plot(x, y, **kwargs)
+            else:
+                # Fallback to convex hull if alphashape fails
+                hull = ConvexHull(points)
+                boundary = np.append(hull.vertices, hull.vertices[0])
+                if facecolor:
+                    ax.fill(points[boundary, 0], points[boundary, 1], 
+                           facecolor=facecolor, alpha=alpha_fill, hatch=hatch, **kwargs)
+                if linewidth > 0:
+                    ax.plot(points[boundary, 0], points[boundary, 1], **kwargs)
+        else:
+            hull = ConvexHull(points)
+            boundary = np.append(hull.vertices, hull.vertices[0])
+            if facecolor:
+                ax.fill(points[boundary, 0], points[boundary, 1], 
+                       facecolor=facecolor, alpha=alpha_fill, hatch=hatch, **kwargs)
+            if linewidth > 0:
+                ax.plot(points[boundary, 0], points[boundary, 1], **kwargs)
+
+    def _create_minimal_dataframe(self) -> pd.DataFrame:
         """Create a minimal dataframe for the plotter to work with."""
-        import pandas as pd
-        return pd.DataFrame({'dummy': [1]})  # Minimal dataframe
+        return pd.DataFrame({'dummy': [1]})
 
-    def plot_all(self):
-        """Generate all M-dwarf HZ limit plots using dataframe distances."""
-        # Use distances from dataframe if available, otherwise use default range
-        if 'distance' in self.df.columns:
-            distances_pc = self.df['distance'].values
-            # Filter to reasonable range and remove duplicates
-            mask = (distances_pc >= 2) & (distances_pc <= 20)
-            distances_pc = np.unique(distances_pc[mask])
-            if len(distances_pc) == 0:
-                distances_pc = np.linspace(2, 20, 200)
-        else:
-            distances_pc = np.linspace(2, 20, 200)
-        
-        self.plot_mdwarf_hz_limits(distances_pc)
-        self.plot_iwa_vs_a_by_star_type()
-        self.plot_radius_vs_flux_by_star_type()
-        self.plot_temperature_vs_distance()
-        print(f"M-dwarf HZ limits plots generated using {len(distances_pc)} distance points!")
-
-    def plot_mdwarf_hz_limits(self, distances_pc: Optional[np.ndarray] = None) -> None:
-        """Plot M-dwarf HZ limits: flux ratio vs distance and IWA vs distance."""
-        if distances_pc is None:
-            distances_pc = np.linspace(2, 20, 200)
-        
-        distances_m = distances_pc * const.pc_to_m
-        params = self._setup_mdwarf_parameters()
-        
-        # Calculate flux ratios
-        F_p = self._planck_function(params['lambda_obs'], params['T_planet'])
-        F_s = self._planck_function(params['lambda_obs'], params['T_star'])
-        flux_ratio_surface = (params['R_planet']**2 * F_p) / (params['R_star']**2 * F_s)
-        flux_ratio = flux_ratio_surface * np.ones_like(distances_pc)
-        
-        # Get HWO limits for both best and worst cases
-        hwo_best = const.HWOConstants('best')
-        hwo_worst = const.HWOConstants('worst')
-        IWA_best_rad = hwo_best.iwa  # in radians
-        IWA_worst_rad = hwo_worst.iwa  # in radians
-        IWA_best_AU = IWA_best_rad * distances_m / const.au_to_m
-        IWA_worst_AU = IWA_worst_rad * distances_m / const.au_to_m
-    
-        self._plot_iwa_vs_a(distances_pc, IWA_best_AU, IWA_worst_AU, params['hz_au'])
-
-    def _plot_iwa_vs_a(self, distances_pc: np.ndarray, IWA_best_AU: np.ndarray, 
-                              IWA_worst_AU: np.ndarray, hz_au: float) -> None:
-        """Plot IWA vs distance and HZ location for M-dwarf."""
-        fig, mpl_ax = plt.subplots(figsize=(7, 5))
-        
-        # Convert distances from pc to AU for x-axis
-        distances_au = distances_pc * const.pc_to_m / const.au_to_m
-        
-        # Add scatter plots of dataframe habitable zone data if available
-        if not self.df.empty and 'hz_in' in self.df.columns and 'hz_out' in self.df.columns and 'maxangsep' in self.df.columns and 'semimajor_p' in self.df.columns:
-            # Get detection mask
-            mask_best, _ = self._get_detection_masks()
-            
-            # Create masks for habitable zone planets
-            hz_mask = (self.df['semimajor_p'] >= self.df['hz_in']) & (self.df['semimajor_p'] <= self.df['hz_out'])
-            non_hz_mask = ~hz_mask
-            
-            # Plot undetected planets in gray (all planets)
-            mpl_ax.scatter(self.df['semimajor_p'], self.df['maxangsep'], 
-                          color='gray', alpha=0.3, s=10, label='All planets')
-            
-            # Plot detected habitable zone planets in blue
-            detected_hz_mask = hz_mask & mask_best
-            if detected_hz_mask.any():
-                mpl_ax.scatter(self.df.loc[detected_hz_mask, 'semimajor_p'], self.df.loc[detected_hz_mask, 'maxangsep'], 
-                              color='blue', alpha=0.8, s=20, label='Detected planets in HZ')
-            
-            # Plot detected non-habitable zone planets in yellow
-            detected_non_hz_mask = non_hz_mask & mask_best
-            if detected_non_hz_mask.any():
-                mpl_ax.scatter(self.df.loc[detected_non_hz_mask, 'semimajor_p'], self.df.loc[detected_non_hz_mask, 'maxangsep'], 
-                              color='yellow', alpha=0.8, s=20, label='Detected planets outside HZ')
-            
-            # Add HWO IWA limits as horizontal lines
-            hwo_best = const.HWOConstants('best')
-            hwo_worst = const.HWOConstants('worst')
-            iwa_best_arcsec = hwo_best.iwa  # IWA is already in arcseconds
-            iwa_worst_arcsec = hwo_worst.iwa  # IWA is already in arcseconds
-            
-            # Plot IWA lines across the full x-axis range
-            mpl_ax.axhline(y=iwa_best_arcsec, color='green', linestyle='--', alpha=0.7, linewidth=2, label='HWO Best IWA')
-            mpl_ax.axhline(y=iwa_worst_arcsec, color='red', linestyle='--', alpha=0.7, linewidth=2, label='HWO Worst IWA')
-            
-            # Set plot limits based on habitable zone data
-            hz_min = self.df['hz_in'].min()
-            hz_max = self.df['hz_out'].max()
-            angsep_min = self.df['maxangsep'].min()
-            angsep_max = self.df['maxangsep'].max()
-            
-            # Add some padding to the limits
-            hz_padding = (hz_max - hz_min) * 0.1
-            angsep_padding = (angsep_max - angsep_min) * 0.1
-            
-            # Limit x-axis to 1.5 AU for detected planets across all stellar types
-            x_limit = min(1.5, hz_max + hz_padding)
-            
-            # Ensure y-axis limits include the IWA values
-            y_min = min(angsep_min - angsep_padding, iwa_best_arcsec, iwa_worst_arcsec)
-            y_max = max(angsep_max + angsep_padding, iwa_best_arcsec, iwa_worst_arcsec)
-            
-            mpl_ax.set_xlim(hz_min - hz_padding, x_limit)
-            mpl_ax.set_ylim(y_min, y_max)
-        else:
-            # Fallback to original lines if no habitable zone data
-            mpl_ax.plot(distances_au, IWA_best_AU, label='HWO Best IWA (AU)', color='green')
-            mpl_ax.plot(distances_au, IWA_worst_AU, label='HWO Worst IWA (AU)', color='red')
-            mpl_ax.axhline(y=hz_au, color='blue', linestyle=':', label='Habitable Zone (HZ)')
-        
-        mpl_ax.set_xlabel('Planet semi-major axis (AU)')
-        mpl_ax.set_ylabel('Maximum Angular Separation (arcsec)')
-        mpl_ax.set_title('AU vs. Angular Separation for all planets')
-        mpl_ax.grid(True)
-        mpl_ax.legend()
-        
-        self._save_plot(fig, 'iwa_vs_a')
-
-    def plot_iwa_vs_a_by_star_type(self):
-        """Plot AU vs Angular Separation with panels for different star types."""
-        if self.df.empty or 'stype' not in self.df.columns:
-            print("Warning: No star type data available for panel plot")
-            return
-        
-        # Create masks for different star types
-        m_stars_mask = self.df['stype'] == 'M'
-        gk_stars_mask = self.df['stype'].isin(['G', 'K'])
-        
-        # Create subplots
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
-        
-        # Plot M-type stars
-        self._plot_panel(ax1, self.df[m_stars_mask], 'M-type Stars')
-        
-        # Plot G/K-type stars
-        self._plot_panel(ax2, self.df[gk_stars_mask], 'G/K-type Stars')
-        
-        plt.tight_layout()
-        self._save_plot(fig, 'iwa_vs_a_by_star_type')
-
-    def _plot_panel(self, ax, df_panel, title):
-        """Plot a single panel for the given star type data."""
-        if df_panel.empty:
-            ax.text(0.5, 0.5, 'No data available', ha='center', va='center', transform=ax.transAxes)
-            ax.set_title(title)
-            return
-        
-        # Check if required columns exist
-        required_cols = ['hz_in', 'hz_out', 'maxangsep', 'semimajor_p']
-        if not all(col in df_panel.columns for col in required_cols):
-            ax.text(0.5, 0.5, 'Missing required data columns', ha='center', va='center', transform=ax.transAxes)
-            ax.set_title(title)
-            return
-        
-        # Get detection mask for this panel
+    def _get_panel_detection_mask(self, df_panel: pd.DataFrame) -> pd.Series:
+        """Get detection mask for a specific panel."""
         mask_best, _ = self._get_detection_masks()
-        panel_detection_mask = mask_best[df_panel.index]
-        
-        # Create masks for habitable zone planets
-        hz_mask = (df_panel['semimajor_p'] >= df_panel['hz_in']) & (df_panel['semimajor_p'] <= df_panel['hz_out'])
-        non_hz_mask = ~hz_mask
-        
-        # Plot all planets in gray (background)
-        ax.scatter(df_panel['semimajor_p'], df_panel['maxangsep'], 
-                  color='gray', alpha=0.3, s=10, label='All planets')
-        
-        # Plot detected habitable zone planets in blue
-        detected_hz_mask = hz_mask & panel_detection_mask
-        if detected_hz_mask.any():
-            ax.scatter(df_panel.loc[detected_hz_mask, 'semimajor_p'], df_panel.loc[detected_hz_mask, 'maxangsep'], 
-                      color='blue', alpha=0.8, s=20, label='Detected planets in HZ')
-        
-        # Plot detected non-habitable zone planets in yellow
-        detected_non_hz_mask = non_hz_mask & panel_detection_mask
-        if detected_non_hz_mask.any():
-            ax.scatter(df_panel.loc[detected_non_hz_mask, 'semimajor_p'], df_panel.loc[detected_non_hz_mask, 'maxangsep'], 
-                      color='yellow', alpha=0.8, s=20, label='Detected planets outside HZ')
-        
-        # Add HWO IWA limits
-        hwo_best = const.HWOConstants('best')
-        hwo_worst = const.HWOConstants('worst')
-        iwa_best_arcsec = hwo_best.iwa  # IWA is already in arcseconds
-        iwa_worst_arcsec = hwo_worst.iwa  # IWA is already in arcseconds
-        
-        # Get the x-axis range for plotting IWA lines
-        x_min = df_panel['semimajor_p'].min()
-        x_max = df_panel['semimajor_p'].max()
-        
-        # Plot IWA lines across the full x-axis range
-        ax.axhline(y=iwa_best_arcsec, color='green', linestyle='--', alpha=0.7, linewidth=2, label='HWO Best IWA')
-        ax.axhline(y=iwa_worst_arcsec, color='red', linestyle='--', alpha=0.7, linewidth=2, label='HWO Worst IWA')
-        
-        # Set plot limits based on panel data
-        if not df_panel.empty:
-            hz_min = df_panel['hz_in'].min()
-            hz_max = df_panel['hz_out'].max()
-            angsep_min = df_panel['maxangsep'].min()
-            angsep_max = df_panel['maxangsep'].max()
-            
-            # Add some padding to the limits
-            hz_padding = (hz_max - hz_min) * 0.1
-            angsep_padding = (angsep_max - angsep_min) * 0.1
-            
-            # Limit x-axis to 1.5 AU for G/K type stars and detected planets
-            if 'G/K' in title or 'G/K-type' in title:
-                x_limit = 1.5
-            else:
-                x_limit = hz_max + hz_padding
-            
-            # Ensure y-axis limits include the IWA values
-            y_min = min(angsep_min - angsep_padding, iwa_best_arcsec, iwa_worst_arcsec)
-            y_max = max(angsep_max + angsep_padding, iwa_best_arcsec, iwa_worst_arcsec)
-            
-            ax.set_xlim(hz_min - hz_padding, x_limit)
-            ax.set_ylim(y_min, y_max)
-        
-        ax.set_xlabel('Planet semi-major axis (AU)')
-        ax.set_ylabel('Maximum Angular Separation (arcsec)')
-        ax.set_title(f'{title} - AU vs. Angular Separation')
-        ax.grid(True)
-        ax.legend()
+        # Convert to pandas Series for proper indexing
+        mask_series = pd.Series(mask_best, index=self.df.index)
+        panel_mask = mask_series.reindex(df_panel.index).fillna(False)
+        return panel_mask.astype(bool)
 
-    def plot_radius_vs_flux_by_star_type(self):
-        """Plot Planet Radius vs Flux Ratio with panels for different star types."""
-        if self.df.empty or 'stype' not in self.df.columns:
-            print("Warning: No star type data available for radius vs flux plot")
-            return
-        
-        # Create masks for different star types
-        m_stars_mask = self.df['stype'] == 'M'
-        gk_stars_mask = self.df['stype'].isin(['G', 'K'])
-        
-        # Create subplots
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
-        
-        # Plot M-type stars
-        self._plot_radius_flux_panel(ax1, self.df[m_stars_mask], 'M-type Stars')
-        
-        # Plot G/K-type stars
-        self._plot_radius_flux_panel(ax2, self.df[gk_stars_mask], 'G/K-type Stars')
-        
-        plt.tight_layout()
-        self._save_plot(fig, 'radius_vs_flux_by_star_type')
+    def _validate_required_columns(self, df: pd.DataFrame, required_cols: list) -> bool:
+        """Validate that required columns exist in dataframe."""
+        missing_cols = [col for col in required_cols if col not in df.columns]
+        if missing_cols:
+            print(f"Warning: Missing required columns: {missing_cols}")
+            return False
+        return True
 
-    def _plot_radius_flux_panel(self, ax, df_panel, title):
-        """Plot a single panel for radius vs flux ratio."""
-        if df_panel.empty:
-            ax.text(0.5, 0.5, 'No data available', ha='center', va='center', transform=ax.transAxes)
-            ax.set_title(title)
-            return
-        
-        # Check if required columns exist
-        required_cols = ['radius_p', 'flux_ratio_value_best']
-        if not all(col in df_panel.columns for col in required_cols):
-            ax.text(0.5, 0.5, 'Missing required data columns', ha='center', va='center', transform=ax.transAxes)
-            ax.set_title(title)
-            return
-        
-        # Get detection mask for this panel
-        mask_best, _ = self._get_detection_masks()
-        panel_detection_mask = mask_best[df_panel.index]
-        
-        # Create masks for detected and non-detected planets
-        detected_mask = panel_detection_mask
-        non_detected_mask = ~panel_detection_mask
-        
-        # Plot non-detected planets in gray (background)
-        if non_detected_mask.any():
-            ax.scatter(df_panel.loc[non_detected_mask, 'radius_p'], 
-                      df_panel.loc[non_detected_mask, 'flux_ratio_value_best'], 
-                      color='gray', alpha=0.3, s=10, label='Non-detected planets')
-        
-        # For non-detected planets, determine the rejection method based on individual pass/fail columns
-        if non_detected_mask.any():
-            # Debug: print available columns
-            print(f"Available columns in panel: {list(df_panel.columns)}")
-            print(f"Non-detected planets: {non_detected_mask.sum()}")
-            
-            # Check for flux ratio rejection (red, alpha=0.5)
-            if 'flux_pass_best' in df_panel.columns:
-                print(f"flux_pass_best data type: {df_panel['flux_pass_best'].dtype}")
-                print(f"flux_pass_best unique values: {df_panel['flux_pass_best'].unique()}")
-                flux_rejected = non_detected_mask & ~df_panel['flux_pass_best'].astype(bool)
-                print(f"Flux rejected planets: {flux_rejected.sum()}")
-                if flux_rejected.any():
-                    ax.scatter(df_panel.loc[flux_rejected, 'radius_p'], 
-                              df_panel.loc[flux_rejected, 'flux_ratio_value_best'], 
-                              color='red', alpha=0.5, s=20, marker='o', 
-                              label='Flux ratio rejected')
-            else:
-                print("flux_pass_best column not found!")
-            
-            # Check for IWA rejection (yellow, alpha=0.8)
-            if 'iwa_pass_best' in df_panel.columns:
-                print(f"iwa_pass_best data type: {df_panel['iwa_pass_best'].dtype}")
-                print(f"iwa_pass_best unique values: {df_panel['iwa_pass_best'].unique()}")
-                iwa_rejected = non_detected_mask & ~df_panel['iwa_pass_best'].astype(bool)
-                print(f"IWA rejected planets: {iwa_rejected.sum()}")
-                if iwa_rejected.any():
-                    ax.scatter(df_panel.loc[iwa_rejected, 'radius_p'], 
-                              df_panel.loc[iwa_rejected, 'flux_ratio_value_best'], 
-                              color='yellow', alpha=0.8, s=20, marker='o', 
-                              label='IWA rejected')
-            else:
-                print("iwa_pass_best column not found!")
-            
-            # Check for exozodi rejection (blue, alpha=0.5)
-            if 'z_pass_best' in df_panel.columns:
-                print(f"z_pass_best data type: {df_panel['z_pass_best'].dtype}")
-                print(f"z_pass_best unique values: {df_panel['z_pass_best'].unique()}")
-                exozodi_rejected = non_detected_mask & ~df_panel['z_pass_best'].astype(bool)
-                print(f"Exozodi rejected planets: {exozodi_rejected.sum()}")
-                if exozodi_rejected.any():
-                    ax.scatter(df_panel.loc[exozodi_rejected, 'radius_p'], 
-                              df_panel.loc[exozodi_rejected, 'flux_ratio_value_best'], 
-                              color='blue', alpha=0.5, s=20, marker='o', 
-                              label='Exozodi rejected')
-            else:
-                print("z_pass_best column not found!")
-        
-        # Create masks for habitable zone planets
-        hz_mask = (df_panel['semimajor_p'] >= df_panel['hz_in']) & (df_panel['semimajor_p'] <= df_panel['hz_out'])
-        non_hz_mask = ~hz_mask
-        
-        # Plot detected habitable zone planets in green
-        detected_hz_mask = hz_mask & detected_mask
-        if detected_hz_mask.any():
-            ax.scatter(df_panel.loc[detected_hz_mask, 'radius_p'], 
-                      df_panel.loc[detected_hz_mask, 'flux_ratio_value_best'], 
-                      color='green', alpha=0.8, s=20, label='Detected planets in HZ')
-        
-        # Plot detected non-habitable zone planets in green (same color for all detected)
-        detected_non_hz_mask = non_hz_mask & detected_mask
-        if detected_non_hz_mask.any():
-            ax.scatter(df_panel.loc[detected_non_hz_mask, 'radius_p'], 
-                      df_panel.loc[detected_non_hz_mask, 'flux_ratio_value_best'], 
-                      color='green', alpha=0.8, s=20, marker='o', label='Detected planets outside HZ')
-        
-        
-        # Add HWO flux ratio limits
-        hwo_best = const.HWOConstants('best')
-        hwo_worst = const.HWOConstants('worst')
-        best_flux_limit = float(hwo_best.min_planet_flux_star_ratio)
-        worst_flux_limit = float(hwo_worst.min_planet_flux_star_ratio)
-        
-        ax.axhline(y=best_flux_limit, color='green', linestyle='--', alpha=0.7, label='HWO Best Flux Limit')
-        ax.axhline(y=worst_flux_limit, color='red', linestyle='--', alpha=0.7, label='HWO Worst Flux Limit')
-        
-        # Set plot limits based on panel data
-        if not df_panel.empty:
-            radius_min = df_panel['radius_p'].min()
-            radius_max = df_panel['radius_p'].max()
-            
-            # Add some padding to the radius limits
-            radius_padding = (radius_max - radius_min) * 0.1
-            
-            ax.set_xlim(radius_min - radius_padding, radius_max + radius_padding)
-            # Let matplotlib automatically set y-axis limits for log scale
-        
-        ax.set_xlabel('Planet Radius (R_earth)')
-        ax.set_ylabel('Flux Ratio (planet/star)')
-        ax.set_title(f'{title} - Radius vs. Flux Ratio')
-        ax.set_yscale('log')
-        ax.grid(True)
-        ax.legend()
+    def _get_flux_rejection_mask(self, df: pd.DataFrame) -> pd.Series:
+        """Get mask for planets rejected due to flux ratio."""
+        return df['flux_ratio_value_best'] < self.best_flux_limit
 
-    def plot_temperature_vs_distance(self):
-        """Plot stellar temperature vs distance with planets colored by rejection method."""
+    def _get_iwa_rejection_mask(self, df: pd.DataFrame) -> pd.Series:
+        """Get mask for planets rejected due to IWA."""
+        return df['maxangsep'] < self.iwa_limit
+
+    def _get_exozodi_rejection_mask(self, df: pd.DataFrame) -> pd.Series:
+        """Get mask for planets rejected due to exozodi."""
+        return df['z'] > self.max_z
+
+    def _compute_luminosity(self, T_eff: np.ndarray, R_star: np.ndarray) -> np.ndarray:
+        """
+        Compute stellar luminosity using the Stefan-Boltzmann law.
+
+        Parameters:
+        - T_eff : np.ndarray
+            Effective temperature of the star(s) in Kelvin.
+        - R_star : np.ndarray
+            Radius of the star(s) in solar radii.
+
+        Returns:
+        - Luminosity in solar luminosities.
+        """
+        return R_star ** 2 * (T_eff / 5780) ** 4
+
+    def plot_temperature_vs_au_with_boundaries(self) -> None:
+        """Plot single plot showing stellar temperature vs planetary semi-major axis with all boundaries overlaid."""
         if self.df.empty:
-            print("Warning: No data available for temperature vs distance plot")
+            print("Warning: No data available for temperature vs semi-major axis plot")
             return
         
-        # Check for required columns
-        required_cols = ['temp_s', 'distance_s', 'detected_best']
-        if not all(col in self.df.columns for col in required_cols):
-            print("Warning: Missing required columns for temperature vs distance plot")
+        required_cols = ['radius_p', 'temp_s', 'semimajor_p']
+        if not self._validate_required_columns(self.df, required_cols):
+            print("Warning: Missing required columns for temperature vs semi-major axis plot")
             return
         
-        fig, ax = plt.subplots(figsize=(10, 8))
+        fig, ax = plt.subplots(1, 1, figsize=(10, 8))
         
-        # Get detection mask using the proper detection logic
-        mask_best, _ = self._get_detection_masks()
+        # Get all masks at once to avoid repeated calculations
+        detected_mask = self._get_panel_detection_mask(self.df)
+        flux_rejected = self._get_flux_rejection_mask(self.df)
+        iwa_rejected = self._get_iwa_rejection_mask(self.df)
+        exozodi_rejected = self._get_exozodi_rejection_mask(self.df)
+        non_detected_mask = ~detected_mask
         
-        # Separate detected and non-detected planets
-        detected_mask = mask_best
-        non_detected_mask = ~mask_best
+        # Plot boundaries in order (back to front)
+        boundary_configs = [
+            (flux_rejected, 'red', 'Flux Rejected'),
+            (exozodi_rejected, 'gold', 'Exozodi Rejected'),
+            (iwa_rejected, 'blue', 'IWA Rejected'),
+            (detected_mask, 'green', 'Detected')
+        ]
         
-        # Plot non-detected planets in gray
-        if non_detected_mask.any():
-            ax.scatter(self.df.loc[non_detected_mask, 'temp_s'], 
-                      self.df.loc[non_detected_mask, 'distance_s'],
-                      color='gray', alpha=0.6, s=30, marker='o', 
-                      label='Non-detected planets')
+        for mask, color, label in boundary_configs:
+            if mask.any():
+                data = self.df[mask]
+                linewidth = 3 if color in ['gray', 'green'] else 0
+                alpha_fill = 0.3 if color in ['red', 'gold', 'blue'] else None
+                facecolor = color if color in ['red', 'gold', 'blue'] else None
+                
+                self.plot_boundary(data, 'temp_s', 'semimajor_p', ax, 
+                                 alpha=0.01, color=color, linewidth=linewidth, 
+                                 linestyle='-', alpha_fill=alpha_fill, 
+                                 facecolor=facecolor, label=label)
         
-        # For non-detected planets, determine the rejection method based on individual pass/fail columns
-        if non_detected_mask.any():
-            # Check for flux ratio rejection (red, alpha=0.5)
-            if 'flux_pass_best' in self.df.columns:
-                flux_rejected = non_detected_mask & ~self.df['flux_pass_best']
-                if flux_rejected.any():
-                    ax.scatter(self.df.loc[flux_rejected, 'temp_s'], 
-                              self.df.loc[flux_rejected, 'distance_s'],
-                              color='red', alpha=0.5, s=30, marker='o', 
-                              label='Flux ratio rejected')
-            
-            # Check for IWA rejection (yellow, alpha=0.8)
-            if 'iwa_pass_best' in self.df.columns:
-                iwa_rejected = non_detected_mask & ~self.df['iwa_pass_best']
-                if iwa_rejected.any():
-                    ax.scatter(self.df.loc[iwa_rejected, 'temp_s'], 
-                              self.df.loc[iwa_rejected, 'distance_s'],
-                              color='yellow', alpha=0.8, s=30, marker='o', 
-                              label='IWA rejected')
-            
-            # Check for exozodi rejection (blue, alpha=0.5)
-            if 'z_pass_best' in self.df.columns:
-                exozodi_rejected = non_detected_mask & ~self.df['z_pass_best']
-                if exozodi_rejected.any():
-                    ax.scatter(self.df.loc[exozodi_rejected, 'temp_s'], 
-                              self.df.loc[exozodi_rejected, 'distance_s'],
-                              color='blue', alpha=0.5, s=30, marker='o', 
-                              label='Exozodi rejected')
+        self._setup_plot_style(ax, 'Stellar Temperature (K)', 'Semi-major Axis (AU)', 
+                              'Planet Boundaries by Detection/Rejection Type for HWO')
+        ax.grid(True, alpha=0.4)
+        ax.set_xlim(3300, 8000)
+        ax.set_ylim(0, 1.5)
         
-        # Plot detected planets (those that passed all tests) in green
-        if detected_mask.any():
-            ax.scatter(self.df.loc[detected_mask, 'temp_s'], 
-                      self.df.loc[detected_mask, 'distance_s'],
-                      color='green', alpha=0.8, s=30, 
-                      label='Detected planets')
-        
-        ax.set_xlabel('Stellar Temperature (K)')
-        ax.set_ylabel('Distance from Star (pc)')
-        ax.set_title(f'Stellar Temperature vs Distance for {self.name} ({self.nruns} runs)\nStar Catalog: {self.star_catalog}')
-        ax.grid(True, alpha=0.3)
-        ax.legend()
-        
-        # Set reasonable axis limits
-        if not self.df.empty:
-            temp_min = self.df['temp_s'].min()
-            temp_max = self.df['temp_s'].max()
-            dist_min = self.df['distance_s'].min()
-            dist_max = self.df['distance_s'].max()
-            
-            # Add some padding
-            temp_padding = (temp_max - temp_min) * 0.05
-            dist_padding = (dist_max - dist_min) * 0.05
-            
-            ax.set_xlim(temp_min - temp_padding, temp_max + temp_padding)
-            ax.set_ylim(dist_min - dist_padding, dist_max + dist_padding)
-        
-        self._save_plot(fig, 'temperature_vs_distance')
+        plt.tight_layout()
+        self._save_plot(fig, 'temperature_vs_au_boundaries_overlaid')
 
-    def _get_detection_masks(self):
-        """Get detection masks for best and worst cases."""
-        # Use the detected_best column which already includes all conditions from hwo_data.py
-        # This includes: iwa_condition & flux_condition & min_photons_rate_condition & z_condition
-        if 'detected_best' in self.df.columns:
-            mask_best = self.df['detected_best'].values
-        else:
-            mask_best = np.zeros(len(self.df), dtype=bool)
-            
-        if 'detected_worst' in self.df.columns:
-            mask_worst = self.df['detected_worst'].values
-        else:
-            mask_worst = np.zeros(len(self.df), dtype=bool)
-            
-        return mask_best, mask_worst
+    def plot_earth_analog_detectability(self) -> None:
+        """Plot detectability of Earth-like planets around different stellar types with detectability percentage gradient."""
+        # Grid of stellar luminosity and distance
+        L_star_vals = np.logspace(-3, 1, 300)  # Extended to 10 L☉
+        distance_vals = np.linspace(1, 50, 300)
+        R_planet_vals = np.linspace(0.5, 1.5, 100)
+
+        L_grid, D_grid = np.meshgrid(L_star_vals, distance_vals)
+        
+        # Vectorized calculation for much better performance
+        detectability_percentage = self._calculate_detectability_vectorized(
+            L_star_vals, distance_vals, R_planet_vals, L_grid, D_grid
+        )
+
+        # Create single plot
+        fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+
+        # Plot the gradient background using the detectability percentage
+        im = ax.contourf(L_grid, D_grid, detectability_percentage, levels=50, cmap='RdYlGn')
+        cbar = plt.colorbar(im, ax=ax)
+        cbar.set_label('Detectability Across Planet Radii of 0.5-1.5 R⊕)')
+        
+        # Add contour lines for specific percentage values
+        percentage_contours = [10, 20, 30, 40, 50, 60, 70, 80, 90]
+        contour_levels = [p for p in percentage_contours if p <= np.max(detectability_percentage)]
+        if contour_levels:
+            cs = ax.contour(L_grid, D_grid, detectability_percentage, levels=contour_levels, colors='white', alpha=0.7, linewidths=1)
+            ax.clabel(cs, inline=True, fontsize=8, fmt='%.0f%%')
+        
+        ax.set_xscale('log')
+        self._setup_plot_style(ax, 'Stellar Luminosity [L☉]', 'Distance [pc]', 
+                              'Planet Detectability Percentage\n(0.5-1.5 R⊕ planets, flux ratio & IWA OK)')
+        
+        # Set plot limits
+        ax.set_xlim(0.01, 5.0)  
+        ax.set_ylim(1, 20)
+        
+        # M-dwarf region box (0.001 to 0.08 L☉, 1 to 20 pc)
+        mdwarf_box = Rectangle((0.001, 1), 0.079, 19, 
+                              linewidth=2, edgecolor='red', facecolor='none', 
+                              linestyle='--', label='M-dwarf Region')
+        ax.add_patch(mdwarf_box)
+        
+        # G star region box (0.4 to 1.5 L☉, 1 to 20 pc)
+        g_star_box = Rectangle((0.4, 1), 1.1, 19, 
+                              linewidth=2, edgecolor='yellow', facecolor='none', 
+                              linestyle='--', label='G Star Region')
+        ax.add_patch(g_star_box)
+        
+        # Add legend for the regions
+        ax.legend(loc='upper right')
+        
+        plt.tight_layout()
+        self._save_plot(fig, 'earth_analog_detectability_percentage')
+
+    def _calculate_detectability_vectorized(self, L_star_vals, distance_vals, R_planet_vals, L_grid, D_grid):
+        """Vectorized calculation of detectability percentage for much better performance."""
+        # Pre-calculate constants
+        a_hz_vals = np.sqrt(L_star_vals) * const.au_to_m
+        distance_m_vals = distance_vals * 3.086e16
+        
+        # Create 3D arrays for vectorized computation
+        L_3d, D_3d, R_3d = np.meshgrid(L_star_vals, distance_vals, R_planet_vals, indexing='ij')
+        
+        # Vectorized calculations
+        a_hz_3d = np.sqrt(L_3d) * const.au_to_m
+        distance_m_3d = D_3d * 3.086e16
+        theta_3d = a_hz_3d / distance_m_3d
+        
+        # Vectorized contrast calculation
+        contrast_3d = const.A_g_earth * (R_3d * const.R_earth / a_hz_3d) ** 2 * const.Phi_alpha
+        
+        # Vectorized detectability check
+        detectable_3d = (contrast_3d >= self.best_flux_limit) & (theta_3d >= self.theta_limit_rad)
+        
+        # Sum along planet radius axis to get percentage
+        detectability_percentage = np.mean(detectable_3d, axis=2)
+        
+        return detectability_percentage.T  # Transpose to match original shape

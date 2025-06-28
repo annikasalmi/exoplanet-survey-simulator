@@ -81,7 +81,7 @@ def run_sim(func=main_hwo, name='hwo', parallel=True, nruns=500, star_catalog='G
     
     # Start timer
     start_time = time.time()
-    print(f"Starting simulation: {name} with {nruns} runs...")
+    print(f"Starting simulation: {name} with {len(nruns)} runs...")
     print("Elapsed time: 0:00:00", end='', flush=True)
     
     # Start a timer thread to show elapsed time
@@ -147,6 +147,6 @@ if __name__ == "__main__":
 
     NRUNS = np.arange(500)
     
-    run_sim(func=main_hwo, name = 'hwo', parallel=True, nruns=NRUNS, star_catalog='Gaia', run_anew=True)
+    run_sim(func=main_hwo, name = 'hwo', parallel=True, nruns=NRUNS, star_catalog='Gaia', run_anew=False)
     # run_sim(func=main_lifesim, name='lifesim', parallel=True, nruns=NRUNS, star_catalog='LTC_3', run_anew=False)
     print('done')

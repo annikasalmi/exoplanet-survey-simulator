@@ -1,3 +1,5 @@
+import numpy as np
+
 h = 6.62607015e-34    # Planck's constant (J·s)
 c = 2.99792458e8      # Speed of light (m/s)
 k = 1.380649e-23      # Boltzmann constant (J/K)
@@ -7,6 +9,9 @@ pc_to_m = 3.0857e16      # 1 parsec in meters
 temp_sun = 5772         # temp of Sun in Kelvin
 R_sun = 6.957e8         # Solar radius in meters
 au_to_m = 1.496e11      # 1 au in meters
+A_g_earth = 0.3         # Albedo of Earth
+Phi_alpha = 0.5         # Phase function at quadrature
+arcsec_to_radians = np.pi / (180 * 3600)  # 1 arcsecond in radians
 
 # HWO specific
 class HWOConstants():

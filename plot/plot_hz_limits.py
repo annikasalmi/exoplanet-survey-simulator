@@ -2,14 +2,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 import pandas as pd
-from typing import Optional, Tuple
+from typing import Optional
 from plot.base_plotter import BasePlotter
-from tools import physics_constants as const
 # For boundary plotting
-from scipy.spatial import ConvexHull
+from scipy.spatial.qhull import ConvexHull
 # For smoother, non-convex boundaries
 import alphashape
 from shapely.geometry import Polygon
+
+from tools import physics_constants as const
 
 class PlotHZLimits(BasePlotter):
     """
@@ -22,7 +23,7 @@ class PlotHZLimits(BasePlotter):
     4. Earth analog detectability plots
     """
     
-    def __init__(self, df: Optional[pd.DataFrame] = None, name: str = 'HWO', 
+    def __init__(self, df: Optional[pd.DataFrame] = None, name: str = 'HWO',
                  nruns: int = 1, star_catalog: str = 'Gaia', **kwargs):
         """Initialize with optional dataframe and parameters."""
         if df is None:

@@ -129,15 +129,11 @@ class HWOData():
 
         Returns: photon rate in photons/hour/μm
         """
-        # Constants
-        h = 6.62607015e-34  # Planck's constant (J·s)
-        c = 2.99792458e8    # Speed of light (m/s)
-
         # Convert wavelength to meters (if it's not already)
         wavelength_m = np.asarray(wavelength_m)
 
         # Energy per photon (Joules)
-        energy_per_photon = h * c / wavelength_m
+        energy_per_photon = const.h * const.c / wavelength_m
 
         # Photon rate (photons/sec/m²)
         photons_per_second_per_m2 = flux_w_m2 / energy_per_photon

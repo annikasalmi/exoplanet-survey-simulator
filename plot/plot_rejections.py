@@ -31,11 +31,12 @@ class PlanetRejectionPlotter(BasePlotter):
         """Calculate rejection counts for each reason across all planets."""
         rejection_counts = {}
         if self.name == 'HWO':
+            # Use the individual pass/fail columns that are calculated in hwo_data.py
+            # These columns are created in the determine_detectable() method
             rejection_counts['# photons hitting detector'] = len(self.df[~self.df['min_photons_pass_best']])
             rejection_counts['Flux Ratio'] = len(self.df[~self.df['flux_pass_best']])
             rejection_counts['IWA'] = len(self.df[~self.df['iwa_pass_best']])
-            z_mask = self.df['z'] > HWOConstants('best').max_z
-            rejection_counts['Exozodi'] = len(self.df[z_mask])
+            rejection_counts['Exozodi'] = len(self.df[~self.df['z_pass_best']])
         else:
             rejection_counts['Not Detected'] = len(self.df[~self.df['detected_best']])
         return rejection_counts
@@ -94,7 +95,7 @@ class PlanetRejectionPlotter(BasePlotter):
             self._setup_plot_axes(axs[i], scenario_labels, scenario, total_planets, rejected_planets)
         
         if plotted:
-            plt.suptitle(f"Rejection Reasons for All Planets", fontsize=16)
+            plt.suptitle(f"Rejection Reasons for All Planets")
             plt.tight_layout(rect=[0, 0, 1, 0.93])
             self._save_plot(fig, 'failure_detected', 'best_case')
 
@@ -117,6 +118,21 @@ class PlanetRejectionPlotter(BasePlotter):
         elif reason == '# photons hitting detector':
             min_val = 1e-20
             max_val = 10**0.8
+            bins = np.logspace(np.log10(min_val), np.log10(max_val), 40)
+            bins = np.sort(bins)
+        elif reason == 'Exozodi':
+            # Use log-spaced bins for exozodi since it has a log x-axis
+            arr = np.asarray(pd.to_numeric(df['z'], errors='coerce'))
+            min_val = np.nanmin(arr)
+            max_val = np.nanmax(arr)
+            # Handle edge cases
+            if not np.isfinite(min_val) or min_val <= 0:
+                min_val = 1e-3
+            if not np.isfinite(max_val) or max_val <= 0:
+                max_val = 1e3
+            if min_val >= max_val:
+                min_val = 1e-3
+                max_val = 1e3
             bins = np.logspace(np.log10(min_val), np.log10(max_val), 40)
             bins = np.sort(bins)
         else:
@@ -225,7 +241,7 @@ class PlanetRejectionPlotter(BasePlotter):
         ax.set_title(f"{reason}")
         
         # Set logarithmic x-axis for all except IWA and Exozodi
-        if reason not in ['IWA', 'Exozodi']:
+        if reason not in ['IWA']:
             ax.set_xscale('log')
         
         ax.legend(fontsize=8, loc='upper right')
@@ -255,10 +271,10 @@ class PlanetRejectionPlotter(BasePlotter):
             bins = self._get_bins_for_reason(reason, df, col)
             
             if reason == 'IWA':
-                ax.hist(df['maxangsep'], bins=bins, color='lightblue', alpha=0.7, edgecolor='black',
+                ax.hist(df['maxangsep'], bins=bins, color='lightgray', alpha=0.7, edgecolor='black',
                         log=True, label='Maximum angular separation')
             else:
-                ax.hist(df[col], bins=bins, color='lightblue', alpha=0.7, edgecolor='black', 
+                ax.hist(df[col], bins=bins, color='lightgray', alpha=0.7, edgecolor='black', 
                         log=True, label='Best case')
             
             # Calculate and display rejection percentages

@@ -78,15 +78,46 @@ def run_sim(func=main_hwo, name='hwo', parallel=True, nruns=500, star_catalog='G
     '''
     Runs the simulation with the provided function, name, parallel execution flag,
     number of runs, and star catalog.'''
-    df_concat = run_with_progress(
-        func,
-        name=name,
-        estimated_minutes=12,
-        parallel=parallel,
-        nruns=nruns,
-        star_catalog=star_catalog,
-        run_anew=run_anew
-    )
+    
+    # Start timer
+    start_time = time.time()
+    print(f"Starting simulation: {name} with {nruns} runs...")
+    print("Elapsed time: 0:00:00", end='', flush=True)
+    
+    # Start a timer thread to show elapsed time
+    import threading
+    import sys
+    
+    def update_timer():
+        while True:
+            elapsed = time.time() - start_time
+            hours = int(elapsed // 3600)
+            minutes = int((elapsed % 3600) // 60)
+            seconds = int(elapsed % 60)
+            print(f"\rElapsed time: {hours}:{minutes:02d}:{seconds:02d}", end='', flush=True)
+            time.sleep(1)
+    
+    # Start timer thread
+    timer_thread = threading.Thread(target=update_timer, daemon=True)
+    timer_thread.start()
+    
+    try:
+        df_concat = run_with_progress(
+            func,
+            name=name,
+            estimated_minutes=12,
+            parallel=parallel,
+            nruns=nruns,
+            star_catalog=star_catalog,
+            run_anew=run_anew
+        )
+    finally:
+        # Stop timer display
+        elapsed = time.time() - start_time
+        hours = int(elapsed // 3600)
+        minutes = int((elapsed % 3600) // 60)
+        seconds = int(elapsed % 60)
+        print(f"\rSimulation completed in: {hours}:{minutes:02d}:{seconds:02d}")
 
     # Bin by radius
     bins = [0, 1.5, 3.0, 6.0]
@@ -100,10 +131,15 @@ def run_sim(func=main_hwo, name='hwo', parallel=True, nruns=500, star_catalog='G
     # Combine all rows
     df_concat = pd.concat([df_concat, rocky_hz], ignore_index=True)
     if plot:
-        start_time = time.time()
+        plot_start_time = time.time()
+        print(f"Starting plotting...")
         plot_all(df=df_concat, sim_name=name, nruns=len(nruns), star_catalog=star_catalog, use_multiprocessing=False)
-        end_time = time.time()
-        print(f"Time taken to plot: {end_time - start_time} seconds")
+        plot_end_time = time.time()
+        plot_elapsed = plot_end_time - plot_start_time
+        plot_hours = int(plot_elapsed // 3600)
+        plot_minutes = int((plot_elapsed % 3600) // 60)
+        plot_seconds = int(plot_elapsed % 60)
+        print(f"Time taken to plot: {plot_hours}:{plot_minutes:02d}:{plot_seconds:02d}")
     return df_concat
 
 # Run the whole thing
@@ -111,6 +147,6 @@ if __name__ == "__main__":
 
     NRUNS = np.arange(500)
     
-    run_sim(func=main_hwo, name = 'hwo', parallel=True, nruns=NRUNS, star_catalog='Gaia', run_anew=False)
+    run_sim(func=main_hwo, name = 'hwo', parallel=True, nruns=NRUNS, star_catalog='Gaia', run_anew=True)
     # run_sim(func=main_lifesim, name='lifesim', parallel=True, nruns=NRUNS, star_catalog='LTC_3', run_anew=False)
     print('done')

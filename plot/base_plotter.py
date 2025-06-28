@@ -5,6 +5,7 @@ import pandas as pd
 from typing import Optional, Tuple
 
 from tools.paths import PLOTS_DIR
+from tools import physics_constants as const
 
 class BasePlotter:
     """
@@ -37,7 +38,7 @@ class BasePlotter:
     
     def _output_filename(self, plot_type: str, suffix: Optional[str] = None) -> str:
         """Centralize output filename formatting."""
-        base = f"{plot_type}_{self.name}_nruns{self.nruns}_{self.star_catalog}"
+        base = f"{plot_type}"
         if suffix:
             base += f"_{suffix}"
         return base + ".png"
@@ -47,16 +48,22 @@ class BasePlotter:
         if 'detection_masks' not in self._cache:
             self._cache['detection_masks'] = self._get_detection_masks()
 
+    def _get_detection_masks(self) -> Tuple[pd.Series, Optional[pd.Series]]:
+        """Get detection masks for detected, detected_best, detected_worst depending on scenario."""
+        if self.name == 'HWO':
+            mask_best = self.df['detected_best'] if 'detected_best' in self.df else self.df['detected']
+            mask_worst = self.df['detected_worst'] if 'detected_worst' in self.df else None
+            return mask_best, mask_worst
+        else:
+            mask = self.df['detected']
+            return mask, None
+
     def _save_plot(self, fig, filename: str, suffix: Optional[str] = None) -> None:
         """Save plot with consistent settings."""
         plt.tight_layout()
         outfile = self._output_filename(filename, suffix)
         plt.savefig(os.path.join(self.data_dir, outfile), dpi=300, bbox_inches='tight')
         plt.close(fig)
-
-    def _get_detection_masks(self) -> Tuple[pd.Series, Optional[pd.Series]]:
-        """Get detection masks from cache."""
-        return self._cache['detection_masks']
 
     def _validate_data(self) -> bool:
         """Validate that the dataframe has required data."""
@@ -108,20 +115,42 @@ class BasePlotter:
     def _create_overlay_bars(self, ax, x, total_heights, detected_heights, 
                            total_errors=None, detected_errors=None,
                            bar_width=0.8, total_color='lightgray', 
-                           detected_color='green', detected_hatch=None):
+                           detected_color='green', detected_hatch=None,
+                           add_total_label=True, detected_label='Detected'):
         """Create overlay bar plot with total and detected bars."""
         # Plot total bars (background)
+        total_label = 'Total' if add_total_label else None
         ax.bar(x, total_heights, width=bar_width, color=total_color, 
                alpha=0.5, edgecolor='black', yerr=total_errors, capsize=3,
-               label='Total')
+               label=total_label)
         
         # Plot detected bars (overlay)
         ax.bar(x, detected_heights, width=bar_width, color=detected_color,
                alpha=0.8, edgecolor='black', yerr=detected_errors, capsize=3,
                bottom=np.zeros_like(detected_heights), hatch=detected_hatch,
-               label='Detected')
+               label=detected_label)
         
-        return detected_heights, detected_errors or np.zeros_like(detected_heights)
+        # Fix the numpy array truth value ambiguity
+        if detected_errors is not None:
+            return detected_heights, detected_errors
+        else:
+            return detected_heights, np.zeros_like(detected_heights)
+
+    def _planck_function(self, wavelength: float, temperature: float) -> float:
+        """Calculate Planck function for given wavelength and temperature."""
+        return (2 * const.h * const.c**2) / (wavelength**5 * 
+                (np.exp((const.h * const.c) / (wavelength * const.k * temperature)) - 1))
+
+    def _setup_mdwarf_parameters(self):
+        """Setup M-dwarf and planet parameters for HZ limit calculations."""
+        return {
+            'T_star': 3200,  # K (typical M-dwarf)
+            'R_star': 0.2 * const.R_sun,  # 0.2 solar radii
+            'T_planet': 288,  # K (Earth-like)
+            'R_planet': const.R_earth,
+            'lambda_obs': 10e-6,  # m (mid-IR, 10 micron)
+            'hz_au': 0.1  # AU (habitable zone for M-dwarf)
+        }
 
     def plot_all(self) -> None:
         """Base plot_all method - should be overridden by subclasses."""

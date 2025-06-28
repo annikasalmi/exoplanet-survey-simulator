@@ -37,7 +37,7 @@ class PlanetDistribution():
         self.rng = rng
         
         # Print.
-        print('--> Initializing Fressin2013 planet distribution')
+        # print('--> Initializing Fressin2013 planet distribution')
         
         # Model parameters.
         self.returns = ['Rp', 'Porb']
@@ -53,7 +53,7 @@ class PlanetDistribution():
             print('--> WARNING: '+str(Scenario)+' is an unknown scenario')
             Scenario = 'baseline'
             self.Rates = np.array([[0.18, 0.61, 1.72, 2.7, 2.7, 2.93, 4.08, 3.46, 0., 0., 0.], [0.17, 0.74, 1.49, 2.9, 4.3, 4.49, 5.29, 3.66, 6.54, 0., 0.], [0.035, 0.18, 0.73, 1.93, 3.67, 5.29, 6.45, 5.25, 4.31, 3.09, 0.], [0.004, 0.006, 0.11, 0.091, 0.29, 0.32, 0.49, 0.66, 0.43, 0.53, 0.24], [0.015, 0.067, 0.17, 0.18, 0.27, 0.23, 0.35, 0.71, 1.25, 0.94, 1.05]])*1e-2
-        print('--> Using scenario '+str(Scenario))
+        # print('--> Using scenario '+str(Scenario))
         self.BinsRp = np.log(np.array([0.8, 1.25, 2., 4., 6., 22.])) # Rearth
         self.BinsPorb = np.log(np.array([0.8, 2., 3.4, 5.9, 10., 17., 29., 50., 85., 145., 245., 418.])) # d
         
@@ -74,7 +74,7 @@ class PlanetDistribution():
         """
         
         # Print.
-        print('--> Extrapolating empty bins with bivariate quadratic function')
+        # print('--> Extrapolating empty bins with bivariate quadratic function')
         
         x = (self.BinsPorb[:-1]+self.BinsPorb[1:])/2.
         y = (self.BinsRp[:-1]+self.BinsRp[1:])/2.

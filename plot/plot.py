@@ -5,7 +5,7 @@ import os
 from plot.plot_by_type import PlotPlanetType
 from plot.plot_detections import PlanetDetectionPlotter
 from plot.plot_rejections import PlanetRejectionPlotter
-from plot.plot_mdwarf_hz_limits import PlotMdwarfHZLimits
+from plot.plot_hz_limits import PlotHZLimits
 
 
 def _run_plotter_class(plotter_class, df, nruns, star_catalog, sim_name, **kwargs):
@@ -50,7 +50,7 @@ def plot_all(df, nruns=1, star_catalog='Gaia', sim_name='HWO', use_multiprocessi
     # Add rejection plotting only for HWO
     if sim_name == 'HWO':
         plotting_tasks.append((PlanetRejectionPlotter, {}))
-        plotting_tasks.append((PlotMdwarfHZLimits, {}))
+        plotting_tasks.append((PlotHZLimits, {}))
     
     if use_multiprocessing and len(plotting_tasks) > 1:
         # Use multiprocessing for parallel execution

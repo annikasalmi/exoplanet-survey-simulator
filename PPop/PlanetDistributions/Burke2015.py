@@ -34,7 +34,7 @@ class PlanetDistribution():
         self.rng=rng
 
         # Print.
-        print('--> Initializing Burke2015 planet distribution')
+        # print('--> Initializing Burke2015 planet distribution')
         
         # Model parameters.
         self.returns = ['Rp', 'Porb']
@@ -64,7 +64,7 @@ class PlanetDistribution():
             self.alpha2 = -1.779
             self.Rbrk = 0.941 # Rearth
             self.beta = -0.655
-        print('--> Using scenario '+str(Scenario))
+        # print('--> Using scenario '+str(Scenario))
         self.Rp_lims = [0.75, 2.5] # Rearth
         self.Porb_lims = [50., 300.] # d
         self.R0 = (self.Rp_lims[0]+self.Rp_lims[1])/2. # Rearth

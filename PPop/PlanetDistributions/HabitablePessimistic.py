@@ -40,7 +40,7 @@ class PlanetDistribution():
         self.rng = rng
         
         # Print.
-        print('--> Initializing HabitablePessimistic planet distribution')
+        # print('--> Initializing HabitablePessimistic planet distribution')
         
         # Constants.
         self.G = 6.674e-11 # m^3/kg/s^2

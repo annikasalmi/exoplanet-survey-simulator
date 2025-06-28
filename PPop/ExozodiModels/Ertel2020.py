@@ -48,7 +48,7 @@ class ExozodiModel():
             print('--> WARNING: '+str(Scenario)+' is an unknown scenario')
             Scenario = 'baseline'
             self.ExozodiData = np.load('ExozodiModels/ExozodiNominal.npy')
-        print('--> Using scenario '+str(Scenario))
+        # print('--> Using scenario '+str(Scenario))
         
         self.LogExozodiKDE = stats.gaussian_kde(np.log(self.ExozodiData[0]))
         

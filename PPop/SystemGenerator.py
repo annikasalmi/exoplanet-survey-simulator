@@ -363,7 +363,7 @@ class SystemGenerator():
         """
         
         # Print.
-        print('Simulating %.0f universe(s)' % Nuniverses)
+        # print('Simulating %.0f universe(s)' % Nuniverses)
         
         t0 = time.time()
         

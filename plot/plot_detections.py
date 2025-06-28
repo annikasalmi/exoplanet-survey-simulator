@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import gridspec
 
 from plot.base_plotter import BasePlotter
 from tools.plotting_constants import PLOT_CONFIGS, PLANET_TYPE_FILTERS, PANEL_CONFIGS
@@ -10,7 +11,7 @@ class PlanetDetectionPlotter(BasePlotter):
     Uses detected_best columns for overlays.
     """
     
-    def plot_all(self, temp_plots=False) -> None:
+    def plot_all(self, temp_plots=False, include_mdwarf_limits=False) -> None:
         """Generate all detection plots."""
         if not self._validate_data():
             return
@@ -20,6 +21,8 @@ class PlanetDetectionPlotter(BasePlotter):
         self.plot_detection_efficiency_3d_panels()
         if temp_plots:
             self.plot_detection_scatter_by_parameter()
+        if include_mdwarf_limits:
+            self.plot_mdwarf_hz_limits()
 
     def _calculate_efficiency_data(self, df, x_col, bins):
         """Calculate detection efficiency data for given dataframe and bins."""
@@ -113,8 +116,23 @@ class PlanetDetectionPlotter(BasePlotter):
             bins = np.linspace(x_range[0], x_range[1], 40)
             bin_centers = 0.5 * (bins[:-1] + bins[1:])
             
-            # Plot each planet type
-            for i, (label, filter_func) in enumerate(PLANET_TYPE_FILTERS.items()):
+            # Define combined categories: stellar type + planet type
+            combined_categories = {
+                'M dwarf + Rocky HZ': lambda df: (df['habitable'] == True) & 
+                                                 (df['radius_p'] < 1.5) & 
+                                                 (df['stype'].str.contains('M')),
+                'G/K star + Rocky HZ': lambda df: (df['habitable'] == True) & 
+                                                  (df['radius_p'] < 1.5) & 
+                                                  (df['stype'].isin(['G', 'K'])),
+                'All HZ around M dwarfs': lambda df: (df['habitable'] == True) & 
+                                                     (df['stype'].str.contains('M'))
+            }
+            
+            # Plot each combined category
+            for i, (label, filter_func) in enumerate(combined_categories.items()):
+                if i >= 3:  # Only plot first 3 categories
+                    break
+                    
                 subset = self.df[filter_func(self.df)]
                 if len(subset) == 0:
                     continue
@@ -137,7 +155,7 @@ class PlanetDetectionPlotter(BasePlotter):
                     ax2.set_ylabel("Detection Efficiency")
             
             # Finalize plot
-            fig.suptitle(f"Detection Efficiency Across Total Planets by {x_axis.capitalize()} "
+            fig.suptitle(f"Detection Efficiency by {x_axis.capitalize()}"
                         f"for {self.name} ({self.nruns} Runs)\nStar Catalog: {self.star_catalog}", 
                         fontsize=14)
             plt.tight_layout(rect=[0, 0, 1, 0.95])
@@ -152,26 +170,26 @@ class PlanetDetectionPlotter(BasePlotter):
         mask_best, _ = self._get_detection_masks()
         category_str = f" ({category_label})" if category_label else ""
         
-        # Create figure
-        fig, axs = plt.subplots(1, 3, figsize=(15, 6))
+        fig = plt.figure(figsize=(15, 4))
+        gs = gridspec.GridSpec(1, 4, width_ratios=[1, 1, 1, 0.04], wspace=0.3)
+
+        axs = [fig.add_subplot(gs[i]) for i in range(3)]
+
         all_meshes = []
-        
-        # Plot each panel
-        for ax, panel in zip(axs.flat, PANEL_CONFIGS):
+        for ax, panel in zip(axs, PANEL_CONFIGS):
             mesh = self._create_efficiency_panel(ax, df, mask_best, panel)
             all_meshes.append(mesh)
-        
-        # Add visual enhancements
+
         self._enhance_panel_layout(axs)
-        
-        # Add shared colorbar with smaller fraction and more padding
-        cbar = fig.colorbar(all_meshes[0], ax=axs, orientation='vertical', fraction=0.03, pad=0.08)
+
+        # Shared colorbar in the 4th column
+        cbar_ax = fig.add_subplot(gs[3])
+        cbar = fig.colorbar(all_meshes[0], cax=cbar_ax)
         cbar.set_label('Detection Efficiency')
-        
-        # Finalize plot with more space for colorbar
-        fig.suptitle(f'Detection Efficiency {category_str} for {self.name} ({self.nruns} runs)\n'
-                    f'Star Catalog: {self.star_catalog}', fontsize=18, y=0.98)
-        plt.tight_layout(rect=[0, 0, 0.88, 0.96])
+
+        fig.suptitle(f'Detection Efficiency {category_str} for {self.name} ({self.nruns} runs)')
+
+        plt.tight_layout(rect=[0, 0, 1, 0.96])
         self._save_plot(fig, 'detection_efficiency_3d_panels')
 
     def _create_efficiency_panel(self, ax, df, mask_best, panel):

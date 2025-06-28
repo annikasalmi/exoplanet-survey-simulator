@@ -50,7 +50,7 @@ class StarCatalog():
             return 'X'  # unknown/invalid
 
     def read(self, Stypes, Dist_range, Dec_range, Path):
-        print(f'--> Reading Gaia star catalog: {Path}')
+        # print(f'--> Reading Gaia star catalog: {Path}')
 
         # Read input CSV as list of dicts
         with open(Path, 'r') as f:
@@ -126,7 +126,7 @@ class StarCatalog():
                 WDSsep[i], WDSdmag[i], lGal[i], bGal[i]
             ])
 
-        print(f'--> Included {len(SC_out)} / {Nin} stars ({len(SC_out)/float(Nin)*100:.2f}%)')
+        # print(f'--> Included {len(SC_out)} / {Nin} stars ({len(SC_out)/float(Nin)*100:.2f}%)')
         return SC_out
 
     def SummaryPlot(self, FigDir=None, block=True):

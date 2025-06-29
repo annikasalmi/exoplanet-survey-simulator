@@ -43,28 +43,24 @@ class PlotHZLimits(BasePlotter):
         if not self._validate_data():
             return
             
-        # Create side-by-side detectability comparison
+        # Create single detectability plot covering full radius range
         self.plot_detectability_comparison()
         
         # Individual plots
         self.plot_earth_analog_detectability()
-        self.plot_hycean_detectability()
         self.plot_3x1_panels_with_boundaries()
         self.plot_3x1_hycean_panels_with_boundaries()
         print("M-dwarf HZ limits plots generated!")
 
     def plot_detectability_comparison(self) -> None:
-        """Create side-by-side comparison of Earth and Hycean detectability plots."""
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+        """Create detectability plot covering planet radii from 0.5 to 2.8 Earth radii."""
+        fig, ax = plt.subplots(1, 1, figsize=(12, 8))
         
-        # Earth detectability (left)
-        self._plot_detectability_panel(ax1, 'earth')
-        
-        # Hycean detectability (right)
-        self._plot_detectability_panel(ax2, 'hycean')
+        # Plot detectability for full radius range
+        self._plot_detectability_panel(ax, 'full_range')
         
         plt.tight_layout()
-        self._save_plot(fig, 'detectability_comparison')
+        self._save_plot(fig, 'detectability_full_range')
 
     def _plot_detectability_panel(self, ax, planet_type: str) -> None:
         """Plot detectability for given planet type on the given axis."""
@@ -77,6 +73,15 @@ class PlotHZLimits(BasePlotter):
             ylim = (1, 20)
             title = 'Earth-like (0.5-1.5 R⊕)'
             albedo = const.A_g_earth
+        elif planet_type == 'full_range':
+            # Full range: 0.5-2.8 R⊕
+            L_star_vals = np.logspace(-3, 1, 200)
+            distance_vals = np.linspace(1, 50, 200)
+            R_planet_vals = np.linspace(0.5, 2.8, 100)
+            xlim = (0.01, 5.0)
+            ylim = (1, 20)
+            title = 'Planet Detectability (0.5-2.8 R⊕)'
+            albedo = 0.25  # Average albedo for mixed planet types
         else:  # hycean
             # Hycean worlds: 1.5-2.8 R⊕
             L_star_vals = np.logspace(-3, -0.5, 200)
@@ -110,7 +115,7 @@ class PlotHZLimits(BasePlotter):
         ax.set_ylim(ylim)
         
         # Add region box
-        if planet_type == 'earth':
+        if planet_type in ['earth', 'full_range']:
             box = Rectangle((0.001, 1), 0.079, 19, linewidth=2, edgecolor='red', 
                            facecolor='none', linestyle='--', label='M-dwarf Region')
             ax.add_patch(box)

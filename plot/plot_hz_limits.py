@@ -43,9 +43,111 @@ class PlotHZLimits(BasePlotter):
         if not self._validate_data():
             return
             
+        # Create side-by-side detectability comparison
+        self.plot_detectability_comparison()
+        
+        # Individual plots
         self.plot_earth_analog_detectability()
+        self.plot_hycean_detectability()
         self.plot_3x1_panels_with_boundaries()
+        self.plot_3x1_hycean_panels_with_boundaries()
         print("M-dwarf HZ limits plots generated!")
+
+    def plot_detectability_comparison(self) -> None:
+        """Create side-by-side comparison of Earth and Hycean detectability plots."""
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+        
+        # Earth detectability (left)
+        self._plot_detectability_panel(ax1, 'earth')
+        
+        # Hycean detectability (right)
+        self._plot_detectability_panel(ax2, 'hycean')
+        
+        plt.tight_layout()
+        self._save_plot(fig, 'detectability_comparison')
+
+    def _plot_detectability_panel(self, ax, planet_type: str) -> None:
+        """Plot detectability for given planet type on the given axis."""
+        if planet_type == 'earth':
+            # Earth-like planets: 0.5-1.5 R⊕
+            L_star_vals = np.logspace(-3, 1, 200)
+            distance_vals = np.linspace(1, 50, 200)
+            R_planet_vals = np.linspace(0.5, 1.5, 50)
+            xlim = (0.01, 5.0)
+            ylim = (1, 20)
+            title = 'Earth-like (0.5-1.5 R⊕)'
+            albedo = const.A_g_earth
+        else:  # hycean
+            # Hycean worlds: 1.5-2.8 R⊕
+            L_star_vals = np.logspace(-3, -0.5, 200)
+            distance_vals = np.linspace(1, 30, 200)
+            R_planet_vals = np.linspace(1.5, 2.8, 50)
+            xlim = (0.001, 0.3)
+            ylim = (1, 30)
+            title = 'Hycean (1.5-2.8 R⊕)'
+            albedo = 0.3  # Higher albedo for Hycean worlds
+
+        L_grid, D_grid = np.meshgrid(L_star_vals, distance_vals)
+        
+        # Calculate detectability
+        detectability = self._calculate_detectability_generic(
+            L_star_vals, distance_vals, R_planet_vals, L_grid, D_grid, albedo
+        )
+
+        # Plot
+        im = ax.contourf(L_grid, D_grid, detectability, levels=20, cmap='RdYlGn')
+        
+        # Add contour lines
+        cs = ax.contour(L_grid, D_grid, detectability, levels=[20, 40, 60, 80], 
+                       colors='white', alpha=0.7, linewidths=1)
+        ax.clabel(cs, inline=True, fontsize=8, fmt='%.0f%%')
+        
+        ax.set_xscale('log')
+        ax.set_xlabel('Stellar Luminosity [L☉]')
+        ax.set_ylabel('Distance [pc]')
+        ax.set_title(title)
+        ax.set_xlim(xlim)
+        ax.set_ylim(ylim)
+        
+        # Add region box
+        if planet_type == 'earth':
+            box = Rectangle((0.001, 1), 0.079, 19, linewidth=2, edgecolor='red', 
+                           facecolor='none', linestyle='--', label='M-dwarf Region')
+            ax.add_patch(box)
+            ax.legend(loc='upper right')
+        
+        # Add colorbar
+        cbar = plt.colorbar(im, ax=ax)
+        cbar.set_label('Detectability %')
+
+    def _calculate_detectability_generic(self, L_star_vals, distance_vals, R_planet_vals, L_grid, D_grid, albedo):
+        """Generic detectability calculation for any planet type."""
+        # Create 3D arrays for vectorized computation
+        L_3d, D_3d, R_3d = np.meshgrid(L_star_vals, distance_vals, R_planet_vals, indexing='ij')
+        
+        # Vectorized calculations
+        a_hz_3d = np.sqrt(L_3d) * const.au_to_m
+        distance_m_3d = D_3d * 3.086e16
+        theta_3d = a_hz_3d / distance_m_3d
+        
+        # Vectorized contrast calculation
+        contrast_3d = albedo * (R_3d * const.R_earth / a_hz_3d) ** 2 * const.Phi_alpha
+        
+        # Vectorized detectability check
+        detectable_3d = (contrast_3d >= self.best_flux_limit) & (theta_3d >= self.theta_limit_rad)
+        
+        # Sum along planet radius axis to get percentage
+        detectability_percentage = np.mean(detectable_3d, axis=2)
+        
+        return detectability_percentage.T
+
+    def _plot_earth_detectability_panel(self, ax) -> None:
+        """Plot Earth detectability on the given axis."""
+        self._plot_detectability_panel(ax, 'earth')
+
+    def _plot_hycean_detectability_panel(self, ax) -> None:
+        """Plot Hycean detectability on the given axis."""
+        self._plot_detectability_panel(ax, 'hycean')
 
     def _validate_and_filter_points(self, points: np.ndarray, xcol: str, ycol: str) -> Optional[np.ndarray]:
         """
@@ -219,83 +321,25 @@ class PlotHZLimits(BasePlotter):
 
     def plot_earth_analog_detectability(self) -> None:
         """Plot detectability of Earth-like planets around different stellar types with detectability percentage gradient."""
-        # Grid of stellar luminosity and distance
-        L_star_vals = np.logspace(-3, 1, 300)  # Extended to 10 L☉
-        distance_vals = np.linspace(1, 50, 300)
-        R_planet_vals = np.linspace(0.5, 1.5, 100)
-
-        L_grid, D_grid = np.meshgrid(L_star_vals, distance_vals)
-        
-        # Vectorized calculation for much better performance
-        detectability_percentage = self._calculate_detectability_vectorized(
-            L_star_vals, distance_vals, R_planet_vals, L_grid, D_grid
-        )
-
         # Create single plot
         fig, ax = plt.subplots(1, 1, figsize=(10, 8))
-
-        # Plot the gradient background using the detectability percentage
-        im = ax.contourf(L_grid, D_grid, detectability_percentage, levels=50, cmap='RdYlGn')
-        cbar = plt.colorbar(im, ax=ax)
-        cbar.set_label('Detectability Across Planet Radii of 0.5-1.5 R⊕)')
         
-        # Add contour lines for specific percentage values
-        percentage_contours = [10, 20, 30, 40, 50, 60, 70, 80, 90]
-        contour_levels = [p for p in percentage_contours if p <= np.max(detectability_percentage)]
-        if contour_levels:
-            cs = ax.contour(L_grid, D_grid, detectability_percentage, levels=contour_levels, colors='white', alpha=0.7, linewidths=1)
-            ax.clabel(cs, inline=True, fontsize=8, fmt='%.0f%%')
-        
-        ax.set_xscale('log')
-        self._setup_plot_style(ax, 'Stellar Luminosity [L☉]', 'Distance [pc]', 
-                              'Planet Detectability Percentage\n(0.5-1.5 R⊕ planets, flux ratio & IWA OK)')
-        
-        # Set plot limits
-        ax.set_xlim(0.01, 5.0)  
-        ax.set_ylim(1, 20)
-        
-        # M-dwarf region box (0.001 to 0.08 L☉, 1 to 20 pc)
-        mdwarf_box = Rectangle((0.001, 1), 0.079, 19, 
-                              linewidth=2, edgecolor='red', facecolor='none', 
-                              linestyle='--', label='M-dwarf Region')
-        ax.add_patch(mdwarf_box)
-        
-        # G star region box (0.4 to 1.5 L☉, 1 to 20 pc)
-        g_star_box = Rectangle((0.4, 1), 1.1, 19, 
-                              linewidth=2, edgecolor='yellow', facecolor='none', 
-                              linestyle='--', label='G Star Region')
-        ax.add_patch(g_star_box)
-        
-        # Add legend for the regions
-        ax.legend(loc='upper right')
+        # Use the panel plotting method
+        self._plot_earth_detectability_panel(ax)
         
         plt.tight_layout()
         self._save_plot(fig, 'earth_analog_detectability_percentage')
 
-    def _calculate_detectability_vectorized(self, L_star_vals, distance_vals, R_planet_vals, L_grid, D_grid):
-        """Vectorized calculation of detectability percentage for much better performance."""
-        # Pre-calculate constants
-        a_hz_vals = np.sqrt(L_star_vals) * const.au_to_m
-        distance_m_vals = distance_vals * 3.086e16
+    def plot_hycean_detectability(self) -> None:
+        """Plot detectability of Hycean worlds (1.5-2.8 R⊕) around M-dwarfs with detectability percentage gradient."""
+        # Create single plot
+        fig, ax = plt.subplots(1, 1, figsize=(10, 8))
         
-        # Create 3D arrays for vectorized computation
-        L_3d, D_3d, R_3d = np.meshgrid(L_star_vals, distance_vals, R_planet_vals, indexing='ij')
+        # Use the panel plotting method
+        self._plot_hycean_detectability_panel(ax)
         
-        # Vectorized calculations
-        a_hz_3d = np.sqrt(L_3d) * const.au_to_m
-        distance_m_3d = D_3d * 3.086e16
-        theta_3d = a_hz_3d / distance_m_3d
-        
-        # Vectorized contrast calculation
-        contrast_3d = const.A_g_earth * (R_3d * const.R_earth / a_hz_3d) ** 2 * const.Phi_alpha
-        
-        # Vectorized detectability check
-        detectable_3d = (contrast_3d >= self.best_flux_limit) & (theta_3d >= self.theta_limit_rad)
-        
-        # Sum along planet radius axis to get percentage
-        detectability_percentage = np.mean(detectable_3d, axis=2)
-        
-        return detectability_percentage.T  # Transpose to match original shape
+        plt.tight_layout()
+        self._save_plot(fig, 'hycean_detectability_percentage')
 
     def plot_3x1_panels_with_boundaries(self) -> None:
         """Plot 3x1 panels showing specific combinations with semi-major axis on y-axis and improved legend placement."""
@@ -449,3 +493,21 @@ class PlotHZLimits(BasePlotter):
             'flux_p': 'Planet Flux (W/m²)'
         }
         return labels.get(var_name, var_name)
+
+    def plot_3x1_hycean_panels_with_boundaries(self) -> None:
+        """Plot 3x1 panels for Hycean worlds (1.5-2.8 R⊕) with semi-major axis on y-axis."""
+        if self.df.empty:
+            print("Warning: No data available for Hycean 3x1 panel plot")
+            return
+        
+        # Filter data for Hycean worlds (1.5-2.8 R⊕)
+        hycean_mask = (self.df['radius_p'] >= 1.5) & (self.df['radius_p'] <= 2.8)
+        hycean_df = self.df[hycean_mask].copy()
+        
+        if hycean_df.empty:
+            print("Warning: No Hycean worlds (1.5-2.8 R⊕) found in data")
+            return
+        
+        # Create temporary plotter with Hycean data
+        temp_plotter = PlotHZLimits(hycean_df)
+        temp_plotter.plot_3x1_panels_with_boundaries()

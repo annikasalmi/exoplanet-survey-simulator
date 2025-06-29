@@ -92,7 +92,7 @@ class PlotPlanetType(BasePlotter):
             categories.append('Sub-Jovians')
         
         return categories if categories else None
-    
+
     def plot_by_star(self) -> None:
         """Grouped bar plots by star type and radius bin. For HWO, uses detected_best/worst logic."""
         df = self.df.copy()

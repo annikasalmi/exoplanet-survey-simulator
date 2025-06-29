@@ -9,7 +9,7 @@ def planck(wavelength_m, temperature):
     """Calculate spectral radiance using Planck's Law."""
     h, c, k = const.h, const.c, const.k
     exponent = h * c / (wavelength_m * k * temperature)
-    exp_term = np.where(exponent > 700, np.inf, np.exp(exponent))
+    exp_term = np.where(exponent > 100, np.inf, np.exp(exponent))
     B_lambda = (2 * h * c**2) / (wavelength_m**5) / (exp_term - 1)
     return np.where(np.isinf(exp_term), 0, B_lambda)
 
@@ -99,23 +99,23 @@ def main():
     ax.set_ylim(1e-30, 10)
     ax.set_title('Planet Emission + Reflected Starlight')
     ax.grid(True, alpha=0.3)
-    ax.legend()
-    
     # Add HWO box and contrast info
     HWO_box = Rectangle((0.2, 1e-50), 2.3, 20 - 1e-10, linewidth=2, edgecolor='black',
                         facecolor='none', linestyle='--', label='HWO observable')
     ax.add_patch(HWO_box)
     
-    contrast_info = f'Planet/Star Flux Ratios:\nM-dwarf: {np.max(contrast_mdwarf):.2e}\nSun-like: {np.max(contrast_sun):.2e}'
-    ax.text(0.02, 0.98, contrast_info, transform=ax.transAxes, fontsize=10, 
-            verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+    # contrast_info = f'Planet/Star Flux Ratios:\nM-dwarf: {np.max(contrast_mdwarf):.2e}\nSun-like: {np.max(contrast_sun):.2e}'
+    # ax.text(0.02, 0.98, contrast_info, transform=ax.transAxes, fontsize=10, 
+    #         verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
     
     # Add absorption features
     plot_absorption_features(ax, wavelength_um, [flux_planet_mdwarf, reflected_mdwarf, reflected_sun])
+    ax.legend()
+    
     
     fig.suptitle('Planet Blackbody Emission + Reflected Starlight\nM-dwarf vs Sun-like Systems', fontsize=14)
     plt.tight_layout()
-    plt.savefig(os.path.join(PLOTS_DIR, 'other_useful', 'flux_ratios.png'))
+    plt.savefig(os.path.join(PLOTS_DIR, 'other_useful', 'flux_ratios_no_text.png'))
 
 if __name__ == "__main__":
     main() 

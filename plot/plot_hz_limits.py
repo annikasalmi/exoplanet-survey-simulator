@@ -43,9 +43,8 @@ class PlotHZLimits(BasePlotter):
         if not self._validate_data():
             return
             
-        self.plot_temperature_vs_au_with_boundaries()
         self.plot_earth_analog_detectability()
-        self.plot_4x4_panels_with_boundaries()
+        self.plot_3x1_panels_with_boundaries()
         print("M-dwarf HZ limits plots generated!")
 
     def _validate_and_filter_points(self, points: np.ndarray, xcol: str, ycol: str) -> Optional[np.ndarray]:
@@ -218,55 +217,6 @@ class PlotHZLimits(BasePlotter):
         """
         return R_star ** 2 * (T_eff / 5780) ** 4
 
-    def plot_temperature_vs_au_with_boundaries(self) -> None:
-        """Plot single plot showing stellar temperature vs planetary semi-major axis with all boundaries overlaid."""
-        if self.df.empty:
-            print("Warning: No data available for temperature vs semi-major axis plot")
-            return
-        
-        required_cols = ['radius_p', 'temp_s', 'semimajor_p']
-        if not self._validate_required_columns(self.df, required_cols):
-            print("Warning: Missing required columns for temperature vs semi-major axis plot")
-            return
-        
-        fig, ax = plt.subplots(1, 1, figsize=(10, 8))
-        
-        # Get all masks at once to avoid repeated calculations
-        detected_mask = self._get_panel_detection_mask(self.df)
-        flux_rejected = self._get_flux_rejection_mask(self.df)
-        iwa_rejected = self._get_iwa_rejection_mask(self.df)
-        exozodi_rejected = self._get_exozodi_rejection_mask(self.df)
-        non_detected_mask = ~detected_mask
-        
-        # Plot boundaries in order (back to front)
-        boundary_configs = [
-            (flux_rejected, 'red', 'Flux Rejected'),
-            (exozodi_rejected, 'gold', 'Exozodi Rejected'),
-            (iwa_rejected, 'blue', 'IWA Rejected'),
-            (detected_mask, 'green', 'Detected')
-        ]
-        
-        for mask, color, label in boundary_configs:
-            if mask.any():
-                data = self.df[mask]
-                linewidth = 3 if color in ['gray', 'green'] else 0
-                alpha_fill = 0.3 if color in ['red', 'gold', 'blue'] else None
-                facecolor = color if color in ['red', 'gold', 'blue'] else None
-                
-                self.plot_boundary(data, 'temp_s', 'semimajor_p', ax, 
-                                 alpha=0.01, color=color, linewidth=linewidth, 
-                                 linestyle='-', alpha_fill=alpha_fill, 
-                                 facecolor=facecolor, label=label)
-        
-        self._setup_plot_style(ax, 'Stellar Temperature (K)', 'Semi-major Axis (AU)', 
-                              'Planet Boundaries by Detection/Rejection Type for HWO')
-        ax.grid(True, alpha=0.4)
-        ax.set_xlim(3300, 8000)
-        ax.set_ylim(0, 1.5)
-        
-        plt.tight_layout()
-        self._save_plot(fig, 'temperature_vs_au_boundaries_overlaid')
-
     def plot_earth_analog_detectability(self) -> None:
         """Plot detectability of Earth-like planets around different stellar types with detectability percentage gradient."""
         # Grid of stellar luminosity and distance
@@ -347,22 +297,29 @@ class PlotHZLimits(BasePlotter):
         
         return detectability_percentage.T  # Transpose to match original shape
 
-    def plot_4x4_panels_with_boundaries(self) -> None:
-        """Plot 4x4 panels showing all combinations of semimajor_p, p_orb, radius_p, temp, temp_s, mass_s, flux_p with boundaries."""
+    def plot_3x1_panels_with_boundaries(self) -> None:
+        """Plot 3x1 panels showing specific combinations with semi-major axis on y-axis and improved legend placement."""
         if self.df.empty:
-            print("Warning: No data available for 4x4 panel plot")
+            print("Warning: No data available for 3x1 panel plot")
             return
         
-        # Define all the variables we want to plot
-        variables = ['semimajor_p', 'p_orb', 'radius_p', 'temp', 'temp_s', 'mass_s', 'flux_p']
+        # Define the specific variable combinations we want to plot (semi-major axis on y-axis)
+        var_combinations = [
+            ('p_orb', 'semimajor_p'),      # Orbital period vs semi-major axis
+            ('temp_s', 'semimajor_p'),     # Stellar temperature vs semi-major axis  
+            ('radius_p', 'semimajor_p')    # Planet radius vs semi-major axis
+        ]
         
         # Check which variables are available in the dataframe
-        available_vars = [var for var in variables if var in self.df.columns]
-        if len(available_vars) < 2:
-            print(f"Warning: Need at least 2 variables, but only found: {available_vars}")
-            return
+        available_vars = []
+        for x_var, y_var in var_combinations:
+            if x_var in self.df.columns and y_var in self.df.columns:
+                available_vars.append((x_var, y_var))
         
-        print("Pre-computing boundaries for speed optimization...")
+        if len(available_vars) < 1:
+            print(f"Warning: Need at least 1 variable combination, but only found: {available_vars}")
+            return
+
         
         # Pre-compute all masks and data subsets once
         detected_mask = self._get_panel_detection_mask(self.df)
@@ -379,10 +336,8 @@ class PlotHZLimits(BasePlotter):
         
         # Pre-compute boundaries for all variable combinations and categories
         boundary_cache = {}
-        from itertools import combinations
-        var_combinations = list(combinations(available_vars, 2))
         
-        for x_var, y_var in var_combinations[:16]:  # Only first 16 combinations
+        for x_var, y_var in available_vars:
             for category, data in data_subsets.items():
                 # Skip if not enough data points
                 valid_data = data[[x_var, y_var]].dropna()
@@ -409,11 +364,8 @@ class PlotHZLimits(BasePlotter):
                     print(f"Warning: Could not compute boundary for {x_var} vs {y_var} ({category}): {str(e)}")
                     continue
         
-        print(f"Computed {len(boundary_cache)} boundaries, creating plot...")
-        
-        # Create 4x4 subplot grid
-        fig, axes = plt.subplots(4, 4, figsize=(20, 20))
-        axes = axes.flatten()
+        # Create 3x1 subplot grid
+        fig, axes = plt.subplots(1, 3, figsize=(18, 6))
         
         # Define boundary configurations
         boundary_configs = [
@@ -424,10 +376,7 @@ class PlotHZLimits(BasePlotter):
         ]
         
         # Plot each combination
-        for i, (x_var, y_var) in enumerate(var_combinations):
-            if i >= 16:  # Only plot first 16 combinations (4x4 grid)
-                break
-                
+        for i, (x_var, y_var) in enumerate(available_vars):
             ax = axes[i]
             
             # Plot boundaries for this panel using cached results
@@ -470,17 +419,23 @@ class PlotHZLimits(BasePlotter):
                 if np.isfinite(y_min) and np.isfinite(y_max) and y_max > y_min:
                     ax.set_ylim(y_min * 0.9, y_max * 1.1)
         
-        # Hide unused subplots
-        for i in range(len(var_combinations), 16):
-            axes[i].set_visible(False)
-        
-        # Add legend to the first subplot
-        if len(var_combinations) > 0 and len(var_combinations) <= 16:
-            axes[0].legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        # Add legend in a more logical place - centered at the bottom
+        if len(available_vars) > 0:
+            from matplotlib.patches import Patch
+            legend_elements = [
+                Patch(facecolor='red', alpha=0.3, label='Flux Rejected'),
+                Patch(facecolor='gold', alpha=0.3, label='Exozodi Rejected'),
+                Patch(facecolor='blue', alpha=0.3, label='IWA Rejected'),
+                Patch(facecolor='green', alpha=1.0, label='Detected')
+            ]
+            # Place legend in the upper left of the leftmost plot
+            axes[0].legend(handles=legend_elements, loc='upper left', 
+                          frameon=True, fancybox=True, shadow=True)
         
         plt.tight_layout()
-        self._save_plot(fig, '4x4_panels_boundaries')
-        print("4x4 panel plot completed!")
+        # No need for subplot adjustment since legend is within plot
+        self._save_plot(fig, '3x1_panels_boundaries')
+        print("3x1 panel plot completed!")
     
     def _get_axis_label(self, var_name: str) -> str:
         """Get formatted axis label for a variable name."""

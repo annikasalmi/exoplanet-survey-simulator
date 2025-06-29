@@ -17,10 +17,7 @@ class PlotHZLimits(BasePlotter):
     Plotter for M-dwarf HZ limits and related plots.
     
     Features:
-    1. IWA vs flux ratio plots with rejection reasons
-    2. Temperature vs semi-major axis plots with rejection reasons
-    3. Temperature vs semi-major axis boundaries plot
-    4. Earth analog detectability plots
+    1. 3x1 boundary plots for data analysis
     """
     
     def __init__(self, df: Optional[pd.DataFrame] = None, name: str = 'HWO',
@@ -32,7 +29,6 @@ class PlotHZLimits(BasePlotter):
         
         # Cache HWO constants to avoid repeated instantiation
         self.hwo_best = const.HWOConstants('best')
-        self.hwo_worst = const.HWOConstants('worst')
         self.best_flux_limit = float(self.hwo_best.min_planet_flux_star_ratio)
         self.iwa_limit = float(self.hwo_best.iwa)
         self.max_z = float(self.hwo_best.max_z)
@@ -43,116 +39,9 @@ class PlotHZLimits(BasePlotter):
         if not self._validate_data():
             return
             
-        # Create single detectability plot covering full radius range
-        self.plot_detectability_comparison()
-        
-        # Individual plots
-        self.plot_earth_analog_detectability()
+        # 3x1 boundary plots
         self.plot_3x1_panels_with_boundaries()
-        self.plot_3x1_hycean_panels_with_boundaries()
         print("M-dwarf HZ limits plots generated!")
-
-    def plot_detectability_comparison(self) -> None:
-        """Create detectability plot covering planet radii from 0.5 to 2.8 Earth radii."""
-        fig, ax = plt.subplots(1, 1, figsize=(12, 8))
-        
-        # Plot detectability for full radius range
-        self._plot_detectability_panel(ax, 'full_range')
-        
-        plt.tight_layout()
-        self._save_plot(fig, 'detectability_full_range')
-
-    def _plot_detectability_panel(self, ax, planet_type: str) -> None:
-        """Plot detectability for given planet type on the given axis."""
-        if planet_type == 'earth':
-            # Earth-like planets: 0.5-1.5 R⊕
-            L_star_vals = np.logspace(-3, 1, 200)
-            distance_vals = np.linspace(1, 50, 200)
-            R_planet_vals = np.linspace(0.5, 1.5, 50)
-            xlim = (0.01, 5.0)
-            ylim = (1, 20)
-            title = 'Earth-like (0.5-1.5 R⊕)'
-            albedo = const.A_g_earth
-        elif planet_type == 'full_range':
-            # Full range: 0.5-2.8 R⊕
-            L_star_vals = np.logspace(-3, 1, 200)
-            distance_vals = np.linspace(1, 50, 200)
-            R_planet_vals = np.linspace(0.5, 2.8, 100)
-            xlim = (0.01, 5.0)
-            ylim = (1, 20)
-            title = 'Planet Detectability (0.5-2.8 R⊕)'
-            albedo = 0.25  # Average albedo for mixed planet types
-        else:  # hycean
-            # Hycean worlds: 1.5-2.8 R⊕
-            L_star_vals = np.logspace(-3, -0.5, 200)
-            distance_vals = np.linspace(1, 30, 200)
-            R_planet_vals = np.linspace(1.5, 2.8, 50)
-            xlim = (0.001, 0.3)
-            ylim = (1, 30)
-            title = 'Hycean (1.5-2.8 R⊕)'
-            albedo = 0.3  # Higher albedo for Hycean worlds
-
-        L_grid, D_grid = np.meshgrid(L_star_vals, distance_vals)
-        
-        # Calculate detectability
-        detectability = self._calculate_detectability_generic(
-            L_star_vals, distance_vals, R_planet_vals, L_grid, D_grid, albedo
-        )
-
-        # Plot
-        im = ax.contourf(L_grid, D_grid, detectability, levels=20, cmap='RdYlGn')
-        
-        # Add contour lines
-        cs = ax.contour(L_grid, D_grid, detectability, levels=[20, 40, 60, 80], 
-                       colors='white', alpha=0.7, linewidths=1)
-        ax.clabel(cs, inline=True, fontsize=8, fmt='%.0f%%')
-        
-        ax.set_xscale('log')
-        ax.set_xlabel('Stellar Luminosity [L☉]')
-        ax.set_ylabel('Distance [pc]')
-        ax.set_title(title)
-        ax.set_xlim(xlim)
-        ax.set_ylim(ylim)
-        
-        # Add region box
-        if planet_type in ['earth', 'full_range']:
-            box = Rectangle((0.001, 1), 0.079, 19, linewidth=2, edgecolor='red', 
-                           facecolor='none', linestyle='--', label='M-dwarf Region')
-            ax.add_patch(box)
-            ax.legend(loc='upper right')
-        
-        # Add colorbar
-        cbar = plt.colorbar(im, ax=ax)
-        cbar.set_label('Detectability %')
-
-    def _calculate_detectability_generic(self, L_star_vals, distance_vals, R_planet_vals, L_grid, D_grid, albedo):
-        """Generic detectability calculation for any planet type."""
-        # Create 3D arrays for vectorized computation
-        L_3d, D_3d, R_3d = np.meshgrid(L_star_vals, distance_vals, R_planet_vals, indexing='ij')
-        
-        # Vectorized calculations
-        a_hz_3d = np.sqrt(L_3d) * const.au_to_m
-        distance_m_3d = D_3d * 3.086e16
-        theta_3d = a_hz_3d / distance_m_3d
-        
-        # Vectorized contrast calculation
-        contrast_3d = albedo * (R_3d * const.R_earth / a_hz_3d) ** 2 * const.Phi_alpha
-        
-        # Vectorized detectability check
-        detectable_3d = (contrast_3d >= self.best_flux_limit) & (theta_3d >= self.theta_limit_rad)
-        
-        # Sum along planet radius axis to get percentage
-        detectability_percentage = np.mean(detectable_3d, axis=2)
-        
-        return detectability_percentage.T
-
-    def _plot_earth_detectability_panel(self, ax) -> None:
-        """Plot Earth detectability on the given axis."""
-        self._plot_detectability_panel(ax, 'earth')
-
-    def _plot_hycean_detectability_panel(self, ax) -> None:
-        """Plot Hycean detectability on the given axis."""
-        self._plot_detectability_panel(ax, 'hycean')
 
     def _validate_and_filter_points(self, points: np.ndarray, xcol: str, ycol: str) -> Optional[np.ndarray]:
         """
@@ -289,14 +178,6 @@ class PlotHZLimits(BasePlotter):
         panel_mask = mask_series.reindex(df_panel.index).fillna(False)
         return panel_mask.astype(bool)
 
-    def _validate_required_columns(self, df: pd.DataFrame, required_cols: list) -> bool:
-        """Validate that required columns exist in dataframe."""
-        missing_cols = [col for col in required_cols if col not in df.columns]
-        if missing_cols:
-            print(f"Warning: Missing required columns: {missing_cols}")
-            return False
-        return True
-
     def _get_flux_rejection_mask(self, df: pd.DataFrame) -> pd.Series:
         """Get mask for planets rejected due to flux ratio."""
         return df['flux_ratio_value_best'] < self.best_flux_limit
@@ -308,43 +189,6 @@ class PlotHZLimits(BasePlotter):
     def _get_exozodi_rejection_mask(self, df: pd.DataFrame) -> pd.Series:
         """Get mask for planets rejected due to exozodi."""
         return df['z'] > self.max_z
-
-    def _compute_luminosity(self, T_eff: np.ndarray, R_star: np.ndarray) -> np.ndarray:
-        """
-        Compute stellar luminosity using the Stefan-Boltzmann law.
-
-        Parameters:
-        - T_eff : np.ndarray
-            Effective temperature of the star(s) in Kelvin.
-        - R_star : np.ndarray
-            Radius of the star(s) in solar radii.
-
-        Returns:
-        - Luminosity in solar luminosities.
-        """
-        return R_star ** 2 * (T_eff / 5780) ** 4
-
-    def plot_earth_analog_detectability(self) -> None:
-        """Plot detectability of Earth-like planets around different stellar types with detectability percentage gradient."""
-        # Create single plot
-        fig, ax = plt.subplots(1, 1, figsize=(10, 8))
-        
-        # Use the panel plotting method
-        self._plot_earth_detectability_panel(ax)
-        
-        plt.tight_layout()
-        self._save_plot(fig, 'earth_analog_detectability_percentage')
-
-    def plot_hycean_detectability(self) -> None:
-        """Plot detectability of Hycean worlds (1.5-2.8 R⊕) around M-dwarfs with detectability percentage gradient."""
-        # Create single plot
-        fig, ax = plt.subplots(1, 1, figsize=(10, 8))
-        
-        # Use the panel plotting method
-        self._plot_hycean_detectability_panel(ax)
-        
-        plt.tight_layout()
-        self._save_plot(fig, 'hycean_detectability_percentage')
 
     def plot_3x1_panels_with_boundaries(self) -> None:
         """Plot 3x1 panels showing specific combinations with semi-major axis on y-axis and improved legend placement."""
@@ -368,7 +212,6 @@ class PlotHZLimits(BasePlotter):
         if len(available_vars) < 1:
             print(f"Warning: Need at least 1 variable combination, but only found: {available_vars}")
             return
-
         
         # Pre-compute all masks and data subsets once
         detected_mask = self._get_panel_detection_mask(self.df)
@@ -455,15 +298,18 @@ class PlotHZLimits(BasePlotter):
             ax.grid(True, alpha=0.4)
             
             # Set reasonable axis limits based on data
-            if not self.df[x_var].isna().all():
-                x_min = self.df[x_var].min()
-                x_max = self.df[x_var].max()
+            x_data = self.df[x_var].dropna()
+            if len(x_data) > 0:
+                x_min = float(x_data.min())
+                x_max = float(x_data.max())
                 # Check for reasonable bounds
                 if np.isfinite(x_min) and np.isfinite(x_max) and x_max > x_min:
                     ax.set_xlim(x_min * 0.9, x_max * 1.1)
-            if not self.df[y_var].isna().all():
-                y_min = self.df[y_var].min()
-                y_max = self.df[y_var].max()
+            
+            y_data = self.df[y_var].dropna()
+            if len(y_data) > 0:
+                y_min = float(y_data.min())
+                y_max = float(y_data.max())
                 # Check for reasonable bounds
                 if np.isfinite(y_min) and np.isfinite(y_max) and y_max > y_min:
                     ax.set_ylim(y_min * 0.9, y_max * 1.1)
@@ -482,7 +328,6 @@ class PlotHZLimits(BasePlotter):
                           frameon=True, fancybox=True, shadow=True)
         
         plt.tight_layout()
-        # No need for subplot adjustment since legend is within plot
         self._save_plot(fig, '3x1_panels_boundaries')
         print("3x1 panel plot completed!")
     
@@ -498,21 +343,3 @@ class PlotHZLimits(BasePlotter):
             'flux_p': 'Planet Flux (W/m²)'
         }
         return labels.get(var_name, var_name)
-
-    def plot_3x1_hycean_panels_with_boundaries(self) -> None:
-        """Plot 3x1 panels for Hycean worlds (1.5-2.8 R⊕) with semi-major axis on y-axis."""
-        if self.df.empty:
-            print("Warning: No data available for Hycean 3x1 panel plot")
-            return
-        
-        # Filter data for Hycean worlds (1.5-2.8 R⊕)
-        hycean_mask = (self.df['radius_p'] >= 1.5) & (self.df['radius_p'] <= 2.8)
-        hycean_df = self.df[hycean_mask].copy()
-        
-        if hycean_df.empty:
-            print("Warning: No Hycean worlds (1.5-2.8 R⊕) found in data")
-            return
-        
-        # Create temporary plotter with Hycean data
-        temp_plotter = PlotHZLimits(hycean_df)
-        temp_plotter.plot_3x1_panels_with_boundaries()

@@ -44,13 +44,13 @@ def plot_all(df, nruns=1, star_catalog='Gaia', sim_name='HWO', use_multiprocessi
     # Define plotting tasks
     plotting_tasks = [
         # (PlotPlanetType, {}),
-        # (PlanetDetectionPlotter, {}),
+        (PlanetDetectionPlotter, {}),
     ]
     
     # Add rejection plotting only for HWO
-    if sim_name == 'HWO':
+    # if sim_name == 'HWO':
         # plotting_tasks.append((PlanetRejectionPlotter, {}))
-        plotting_tasks.append((PlotHZLimits, {}))
+        # plotting_tasks.append((PlotHZLimits, {}))
     
     if use_multiprocessing and len(plotting_tasks) > 1:
         # Use multiprocessing for parallel execution

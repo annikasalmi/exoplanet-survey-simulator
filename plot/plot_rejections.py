@@ -274,7 +274,7 @@ class PlanetRejectionPlotter(BasePlotter):
             elif reason == 'IWA':
                 edgecolor = 'blue'
             elif reason == 'Exozodi':
-                edgecolor = 'yellow'
+                edgecolor = 'gold'
             else:
                 edgecolor = 'black'
             
@@ -348,7 +348,7 @@ class PlanetRejectionPlotter(BasePlotter):
             elif reason == 'IWA':
                 edgecolor = 'blue'
             elif reason == 'Exozodi':
-                edgecolor = 'yellow'
+                edgecolor = 'gold'
             else:
                 edgecolor = 'black'
             if reason == 'IWA':

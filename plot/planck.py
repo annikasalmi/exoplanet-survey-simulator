@@ -1,7 +1,9 @@
 import numpy as np
 import os
+import sys
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from tools import physics_constants as const
 from tools.paths import PLOTS_DIR
 
@@ -48,10 +50,9 @@ def plot_absorption_features(ax, wavelength_um, fluxes):
         'O₂': [0.688, 0.760, 1.06, 1.27],
         'NH₃': [1.5, 2.0, 2.2]
     }
-    # Define gray shades and linestyles
     gray_shades = ['#888888', '#AAAAAA', '#666666', '#BBBBBB', '#444444']
     linestyles = ['-', '--', '-.', ':', (0, (3, 5, 1, 5))]
-    
+
     for i, (molecule, wavelengths) in enumerate(features.items()):
         color = gray_shades[i % len(gray_shades)]
         linestyle = linestyles[i % len(linestyles)]
@@ -60,8 +61,18 @@ def plot_absorption_features(ax, wavelength_um, fluxes):
                 idx = np.argmin(np.abs(wavelength_um - wavelength))
                 max_flux = max(fluxes[idx] for fluxes in fluxes)
                 ax.axvline(x=wavelength, color=color, alpha=0.7, linestyle=linestyle, linewidth=1)
-                ax.text(wavelength, max_flux * 1.5, molecule, rotation=90, fontsize=8, 
-                        color=color, ha='right', va='bottom')
+                # Special handling for 2.0 μm overlap
+                if wavelength == 2.0 and molecule == 'CO₂':
+                    ax.text(wavelength + 0.01, max_flux * 1.7, molecule, rotation=90, fontsize=8,
+                            color=color, ha='left', va='bottom')
+                elif wavelength == 2.0 and molecule == 'NH₃':
+                    ax.text(wavelength - 0.01, max_flux * 1.3, molecule, rotation=90, fontsize=8,
+                            color=color, ha='right', va='bottom')
+                else:
+                    # Offset label if another molecule is already at this wavelength
+                    y_offset = 1.5
+                    ax.text(wavelength, max_flux * y_offset, molecule, rotation=90, fontsize=8,
+                            color=color, ha='right', va='bottom')
 
 def main():
     """Main analysis and plotting function."""
@@ -93,7 +104,7 @@ def main():
         ax = ax.flat[0]
     
     # Plot spectral radiance
-    ax.plot(wavelength_um, flux_planet_mdwarf, label='Planet (M-dwarf)', lw=3, color='green')
+    ax.plot(wavelength_um, flux_planet_mdwarf, label='Habitable planet', lw=3, color='green')
     ax.plot(wavelength_um, reflected_mdwarf, label='Reflected (M-dwarf)', lw=1, color='red')
     ax.plot(wavelength_um, reflected_sun, label='Reflected (Sun-like)', lw=1, color='gold')
     
@@ -104,7 +115,6 @@ def main():
     ax.set_xlim(0, 3)
     ax.set_ylim(1e-30, 10)
     ax.set_title('Planet Emission + Reflected Starlight')
-    ax.grid(True, alpha=0.3)
     # Add HWO box and contrast info
     HWO_box = Rectangle((0.2, 1e-50), 2.3, 20 - 1e-10, linewidth=2, edgecolor='black',
                         facecolor='none', label='HWO observable')

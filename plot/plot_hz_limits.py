@@ -2,9 +2,7 @@ import pandas as pd
 import numpy as np
 from typing import Optional
 from scipy.spatial.qhull import ConvexHull
-from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 import alphashape
@@ -41,7 +39,7 @@ class PlotHZLimits(BasePlotter):
             return
             
         # 3x1 boundary plots
-        self.plot_3x1_panels_with_boundaries()
+        self.plot_boundaries()
         self.plot_detectability_panel()
 
     def _validate_and_filter_points(self, points: np.ndarray, xcol: str, ycol: str) -> Optional[np.ndarray]:
@@ -191,8 +189,8 @@ class PlotHZLimits(BasePlotter):
         """Get mask for planets rejected due to exozodi."""
         return df['z'] > self.max_z
 
-    def plot_3x1_panels_with_boundaries(self) -> None:
-        """Plot a single panel: stellar temperature vs semi-major axis with boundaries."""
+    def plot_boundaries(self) -> None:
+        """Plot a single panel: stellar temperature vs semi-major axis with boundaries only (no density)."""
         def _safe_float(val):
             try:
                 return float(val)
@@ -227,13 +225,16 @@ class PlotHZLimits(BasePlotter):
         ]
         # Compute boundaries
         boundary_cache = {}
+        fig, ax = plt.subplots(figsize=(6, 6))
+        if isinstance(ax, np.ndarray):
+            ax = ax.flat[0]
         for category, data in data_subsets.items():
             if not isinstance(data, pd.DataFrame):
                 continue
             valid_data = data[[x_var, y_var]].dropna()
             if len(valid_data) < 3:
                 continue
-            points = np.asarray(valid_data.values, dtype=float)  # ensure numpy array of float
+            points = np.asarray(valid_data.values, dtype=float)
             filtered_points = self._validate_and_filter_points(points, x_var, y_var)
             if filtered_points is None:
                 continue
@@ -245,11 +246,6 @@ class PlotHZLimits(BasePlotter):
             except Exception as e:
                 print(f"Warning: Could not compute boundary for {x_var} vs {y_var} ({category}): {str(e)}")
                 continue
-        # Plot
-        fig, ax = plt.subplots(figsize=(6, 6))
-        # If ax is an array (shouldn't be, but just in case), get the first element
-        if isinstance(ax, np.ndarray):
-            ax = ax.flat[0]
         for category, color, label in boundary_configs:
             if category in boundary_cache:
                 boundary_points = boundary_cache[category]
@@ -260,11 +256,9 @@ class PlotHZLimits(BasePlotter):
                     ax.fill(boundary_points[:, 0], boundary_points[:, 1], facecolor=facecolor, alpha=alpha_fill, color=color, linewidth=linewidth, label=label)
                 elif linewidth > 0:
                     ax.plot(boundary_points[:, 0], boundary_points[:, 1], color=color, linewidth=linewidth, label=label)
-        # Set axis labels and limits using pandas Series
         ax.set_xlabel(self._get_axis_label(x_var))
         ax.set_ylabel(self._get_axis_label(y_var))
         ax.set_title(f'{self._get_axis_label(x_var)} vs {self._get_axis_label(y_var)}')
-        ax.grid(True, alpha=0.4)
         x_data = self.df[x_var]
         if isinstance(x_data, pd.Series):
             x_data = x_data.dropna()
@@ -281,7 +275,6 @@ class PlotHZLimits(BasePlotter):
             y_max = _safe_float(y_data.max())
             if np.isfinite(y_min) and np.isfinite(y_max) and y_max > y_min:
                 ax.set_ylim(y_min * 0.9, y_max * 1.1)
-        from matplotlib.patches import Patch
         legend_elements = [
             Patch(facecolor='red', alpha=0.3, label='Flux Rejected'),
             Patch(facecolor='gold', alpha=0.3, label='Exozodi Rejected'),
@@ -306,7 +299,7 @@ class PlotHZLimits(BasePlotter):
         return labels.get(var_name, var_name)
 
     def plot_detectability_panel(self):
-        """Plot detectability for 0.5–1.1 R⊕, 1.1–2.6 R⊕, and 'none' as a single figure, using pcolormesh for log axes."""
+        """Plot detectability for 0.5–2.6 R⊕ and 'none' as a single figure, using pcolormesh for log axes."""
 
         # --- Grid ---
         L_vals = np.logspace(-2, 1, 1000)  # Stellar Luminosity [L☉]
@@ -328,7 +321,7 @@ class PlotHZLimits(BasePlotter):
         distance_m = D_grid * pc_m
         theta_arcsec = (a_hz_m / distance_m) * rad2arcsec
 
-        # --- Planet flux ratios for two radii ---
+        # --- Planet flux ratio for 0.5 R_earth and 2.6 R_earth ---
         Rp_small = 0.5 * R_earth_m
         Rp_large = 2.6 * R_earth_m
         flux_ratio_small = A_g * (Rp_small / a_hz_m) ** 2 * Phi
@@ -341,15 +334,17 @@ class PlotHZLimits(BasePlotter):
         # --- Assign region codes ---
         # 1 = detectable (0.5–2.6 R⊕)
         # 0 = not detectable
-        detectability = np.zeros_like(L_grid, dtype=int)
-        detectability[detect_small] = 1  # Only mark as detectable if small (0.5–2.6 R⊕) is detectable
-        region = detectability
+        region = np.zeros_like(L_grid, dtype=int)
+        region[detect_small | detect_large] = 1
 
         # --- Custom colormap for the 2 categories ---
+        from matplotlib.colors import ListedColormap
         cmap = ListedColormap(['#f7cac9', '#88b04b'])  # pink, green
 
         # --- Plotting ---
         fig, ax = plt.subplots(figsize=(12, 8))
+        if isinstance(ax, np.ndarray):
+            ax = ax.flat[0]
         L_edges = np.logspace(np.log10(L_vals[0]), np.log10(L_vals[-1]), L_vals.size + 1)
         D_edges = np.linspace(D_vals[0], D_vals[-1], D_vals.size + 1)
         im = ax.pcolormesh(L_edges, D_edges, region, cmap=cmap, shading='auto', vmin=0, vmax=1)
@@ -412,7 +407,6 @@ class PlotHZLimits(BasePlotter):
         # --- Legend construction ---
         legend_elements = [
             Patch(facecolor='#f7cac9', label='None'),
-            Patch(facecolor='#f4b183', label='1.1–2.6 R⊕'),
             Patch(facecolor='#88b04b', label='0.5–2.6 R⊕'),
             Line2D([0], [0], color='red', linestyle='--', label='M-dwarf Region'),
             Line2D([0], [0], color='gold', linestyle='--', label='G Star Region'),
@@ -421,10 +415,20 @@ class PlotHZLimits(BasePlotter):
         ]
         ax.legend(handles=legend_elements, loc='lower right')
 
-        # --- Colorbar ---
-        # cbar = fig.colorbar(im, ax=ax, ticks=[0.5, 1.5, 2.5])
-        # cbar.ax.set_yticklabels(['None', '1.1–2.6 R⊕', '0.5–2.6 R⊕'])
-        # cbar.set_label("Detectability Regions")
-
         plt.tight_layout()
         self._save_plot(fig, 'detectability_panel')
+
+    def plot_density_bins(self, data, xcol, ycol, ax, kind='hist2d', cmap='Greys', gridsize=50, **kwargs):
+        """Plot a density map (hexbin or hist2d) for the given data and axis."""
+        points = data[[xcol, ycol]].dropna().values
+        if len(points) == 0:
+            return
+
+        if kind == 'hexbin':
+            # C=None means color based on count
+            plot_obj = ax.hexbin(points[:, 0], points[:, 1], gridsize=gridsize, cmap=cmap, **kwargs)
+        elif kind == 'hist2d':
+            plot_obj = ax.hist2d(points[:, 0], points[:, 1], bins=gridsize, cmap=cmap, **kwargs)
+        else:
+            raise ValueError("kind must be 'hexbin' or 'hist2d'")
+        return plot_obj

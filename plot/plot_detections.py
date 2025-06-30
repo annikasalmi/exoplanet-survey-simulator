@@ -80,16 +80,18 @@ class PlanetDetectionPlotter(BasePlotter):
             combined_categories = {
                 'M dwarf + Rocky HZ': lambda df: (df['habitable'] == True) & 
                                                  (df['radius_p'] < 1.5) & 
-                                                 (df['stype'].str.contains('M')),
+                                                 (df['stype'].str.contains('M')) & 
+                                                 (df['temp_p'] <= 350),
                 'G/K star + Rocky HZ': lambda df: (df['habitable'] == True) & 
                                                   (df['radius_p'] < 1.5) & 
-                                                  (df['stype'].isin(['G', 'K'])),
+                                                  (df['stype'].isin(['G', 'K'])) & 
+                                                  (df['temp_p'] <= 350),
                 'M dwarf + Hycean HZ': lambda df: (df['habitable'] == True) & 
                                                   (df['radius_p'] >= 1.1) & 
                                                   (df['radius_p'] <= 2.6) & 
-                                                  (df['stype'].str.contains('M')),
-                'All HZ around M dwarfs': lambda df: (df['habitable'] == True) & 
-                                                     (df['stype'].str.contains('M'))
+                                                  (df['stype'].str.contains('M')) & 
+                                                  (df['temp_p'] <= 350),
+                'All Planets (≤350K)': lambda df: (df['temp_p'] <= 350)
             }
             
             # Plot each combined category
@@ -117,9 +119,14 @@ class PlanetDetectionPlotter(BasePlotter):
                 if i in [0, 2]:
                     axs[i].set_ylabel("Number of Planets")
                     ax2.set_ylabel("Detection Efficiency")
+                
+                # Set xlim to 350 for temperature plots
+                if x_col == 'temp_p':
+                    axs[i].set_xlim([bins[0], 305])
+                    ax2.set_xlim([bins[0], 305])
             
             # Finalize plot
-            fig.suptitle(f"Detection Efficiency by {x_axis.capitalize()}"
+            fig.suptitle(f"Detection Efficiency by  {x_axis.capitalize()}"
                         f"for {self.name} ({self.nruns} Runs)\nStar Catalog: {self.star_catalog}", 
                         fontsize=14)
             plt.tight_layout(rect=[0, 0, 1, 0.95])

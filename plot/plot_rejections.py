@@ -23,9 +23,7 @@ class PlanetRejectionPlotter(BasePlotter):
         if not self._validate_data():
             return
             
-        self.plot_failures_histogram()
-        if plot_percentages:
-            self.plot_failures_percentages()
+        self.plot_combined_failures()
 
     def _calculate_rejection_counts(self) -> dict:
         """Calculate rejection counts for each reason across all planets."""
@@ -64,9 +62,9 @@ class PlanetRejectionPlotter(BasePlotter):
                   label=f'Total rejected: {rejection_percentage:.1f}%')
         return rejected_planets
 
-    def _setup_plot_axes(self, ax, scenario_labels, scenario, total_planets, rejected_planets):
+    def _setup_plot_axes(self, ax, total_planets, rejected_planets):
         """Setup plot axes with titles, labels, and formatting."""
-        ax.set_title(f"{scenario_labels[scenario]}\nTotal: {total_planets}, Rejected: {rejected_planets}")
+        ax.set_title(f"Total: {total_planets}, Rejected: {rejected_planets}")
         ax.set_ylabel("Number of planets")
         ax.set_ylim(0, total_planets * 1.1)
         ax.legend(fontsize=8, loc='upper right')
@@ -92,7 +90,7 @@ class PlanetRejectionPlotter(BasePlotter):
             # Create plot
             self._create_rejection_bar_plot(axs[i], rejection_counts, total_planets, REJECTION_COLORS)
             rejected_planets = self._add_total_rejection_line(axs[i], total_planets)
-            self._setup_plot_axes(axs[i], scenario_labels, scenario, total_planets, rejected_planets)
+            self._setup_plot_axes(axs[i], total_planets, rejected_planets)
         
         if plotted:
             plt.suptitle(f"Rejection Reasons for All Planets")
@@ -254,7 +252,7 @@ class PlanetRejectionPlotter(BasePlotter):
             
         # Setup subplots
         nrows, ncols = 2, 2
-        fig, axs = plt.subplots(nrows, ncols, figsize=(12, 10), sharey=True)
+        fig, axs = plt.subplots(nrows, ncols, figsize=(12, 6), sharey=True)
         axs = axs.flatten()
         
         column_mapping = REJECTION_COLUMN_MAPPING
@@ -270,11 +268,21 @@ class PlanetRejectionPlotter(BasePlotter):
             # Get bins and create histogram
             bins = self._get_bins_for_reason(reason, df, col)
             
+            # Set edgecolor based on reason
+            if reason == 'Flux Ratio':
+                edgecolor = 'red'
+            elif reason == 'IWA':
+                edgecolor = 'blue'
+            elif reason == 'Exozodi':
+                edgecolor = 'yellow'
+            else:
+                edgecolor = 'black'
+            
             if reason == 'IWA':
-                ax.hist(df['maxangsep'], bins=bins, color='lightgray', alpha=0.7, edgecolor='black',
+                ax.hist(df['maxangsep'], bins=bins, color='lightgray', alpha=0.7, edgecolor=edgecolor,
                         log=True, label='Maximum angular separation')
             else:
-                ax.hist(df[col], bins=bins, color='lightgray', alpha=0.7, edgecolor='black', 
+                ax.hist(df[col], bins=bins, color='lightgray', alpha=0.7, edgecolor=edgecolor, 
                         log=True, label='Best case')
             
             # Calculate and display rejection percentages
@@ -310,3 +318,79 @@ class PlanetRejectionPlotter(BasePlotter):
         plt.suptitle(suptitle, fontsize=14)
         plt.tight_layout(rect=[0, 0, 1, 0.95])
         self._save_plot(fig, 'failure_multipanel', 'actual_values')
+
+    def plot_combined_failures(self) -> None:
+        """Create a combined figure with 2x2 histograms on the left and the percentages bar plot on the right, sharing a single title."""
+        df = self.df.copy()
+        if df.empty:
+            return
+
+        # Setup combined subplots: 2 rows x 3 columns, with the rightmost column merged for the bar plot
+        fig = plt.figure(figsize=(18, 10))
+        gs = fig.add_gridspec(2, 3, width_ratios=[1, 1, 1.1])
+        axs_hist = [fig.add_subplot(gs[0, 0]), fig.add_subplot(gs[0, 1]),
+                    fig.add_subplot(gs[1, 0]), fig.add_subplot(gs[1, 1])]
+        ax_bar = fig.add_subplot(gs[:, 2])
+
+        # --- 2x2 Histogram plots (reuse logic from plot_failures_histogram) ---
+        column_mapping = REJECTION_COLUMN_MAPPING
+        for i, (reason, col) in enumerate(column_mapping.items()):
+            ax = axs_hist[i]
+            # Check column existence
+            if reason != 'Exozodi' and col not in df.columns:
+                print(f"Warning: Column '{col}' not found in DataFrame. Available columns: {list(df.columns)}")
+                continue
+            # Get bins and create histogram
+            bins = self._get_bins_for_reason(reason, df, col)
+            # Set edgecolor based on reason
+            if reason == 'Flux Ratio':
+                edgecolor = 'red'
+            elif reason == 'IWA':
+                edgecolor = 'blue'
+            elif reason == 'Exozodi':
+                edgecolor = 'yellow'
+            else:
+                edgecolor = 'black'
+            if reason == 'IWA':
+                ax.hist(df['maxangsep'], bins=bins, color='lightgray', alpha=0.7, edgecolor=edgecolor,
+                        log=True, label='Maximum angular separation')
+            else:
+                ax.hist(df[col], bins=bins, color='lightgray', alpha=0.7, edgecolor=edgecolor, 
+                        log=True, label='Best case')
+            # Calculate and display rejection percentages
+            if reason != 'IWA':
+                pass_col_best = self._get_pass_fail_column(reason)
+                if pass_col_best in df.columns:
+                    pct_best = self._calculate_rejection_percentage(df, reason, pass_col_best)
+                    pct_worst = self._calculate_worst_case_percentage(df, reason)
+                    self._add_rejection_percentage_text(ax, pct_best, pct_worst)
+            # Add threshold lines
+            hwo_best = HWOConstants('best')
+            hwo_worst = HWOConstants('worst')
+            self._add_threshold_lines(ax, reason, hwo_best, hwo_worst)
+            # Setup axes
+            self._setup_histogram_axes(ax, reason)
+
+        # Remove unused subplot axes if any
+        for j in range(i+1, 4):
+            fig.delaxes(axs_hist[j])
+
+        # --- Percentages bar plot (reuse logic from plot_failures_percentages) ---
+        scenario = 'best'
+        total_planets = len(df)
+        rejection_counts = self._calculate_rejection_counts()
+        self._create_rejection_bar_plot(ax_bar, rejection_counts, total_planets, REJECTION_COLORS)
+        rejected_planets = self._add_total_rejection_line(ax_bar, total_planets)
+        self._setup_plot_axes(ax_bar, total_planets, rejected_planets)
+
+        # --- Shared title and layout ---
+        if 'detected_best' in df.columns:
+            mask_detected_best = df['detected_best'].astype(bool)
+            rejected_best = len(df[~mask_detected_best])
+            pct_best = (rejected_best / total_planets) * 100
+            suptitle = f"Actual Values vs. Cutoff Thresholds for Planet Rejection\nBest case: {pct_best:.1f}% rejected"
+        else:
+            suptitle = "Actual Values vs. Cutoff Thresholds for Planet Rejection"
+        plt.suptitle(suptitle, fontsize=16)
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
+        self._save_plot(fig, 'failure_combined', 'combined')

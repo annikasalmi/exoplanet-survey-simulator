@@ -1,15 +1,16 @@
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
 import pandas as pd
+import numpy as np
 from typing import Optional
-from plot.base_plotter import BasePlotter
-# For boundary plotting
 from scipy.spatial.qhull import ConvexHull
-# For smoother, non-convex boundaries
+from scipy.optimize import curve_fit
+import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
+from matplotlib.patches import Patch
+from matplotlib.lines import Line2D
 import alphashape
 from shapely.geometry import Polygon
 
+from plot.base_plotter import BasePlotter
 from tools import physics_constants as const
 
 class PlotHZLimits(BasePlotter):
@@ -41,7 +42,7 @@ class PlotHZLimits(BasePlotter):
             
         # 3x1 boundary plots
         self.plot_3x1_panels_with_boundaries()
-        print("M-dwarf HZ limits plots generated!")
+        self.plot_detectability_panel()
 
     def _validate_and_filter_points(self, points: np.ndarray, xcol: str, ycol: str) -> Optional[np.ndarray]:
         """
@@ -191,146 +192,106 @@ class PlotHZLimits(BasePlotter):
         return df['z'] > self.max_z
 
     def plot_3x1_panels_with_boundaries(self) -> None:
-        """Plot 3x1 panels showing specific combinations with semi-major axis on y-axis and improved legend placement."""
+        """Plot a single panel: stellar temperature vs semi-major axis with boundaries."""
+        def _safe_float(val):
+            try:
+                return float(val)
+            except Exception:
+                return np.nan
+
         if self.df.empty:
-            print("Warning: No data available for 3x1 panel plot")
+            print("Warning: No data available for panel plot")
             return
-        
-        # Define the specific variable combinations we want to plot (semi-major axis on y-axis)
-        var_combinations = [
-            ('p_orb', 'semimajor_p'),      # Orbital period vs semi-major axis
-            ('temp_s', 'semimajor_p'),     # Stellar temperature vs semi-major axis  
-            ('radius_p', 'semimajor_p')    # Planet radius vs semi-major axis
-        ]
-        
-        # Check which variables are available in the dataframe
-        available_vars = []
-        for x_var, y_var in var_combinations:
-            if x_var in self.df.columns and y_var in self.df.columns:
-                available_vars.append((x_var, y_var))
-        
-        if len(available_vars) < 1:
-            print(f"Warning: Need at least 1 variable combination, but only found: {available_vars}")
+
+        x_var, y_var = 'temp_s', 'semimajor_p'
+        if x_var not in self.df.columns or y_var not in self.df.columns:
+            print(f"Warning: Required columns not found: {x_var}, {y_var}")
             return
-        
-        # Pre-compute all masks and data subsets once
+
+        # Masks and data subsets
         detected_mask = self._get_panel_detection_mask(self.df)
         flux_rejected = self._get_flux_rejection_mask(self.df)
         iwa_rejected = self._get_iwa_rejection_mask(self.df)
         exozodi_rejected = self._get_exozodi_rejection_mask(self.df)
-        
-        # Pre-filter data for each category to avoid repeated filtering
-        data_subsets = {}
-        for name, mask in [('detected', detected_mask), ('flux_rejected', flux_rejected), 
-                          ('iwa_rejected', iwa_rejected), ('exozodi_rejected', exozodi_rejected)]:
-            if mask.any():
-                data_subsets[name] = self.df[mask]
-        
-        # Pre-compute boundaries for all variable combinations and categories
-        boundary_cache = {}
-        
-        for x_var, y_var in available_vars:
-            for category, data in data_subsets.items():
-                # Skip if not enough data points
-                valid_data = data[[x_var, y_var]].dropna()
-                if len(valid_data) < 3:
-                    continue
-                
-                points = valid_data.values
-                
-                # Use the same validation and filtering as plot_boundary
-                filtered_points = self._validate_and_filter_points(points, x_var, y_var)
-                if filtered_points is None:
-                    continue
-                
-                try:
-                    # Use convex hull instead of alpha shape for speed
-                    hull = ConvexHull(filtered_points)
-                    boundary = np.append(hull.vertices, hull.vertices[0])
-                    boundary_points = filtered_points[boundary]
-                    
-                    key = (x_var, y_var, category)
-                    boundary_cache[key] = boundary_points
-                except Exception as e:
-                    # Skip if convex hull fails
-                    print(f"Warning: Could not compute boundary for {x_var} vs {y_var} ({category}): {str(e)}")
-                    continue
-        
-        # Create 3x1 subplot grid
-        fig, axes = plt.subplots(1, 3, figsize=(18, 6))
-        
-        # Define boundary configurations
+        data_subsets = {
+            'detected': self.df[detected_mask],
+            'flux_rejected': self.df[flux_rejected],
+            'iwa_rejected': self.df[iwa_rejected],
+            'exozodi_rejected': self.df[exozodi_rejected],
+        }
         boundary_configs = [
             ('flux_rejected', 'red', 'Flux Rejected'),
             ('exozodi_rejected', 'gold', 'Exozodi Rejected'),
             ('iwa_rejected', 'blue', 'IWA Rejected'),
             ('detected', 'green', 'Detected')
         ]
-        
-        # Plot each combination
-        for i, (x_var, y_var) in enumerate(available_vars):
-            ax = axes[i]
-            
-            # Plot boundaries for this panel using cached results
-            for category, color, label in boundary_configs:
-                key = (x_var, y_var, category)
-                if key in boundary_cache:
-                    boundary_points = boundary_cache[key]
-                    
-                    # Determine plotting parameters
-                    linewidth = 3 if color in ['gray', 'green'] else 0
-                    alpha_fill = 0.3 if color in ['red', 'gold', 'blue'] else None
-                    facecolor = color if color in ['red', 'gold', 'blue'] else None
-                    
-                    # Plot the boundary
-                    if facecolor:
-                        ax.fill(boundary_points[:, 0], boundary_points[:, 1], 
-                               facecolor=facecolor, alpha=alpha_fill, 
-                               color=color, linewidth=linewidth, label=label)
-                    elif linewidth > 0:
-                        ax.plot(boundary_points[:, 0], boundary_points[:, 1], 
-                               color=color, linewidth=linewidth, label=label)
-            
-            # Set labels and title
-            ax.set_xlabel(self._get_axis_label(x_var))
-            ax.set_ylabel(self._get_axis_label(y_var))
-            ax.set_title(f'{self._get_axis_label(x_var)} vs {self._get_axis_label(y_var)}')
-            ax.grid(True, alpha=0.4)
-            
-            # Set reasonable axis limits based on data
-            x_data = self.df[x_var].dropna()
-            if len(x_data) > 0:
-                x_min = float(x_data.min())
-                x_max = float(x_data.max())
-                # Check for reasonable bounds
-                if np.isfinite(x_min) and np.isfinite(x_max) and x_max > x_min:
-                    ax.set_xlim(x_min * 0.9, x_max * 1.1)
-            
-            y_data = self.df[y_var].dropna()
-            if len(y_data) > 0:
-                y_min = float(y_data.min())
-                y_max = float(y_data.max())
-                # Check for reasonable bounds
-                if np.isfinite(y_min) and np.isfinite(y_max) and y_max > y_min:
-                    ax.set_ylim(y_min * 0.9, y_max * 1.1)
-        
-        # Add legend in a more logical place - centered at the bottom
-        if len(available_vars) > 0:
-            from matplotlib.patches import Patch
-            legend_elements = [
-                Patch(facecolor='red', alpha=0.3, label='Flux Rejected'),
-                Patch(facecolor='gold', alpha=0.3, label='Exozodi Rejected'),
-                Patch(facecolor='blue', alpha=0.3, label='IWA Rejected'),
-                Patch(facecolor='green', alpha=1.0, label='Detected')
-            ]
-            # Place legend in the upper left of the leftmost plot
-            axes[0].legend(handles=legend_elements, loc='upper left', 
-                          frameon=True, fancybox=True, shadow=True)
-        
+        # Compute boundaries
+        boundary_cache = {}
+        for category, data in data_subsets.items():
+            if not isinstance(data, pd.DataFrame):
+                continue
+            valid_data = data[[x_var, y_var]].dropna()
+            if len(valid_data) < 3:
+                continue
+            points = np.asarray(valid_data.values, dtype=float)  # ensure numpy array of float
+            filtered_points = self._validate_and_filter_points(points, x_var, y_var)
+            if filtered_points is None:
+                continue
+            try:
+                hull = ConvexHull(filtered_points)
+                boundary = np.append(hull.vertices, hull.vertices[0])
+                boundary_points = filtered_points[boundary]
+                boundary_cache[category] = boundary_points
+            except Exception as e:
+                print(f"Warning: Could not compute boundary for {x_var} vs {y_var} ({category}): {str(e)}")
+                continue
+        # Plot
+        fig, ax = plt.subplots(figsize=(6, 6))
+        # If ax is an array (shouldn't be, but just in case), get the first element
+        if isinstance(ax, np.ndarray):
+            ax = ax.flat[0]
+        for category, color, label in boundary_configs:
+            if category in boundary_cache:
+                boundary_points = boundary_cache[category]
+                linewidth = 3 if color == 'green' else 0
+                alpha_fill = 0.3 if color in ['red', 'gold', 'blue'] else None
+                facecolor = color if color in ['red', 'gold', 'blue'] else None
+                if facecolor:
+                    ax.fill(boundary_points[:, 0], boundary_points[:, 1], facecolor=facecolor, alpha=alpha_fill, color=color, linewidth=linewidth, label=label)
+                elif linewidth > 0:
+                    ax.plot(boundary_points[:, 0], boundary_points[:, 1], color=color, linewidth=linewidth, label=label)
+        # Set axis labels and limits using pandas Series
+        ax.set_xlabel(self._get_axis_label(x_var))
+        ax.set_ylabel(self._get_axis_label(y_var))
+        ax.set_title(f'{self._get_axis_label(x_var)} vs {self._get_axis_label(y_var)}')
+        ax.grid(True, alpha=0.4)
+        x_data = self.df[x_var]
+        if isinstance(x_data, pd.Series):
+            x_data = x_data.dropna()
+        if len(x_data) > 0:
+            x_min = _safe_float(x_data.min())
+            x_max = _safe_float(x_data.max())
+            if np.isfinite(x_min) and np.isfinite(x_max) and x_max > x_min:
+                ax.set_xlim(x_min * 0.9, x_max * 1.1)
+        y_data = self.df[y_var]
+        if isinstance(y_data, pd.Series):
+            y_data = y_data.dropna()
+        if len(y_data) > 0:
+            y_min = _safe_float(y_data.min())
+            y_max = _safe_float(y_data.max())
+            if np.isfinite(y_min) and np.isfinite(y_max) and y_max > y_min:
+                ax.set_ylim(y_min * 0.9, y_max * 1.1)
+        from matplotlib.patches import Patch
+        legend_elements = [
+            Patch(facecolor='red', alpha=0.3, label='Flux Rejected'),
+            Patch(facecolor='gold', alpha=0.3, label='Exozodi Rejected'),
+            Patch(facecolor='blue', alpha=0.3, label='IWA Rejected'),
+            Patch(facecolor='green', alpha=1.0, label='Detected')
+        ]
+        ax.legend(handles=legend_elements, loc='upper left', frameon=True, fancybox=True, shadow=True)
         plt.tight_layout()
-        self._save_plot(fig, '3x1_panels_boundaries')
-        print("3x1 panel plot completed!")
-    
+        self._save_plot(fig, 'panel_temp_s_vs_semimajor_p')
+
     def _get_axis_label(self, var_name: str) -> str:
         """Get formatted axis label for a variable name."""
         labels = {
@@ -343,3 +304,127 @@ class PlotHZLimits(BasePlotter):
             'flux_p': 'Planet Flux (W/m²)'
         }
         return labels.get(var_name, var_name)
+
+    def plot_detectability_panel(self):
+        """Plot detectability for 0.5–1.1 R⊕, 1.1–2.6 R⊕, and 'none' as a single figure, using pcolormesh for log axes."""
+
+        # --- Grid ---
+        L_vals = np.logspace(-2, 1, 1000)  # Stellar Luminosity [L☉]
+        D_vals = np.linspace(4, 15, 1000)  # Distance [pc]
+        L_grid, D_grid = np.meshgrid(L_vals, D_vals)
+
+        # --- Constants ---
+        R_earth_m = const.R_earth if hasattr(const, 'R_earth') else 6.371e6
+        AU_m = const.au_to_m if hasattr(const, 'au_to_m') else 1.496e11
+        pc_m = 3.086e16
+        rad2arcsec = 206265
+        A_g = getattr(const, 'A_g_earth', 0.2)
+        Phi = getattr(const, 'Phi_alpha', 1.0)
+        flux_threshold = getattr(self, 'best_flux_limit', 2.5e-11)
+        theta_limit_arcsec = getattr(self, 'theta_limit_rad', 0.0206) * rad2arcsec if hasattr(self, 'theta_limit_rad') else 0.0206
+
+        # --- Derived HZ orbit (a = sqrt(L) * AU) ---
+        a_hz_m = np.sqrt(L_grid) * AU_m
+        distance_m = D_grid * pc_m
+        theta_arcsec = (a_hz_m / distance_m) * rad2arcsec
+
+        # --- Planet flux ratios for two radii ---
+        Rp_small = 0.5 * R_earth_m
+        Rp_large = 2.6 * R_earth_m
+        flux_ratio_small = A_g * (Rp_small / a_hz_m) ** 2 * Phi
+        flux_ratio_large = A_g * (Rp_large / a_hz_m) ** 2 * Phi
+
+        # --- Check detectability for each radius ---
+        detect_small = (flux_ratio_small >= flux_threshold) & (theta_arcsec >= theta_limit_arcsec)
+        detect_large = (flux_ratio_large >= flux_threshold) & (theta_arcsec >= theta_limit_arcsec)
+
+        # --- Assign region codes ---
+        # 1 = detectable (0.5–2.6 R⊕)
+        # 0 = not detectable
+        detectability = np.zeros_like(L_grid, dtype=int)
+        detectability[detect_small] = 1  # Only mark as detectable if small (0.5–2.6 R⊕) is detectable
+        region = detectability
+
+        # --- Custom colormap for the 2 categories ---
+        cmap = ListedColormap(['#f7cac9', '#88b04b'])  # pink, green
+
+        # --- Plotting ---
+        fig, ax = plt.subplots(figsize=(12, 8))
+        L_edges = np.logspace(np.log10(L_vals[0]), np.log10(L_vals[-1]), L_vals.size + 1)
+        D_edges = np.linspace(D_vals[0], D_vals[-1], D_vals.size + 1)
+        im = ax.pcolormesh(L_edges, D_edges, region, cmap=cmap, shading='auto', vmin=0, vmax=1)
+        ax.set_xscale('log')
+        ax.set_xlabel('Stellar Luminosity [L☉]')
+        ax.set_ylabel('Distance [pc]')
+        ax.set_ylim(4, 15)
+        ax.set_title('Detectable Radius Range (0.5–2.6 R⊕)\n% of Full Range Detectable')
+
+        # --- Reference lines for M-dwarf and G-star regions ---
+        ax.axvline(0.08, color='red', linestyle='--', linewidth=2)
+        ax.axvline(0.6, color='gold', linestyle='--', linewidth=2)
+        ax.axvline(1.5, color='gold', linestyle='--', linewidth=2)
+
+        # --- Add flux threshold boundary (vertical purple line) ---
+        A_g_val = A_g
+        Rp_one_earth_m = R_earth_m
+        Phi_val = Phi
+        flux_threshold_val = flux_threshold
+        try:
+            AU_m_val = float(AU_m)
+        except Exception:
+            AU_m_val = 1.496e11
+        L_flux_boundary = (A_g_val * Rp_one_earth_m**2 * Phi_val) / (flux_threshold_val * AU_m_val**2)
+        ax.axvline(x=L_flux_boundary, color='purple', linestyle=':', linewidth=2,
+                   label=f'Flux Limit Boundary (1.0 R⊕)')
+
+        # --- Add angular separation threshold boundary (black dashed curve) ---
+        try:
+            rad2arcsec_val = float(rad2arcsec)
+        except Exception:
+            rad2arcsec_val = 206265
+        try:
+            theta_limit_arcsec_val = float(theta_limit_arcsec)
+        except Exception:
+            theta_limit_arcsec_val = 0.0206
+        try:
+            pc_m_val = float(pc_m)
+        except Exception:
+            pc_m_val = 3.086e16
+        L_star_vals = L_vals
+        D_theta_boundary = (np.sqrt(L_star_vals) * AU_m_val * rad2arcsec_val) / \
+                           (theta_limit_arcsec_val * pc_m_val)
+        # Only plot where D_theta_boundary <= 15
+        mask = D_theta_boundary <= 15
+        ax.plot(L_star_vals[mask], D_theta_boundary[mask], color='black', linestyle='--', linewidth=2,
+                label=f'HWO Angular Sep. Limit (1.0 R⊕)')
+        # Annotate the equation on the plot with actual values
+        eqn = (
+            r"$D = \frac{{\sqrt{{L}} \times {}\,\mathrm{{m}} \times {}}}{{{}\,\mathrm{{arcsec}} \times {}\,\mathrm{{m}}}}$"
+            .format(
+                f'{AU_m_val:.2e}',
+                f'{rad2arcsec_val:.1f}',
+                f'{theta_limit_arcsec_val:.4f}',
+                f'{pc_m_val:.2e}'
+            )
+        )
+        ax.text(0.05, 0.85, eqn, transform=ax.transAxes, fontsize=10, verticalalignment='top', color='black', bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
+
+        # --- Legend construction ---
+        legend_elements = [
+            Patch(facecolor='#f7cac9', label='None'),
+            Patch(facecolor='#f4b183', label='1.1–2.6 R⊕'),
+            Patch(facecolor='#88b04b', label='0.5–2.6 R⊕'),
+            Line2D([0], [0], color='red', linestyle='--', label='M-dwarf Region'),
+            Line2D([0], [0], color='gold', linestyle='--', label='G Star Region'),
+            plt.Line2D([0], [0], color='purple', linestyle=':', linewidth=2, label='Flux Limit Boundary (1.0 R⊕)'),
+            plt.Line2D([0], [0], color='black', linestyle='--', linewidth=2, label='HWO Angular Sep. Limit (1.0 R⊕)')
+        ]
+        ax.legend(handles=legend_elements, loc='lower right')
+
+        # --- Colorbar ---
+        # cbar = fig.colorbar(im, ax=ax, ticks=[0.5, 1.5, 2.5])
+        # cbar.ax.set_yticklabels(['None', '1.1–2.6 R⊕', '0.5–2.6 R⊕'])
+        # cbar.set_label("Detectability Regions")
+
+        plt.tight_layout()
+        self._save_plot(fig, 'detectability_panel')

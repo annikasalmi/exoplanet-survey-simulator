@@ -40,7 +40,7 @@ def calculate_system_fluxes(T_star, T_planet, R_star, R_planet, D, wavelength_m,
     return flux_star, flux_planet, reflected_flux, contrast
 
 def plot_absorption_features(ax, wavelength_um, fluxes):
-    """Plot atmospheric absorption features."""
+    """Plot atmospheric absorption features as gray lines with different linestyles."""
     features = {
         'H₂O': [0.94, 1.13, 1.38, 1.87],
         'CO₂': [2.0],
@@ -48,16 +48,20 @@ def plot_absorption_features(ax, wavelength_um, fluxes):
         'O₂': [0.688, 0.760, 1.06, 1.27],
         'NH₃': [1.5, 2.0, 2.2]
     }
-    colors = ['purple', 'green', 'orange', 'brown', 'cyan']
+    # Define gray shades and linestyles
+    gray_shades = ['#888888', '#AAAAAA', '#666666', '#BBBBBB', '#444444']
+    linestyles = ['-', '--', '-.', ':', (0, (3, 5, 1, 5))]
     
     for i, (molecule, wavelengths) in enumerate(features.items()):
+        color = gray_shades[i % len(gray_shades)]
+        linestyle = linestyles[i % len(linestyles)]
         for wavelength in wavelengths:
             if 0.2 <= wavelength <= 2.5:
                 idx = np.argmin(np.abs(wavelength_um - wavelength))
                 max_flux = max(fluxes[idx] for fluxes in fluxes)
-                ax.axvline(x=wavelength, color=colors[i % len(colors)], alpha=0.7, linestyle='--', linewidth=1)
+                ax.axvline(x=wavelength, color=color, alpha=0.7, linestyle=linestyle, linewidth=1)
                 ax.text(wavelength, max_flux * 1.5, molecule, rotation=90, fontsize=8, 
-                       color=colors[i % len(colors)], ha='right', va='bottom')
+                        color=color, ha='right', va='bottom')
 
 def main():
     """Main analysis and plotting function."""
@@ -85,11 +89,13 @@ def main():
     
     # Create plot
     fig, ax = plt.subplots(figsize=(10, 6))
+    if isinstance(ax, np.ndarray):
+        ax = ax.flat[0]
     
     # Plot spectral radiance
-    ax.plot(wavelength_um, flux_planet_mdwarf, label='Planet (M-dwarf)', lw=2, color='green')
-    ax.plot(wavelength_um, reflected_mdwarf, label='Reflected (M-dwarf)', lw=2, color='red')
-    ax.plot(wavelength_um, reflected_sun, label='Reflected (Sun-like)', lw=2, color='gold')
+    ax.plot(wavelength_um, flux_planet_mdwarf, label='Planet (M-dwarf)', lw=3, color='green')
+    ax.plot(wavelength_um, reflected_mdwarf, label='Reflected (M-dwarf)', lw=1, color='red')
+    ax.plot(wavelength_um, reflected_sun, label='Reflected (Sun-like)', lw=1, color='gold')
     
     # Setup plot
     ax.set_ylabel('Spectral Radiance\n(W·m⁻³·sr⁻¹)')
@@ -101,7 +107,7 @@ def main():
     ax.grid(True, alpha=0.3)
     # Add HWO box and contrast info
     HWO_box = Rectangle((0.2, 1e-50), 2.3, 20 - 1e-10, linewidth=2, edgecolor='black',
-                        facecolor='none', linestyle='--', label='HWO observable')
+                        facecolor='none', label='HWO observable')
     ax.add_patch(HWO_box)
     
     # contrast_info = f'Planet/Star Flux Ratios:\nM-dwarf: {np.max(contrast_mdwarf):.2e}\nSun-like: {np.max(contrast_sun):.2e}'
@@ -111,7 +117,6 @@ def main():
     # Add absorption features
     plot_absorption_features(ax, wavelength_um, [flux_planet_mdwarf, reflected_mdwarf, reflected_sun])
     ax.legend()
-    
     
     fig.suptitle('Planet Blackbody Emission + Reflected Starlight\nM-dwarf vs Sun-like Systems', fontsize=14)
     plt.tight_layout()

@@ -149,41 +149,34 @@ class PlotPlanetType(BasePlotter):
         # Create the overlay plot
         fig, ax = plt.subplots(figsize=(12, 8))
         bar_width = BAR_WIDTH_STAR
+        # Ensure ax is a matplotlib Axes, not an ndarray
+        if isinstance(ax, np.ndarray):
+            ax = ax.flatten()[0]
         
+        # Helper for safe count extraction
+        def get_count(df, star=None, bin_label=None):
+            if not isinstance(df, pd.DataFrame):
+                return 0
+            if star is not None and bin_label is not None:
+                filtered = df[(df['radius_bin'] == bin_label) & (df['stype'] == star)] if 'radius_bin' in df.columns and 'stype' in df.columns else pd.DataFrame()
+            elif star is not None:
+                filtered = df[df['stype'] == star] if 'stype' in df.columns else pd.DataFrame()
+            else:
+                filtered = df
+            return filtered['count'].iloc[0] if isinstance(filtered, pd.DataFrame) and not filtered.empty and not isinstance(filtered, np.ndarray) and 'count' in filtered.columns else 0
         # Plot bars for each radius bin
         for i, bin_label in enumerate(BIN_LABELS):
-            # Get data for this radius bin
-            bin_data = total_mean[total_mean['radius_bin'] == bin_label]
-            bin_std = total_std[total_std['radius_bin'] == bin_label]
-            bin_detected = detected_mean[detected_mean['radius_bin'] == bin_label]
-            bin_detected_std = detected_std[detected_std['radius_bin'] == bin_label]
-            
-            # Align with STAR_ORDER
-            total_heights = []
-            total_errors = []
-            detected_heights = []
-            detected_errors = []
+            bin_data = total_mean[total_mean['radius_bin'] == bin_label] if isinstance(total_mean, pd.DataFrame) else pd.DataFrame()
+            bin_std = total_std[total_std['radius_bin'] == bin_label] if isinstance(total_std, pd.DataFrame) else pd.DataFrame()
+            bin_detected = detected_mean[detected_mean['radius_bin'] == bin_label] if isinstance(detected_mean, pd.DataFrame) else pd.DataFrame()
+            bin_detected_std = detected_std[detected_std['radius_bin'] == bin_label] if isinstance(detected_std, pd.DataFrame) else pd.DataFrame()
+            total_heights, total_errors, detected_heights, detected_errors = [], [], [], []
             for star in STAR_ORDER:
-                # Total data
-                star_data = bin_data[bin_data['stype'] == star]
-                star_std_data = bin_std[bin_std['stype'] == star]
-                if len(star_data) > 0:
-                    total_heights.append(star_data.iloc[0]['count'])
-                    total_errors.append(star_std_data.iloc[0]['count'])
-                else:
-                    total_heights.append(0)
-                    total_errors.append(0)
-                # Detected data
-                star_detected = bin_detected[bin_detected['stype'] == star]
-                star_detected_std = bin_detected_std[bin_detected_std['stype'] == star]
-                if len(star_detected) > 0:
-                    detected_heights.append(star_detected.iloc[0]['count'])
-                    detected_errors.append(star_detected_std.iloc[0]['count'])
-                else:
-                    detected_heights.append(0)
-                    detected_errors.append(0)
-            # Create overlay bars - only add "Total" label for the first radius bin
-            add_total_label = (i == 0)  # Only add "Total" label for the first iteration
+                total_heights.append(get_count(bin_data, star=star))
+                total_errors.append(get_count(bin_std, star=star))
+                detected_heights.append(get_count(bin_detected, star=star))
+                detected_errors.append(get_count(bin_detected_std, star=star))
+            add_total_label = (i == 0)
             self._create_overlay_bars(
                 ax, x + i * bar_width, total_heights, detected_heights,
                 total_errors, detected_errors, bar_width, 'lightgray', STAR_COLORS[i], STAR_HATCHES[i],
@@ -202,71 +195,26 @@ class PlotPlanetType(BasePlotter):
         
         # Add percentage labels
         for i, bin_label in enumerate(BIN_LABELS):
-            # Get data for this radius bin
-            bin_data = total_mean[total_mean['radius_bin'] == bin_label]
-            bin_detected = detected_mean[detected_mean['radius_bin'] == bin_label]
-            
-            # Align with STAR_ORDER
-            total_heights = []
-            detected_heights = []
+            bin_data = total_mean[total_mean['radius_bin'] == bin_label] if isinstance(total_mean, pd.DataFrame) else pd.DataFrame()
+            bin_detected = detected_mean[detected_mean['radius_bin'] == bin_label] if isinstance(detected_mean, pd.DataFrame) else pd.DataFrame()
+            total_heights, detected_heights = [], []
             for star in STAR_ORDER:
-                # Total data
-                star_data = bin_data[bin_data['stype'] == star]
-                if len(star_data) > 0:
-                    total_heights.append(star_data.iloc[0]['count'])
-                else:
-                    total_heights.append(0)
-                # Detected data
-                star_detected = bin_detected[bin_detected['stype'] == star]
-                if len(star_detected) > 0:
-                    detected_heights.append(star_detected.iloc[0]['count'])
-                else:
-                    detected_heights.append(0)
-            
-            self._add_percentage_labels(
-                ax, x + i * bar_width, detected_heights, total_heights
-            )
-
+                total_heights.append(get_count(bin_data, star=star))
+                detected_heights.append(get_count(bin_detected, star=star))
+            self._add_percentage_labels(ax, x + i * bar_width, detected_heights, total_heights)
+        
         # Add detected/total labels above each stellar type
         for idx, star in enumerate(STAR_ORDER):
-            # Sum across all radius bins for this star
-            if isinstance(total_mean, pd.DataFrame) and 'count' in total_mean.columns and 'stype' in total_mean.columns:
-                total_count = total_mean[total_mean['stype'] == star]['count'].sum()
-            else:
-                total_count = 0
-            if isinstance(detected_mean, pd.DataFrame) and 'count' in detected_mean.columns and 'stype' in detected_mean.columns:
-                detected_count = detected_mean[detected_mean['stype'] == star]['count'].sum()
-            else:
-                detected_count = 0
-            # Find the tallest bar for this star (for label placement)
-            bar_tops = []
-            for i, bin_label in enumerate(BIN_LABELS):
-                if isinstance(total_mean, pd.DataFrame) and 'radius_bin' in total_mean.columns and 'stype' in total_mean.columns:
-                    bin_data = total_mean[(total_mean['radius_bin'] == bin_label) & (total_mean['stype'] == star)]
-                else:
-                    bin_data = None
-                if isinstance(detected_mean, pd.DataFrame) and 'radius_bin' in detected_mean.columns and 'stype' in detected_mean.columns:
-                    bin_detected = detected_mean[(detected_mean['radius_bin'] == bin_label) & (detected_mean['stype'] == star)]
-                else:
-                    bin_detected = None
-                bar_top = 0
-                if isinstance(bin_data, pd.DataFrame) and not bin_data.empty and 'count' in bin_data.columns:
-                    val = bin_data['count'].iloc[0]
-                    if isinstance(val, (int, float, np.integer, np.floating)):
-                        bar_top += val
-                elif isinstance(bin_data, (int, float, np.integer, np.floating)):
-                    bar_top += bin_data
-                if isinstance(bin_detected, pd.DataFrame) and not bin_detected.empty and 'count' in bin_detected.columns:
-                    val = bin_detected['count'].iloc[0]
-                    if isinstance(val, (int, float, np.integer, np.floating)):
-                        bar_top += val
-                elif isinstance(bin_detected, (int, float, np.integer, np.floating)):
-                    bar_top += bin_detected
-                bar_tops.append(bar_top)
-            max_height = max(bar_tops) if bar_tops else 0
+            def sum_count(df):
+                return df[df['stype'] == star]['count'].sum() if isinstance(df, pd.DataFrame) and 'stype' in df.columns and 'count' in df.columns else 0
+            total_count = sum_count(total_mean)
+            detected_count = sum_count(detected_mean)
+            # Find the tallest bar for this star
+            heights = [get_count(total_mean, star=star, bin_label=bin_label) + get_count(detected_mean, star=star, bin_label=bin_label) for bin_label in BIN_LABELS]
+            max_height = max(heights) if heights else 0
             ax.text(
-                x[idx] + 1.5 * bar_width, max_height + 2, # 2 is a small offset
-                f"{int(detected_count)} planets detected out of {int(total_count)} planets simulated.",
+                x[idx] + 1.5 * bar_width, max_height,
+                f"{int(detected_count)} detected/{int(total_count)} simulated",
                 ha='center', va='bottom', fontsize=10, fontweight='bold', color='black', rotation=0
             )
         
@@ -320,6 +268,9 @@ class PlotPlanetType(BasePlotter):
         fig, ax = plt.subplots(figsize=(12, 8))
         categories = ['Rocky', 'Super-Earths', 'Sub-Neptunes', 'Sub-Jovians']
         x = np.arange(len(categories))
+        # Ensure ax is a matplotlib Axes, not an ndarray
+        if isinstance(ax, np.ndarray):
+            ax = ax.flatten()[0]
         
         # Plot each temperature zone
         for i, (bin_label, color, hatch) in enumerate(zip(TEMP_ZONES, TEMP_COLORS, HATCHES)):
@@ -429,6 +380,9 @@ class PlotPlanetType(BasePlotter):
         # Setup plot
         fig, ax = plt.subplots(figsize=(12, 8))
         x = np.arange(len(DISTANCE_LABELS))
+        # Ensure ax is a matplotlib Axes, not an ndarray
+        if isinstance(ax, np.ndarray):
+            ax = ax.flatten()[0]
         
         # Calculate total and detected counts across all temperature zones
         total_counts = np.zeros(len(DISTANCE_LABELS))

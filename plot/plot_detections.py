@@ -106,7 +106,7 @@ class PlanetDetectionPlotter(BasePlotter):
                 # Calculate data
                 total_counts, detected_counts, efficiency, mask_best = self._calculate_efficiency_data(subset, x_col, bins)
                 total_planets = len(subset) / self.nruns
-                detected_planets = np.sum(mask_best) / self.nruns
+                detected_planets = np.sum(detected_counts)
                 
                 # Create subplot
                 title = f"{label}\nTotal: {total_planets:.1f}, Detected: {detected_planets:.1f}"
@@ -126,7 +126,7 @@ class PlanetDetectionPlotter(BasePlotter):
                     ax2.set_xlim([bins[0], 305])
             
             # Finalize plot
-            fig.suptitle(f"Detection Efficiency by  {x_axis.capitalize()}"
+            fig.suptitle(f"Detection Efficiency by {x_axis.capitalize()} "
                         f"for {self.name} ({self.nruns} Runs)\nStar Catalog: {self.star_catalog}", 
                         fontsize=14)
             plt.tight_layout(rect=[0, 0, 1, 0.95])
@@ -139,6 +139,7 @@ class PlanetDetectionPlotter(BasePlotter):
             df = df[df[category_column] == category_label]
         
         mask_best, _ = self._get_detection_masks()
+        mask_best = mask_best[df.index]  # Align mask with filtered df
         category_str = f" ({category_label})" if category_label else ""
         
         fig = plt.figure(figsize=(15, 4))
@@ -249,6 +250,7 @@ class PlanetDetectionPlotter(BasePlotter):
         plt.figure(figsize=(8, 6))
         ax = plt.gca()
         mask_best, _ = self._get_detection_masks()
+        mask_best = mask_best[df_plot.index]  # Align mask with filtered df_plot
         
         # Split data by detection status
         detected = df_plot[mask_best == 1]

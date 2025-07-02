@@ -32,6 +32,7 @@ class PlotPlanetType(BasePlotter):
         
         # Get detection masks
         mask_best, _ = self._get_detection_masks()
+        mask_best = mask_best[df.index]  # Align mask with filtered df
         df_detected = df[mask_best].copy()
         
         # Calculate detected statistics
@@ -116,27 +117,34 @@ class PlotPlanetType(BasePlotter):
         total_per_run = df.groupby(['run', 'stype', 'radius_bin']).size().reset_index()
         total_per_run.columns = ['run', 'stype', 'radius_bin', 'count']
         total_pivot = total_per_run.pivot_table(index=['stype', 'radius_bin'], columns='run', values='count', fill_value=0)
-        total_mean = total_pivot.mean(axis=1).reset_index()
-        total_mean = total_mean.rename(columns={total_mean.columns[-1]: 'count'})
-        total_std = total_pivot.std(axis=1).reset_index()
-        total_std = total_std.rename(columns={total_std.columns[-1]: 'count'})
+        total_mean = total_pivot.mean(axis=1)
+        if isinstance(total_mean, pd.Series):
+            total_mean = total_mean.to_frame('count').reset_index()
+        total_std = total_pivot.std(axis=1)
+        if isinstance(total_std, pd.Series):
+            total_std = total_std.to_frame('count').reset_index()
         
         # Detected stats
-        mask_best, _ = self._cache['detection_masks']
+        mask_best, _ = self._get_detection_masks()
+        mask_best = mask_best[df.index]  # Align mask with filtered df
         if self.name == 'HWO':
             df['detected_flag_best'] = mask_best.astype(bool)
             detected_df = df[df['detected_flag_best']]
         else:
             df['detected_flag'] = mask_best.astype(bool)
             detected_df = df[df['detected_flag']]
+        if not isinstance(detected_df, pd.DataFrame):
+            detected_df = pd.DataFrame(columns=df.columns)
         
         detected_per_run = detected_df.groupby(['run', 'stype', 'radius_bin']).size().reset_index()
         detected_per_run.columns = ['run', 'stype', 'radius_bin', 'count']
         detected_pivot = detected_per_run.pivot_table(index=['stype', 'radius_bin'], columns='run', values='count', fill_value=0)
-        detected_mean = detected_pivot.mean(axis=1).reset_index()
-        detected_mean = detected_mean.rename(columns={detected_mean.columns[-1]: 'count'})
-        detected_std = detected_pivot.std(axis=1).reset_index()
-        detected_std = detected_std.rename(columns={detected_std.columns[-1]: 'count'})
+        detected_mean = detected_pivot.mean(axis=1)
+        if isinstance(detected_mean, pd.Series):
+            detected_mean = detected_mean.to_frame('count').reset_index()
+        detected_std = detected_pivot.std(axis=1)
+        if isinstance(detected_std, pd.Series):
+            detected_std = detected_std.to_frame('count').reset_index()
         
         # Create the overlay plot
         fig, ax = plt.subplots(figsize=(12, 8))
@@ -218,6 +226,49 @@ class PlotPlanetType(BasePlotter):
             self._add_percentage_labels(
                 ax, x + i * bar_width, detected_heights, total_heights
             )
+
+        # Add detected/total labels above each stellar type
+        for idx, star in enumerate(STAR_ORDER):
+            # Sum across all radius bins for this star
+            if isinstance(total_mean, pd.DataFrame) and 'count' in total_mean.columns and 'stype' in total_mean.columns:
+                total_count = total_mean[total_mean['stype'] == star]['count'].sum()
+            else:
+                total_count = 0
+            if isinstance(detected_mean, pd.DataFrame) and 'count' in detected_mean.columns and 'stype' in detected_mean.columns:
+                detected_count = detected_mean[detected_mean['stype'] == star]['count'].sum()
+            else:
+                detected_count = 0
+            # Find the tallest bar for this star (for label placement)
+            bar_tops = []
+            for i, bin_label in enumerate(BIN_LABELS):
+                if isinstance(total_mean, pd.DataFrame) and 'radius_bin' in total_mean.columns and 'stype' in total_mean.columns:
+                    bin_data = total_mean[(total_mean['radius_bin'] == bin_label) & (total_mean['stype'] == star)]
+                else:
+                    bin_data = None
+                if isinstance(detected_mean, pd.DataFrame) and 'radius_bin' in detected_mean.columns and 'stype' in detected_mean.columns:
+                    bin_detected = detected_mean[(detected_mean['radius_bin'] == bin_label) & (detected_mean['stype'] == star)]
+                else:
+                    bin_detected = None
+                bar_top = 0
+                if isinstance(bin_data, pd.DataFrame) and not bin_data.empty and 'count' in bin_data.columns:
+                    val = bin_data['count'].iloc[0]
+                    if isinstance(val, (int, float, np.integer, np.floating)):
+                        bar_top += val
+                elif isinstance(bin_data, (int, float, np.integer, np.floating)):
+                    bar_top += bin_data
+                if isinstance(bin_detected, pd.DataFrame) and not bin_detected.empty and 'count' in bin_detected.columns:
+                    val = bin_detected['count'].iloc[0]
+                    if isinstance(val, (int, float, np.integer, np.floating)):
+                        bar_top += val
+                elif isinstance(bin_detected, (int, float, np.integer, np.floating)):
+                    bar_top += bin_detected
+                bar_tops.append(bar_top)
+            max_height = max(bar_tops) if bar_tops else 0
+            ax.text(
+                x[idx] + 1.5 * bar_width, max_height + 2, # 2 is a small offset
+                f"{int(detected_count)} planets detected out of {int(total_count)} planets simulated.",
+                ha='center', va='bottom', fontsize=10, fontweight='bold', color='black', rotation=0
+            )
         
         plt.tight_layout()
         plt.savefig(os.path.join(self.data_dir, 
@@ -228,6 +279,7 @@ class PlotPlanetType(BasePlotter):
     def _calculate_planet_stats(self, df):
         """Calculate statistics for planet-based plots."""
         # Add categories
+        df = df.copy()
         df['categories'] = df.apply(self._assign_category, axis=1)
         df = df.explode('categories')
         
@@ -236,6 +288,7 @@ class PlotPlanetType(BasePlotter):
         
         # Get detection masks
         mask_best, _ = self._get_detection_masks()
+        mask_best = mask_best[df.index]  # Align mask with filtered df
         df_detected = df[mask_best].copy()
         df_detected['categories'] = df_detected.apply(self._assign_category, axis=1)
         df_detected = df_detected.explode('categories')
@@ -307,8 +360,6 @@ class PlotPlanetType(BasePlotter):
     def _calculate_distance_stats(self, df):
         """Calculate statistics for distance-based plots."""
         # Create proper distance bins that match the labels
-        # DISTANCE_LABELS: ['< 3', '3 - 5', '5 - 7', '7 - 9', '9 - 11', '11 - 13', '13 - 15', '15 - 20']
-        # Need 9 bin edges for 8 labels: [0, 3, 5, 7, 9, 11, 13, 15, 20]
         distance_bins = [0, 3, 5, 7, 9, 11, 13, 15, 20]
         
         # Check if there are any distances outside our bin range and handle them
@@ -329,6 +380,7 @@ class PlotPlanetType(BasePlotter):
         
         # Get detection masks
         mask_best, _ = self._get_detection_masks()
+        mask_best = mask_best[df_filtered.index]  # Align mask with filtered df
         df_detected = df_filtered[mask_best].copy()
         df_detected['distance_bin'] = pd.cut(df_detected['distance_s'], bins=distance_bins, labels=DISTANCE_LABELS)
         

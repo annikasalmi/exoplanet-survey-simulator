@@ -133,7 +133,7 @@ def run_sim(func=main_hwo, name='hwo', parallel=True, nruns=500, star_catalog='G
     if plot:
         plot_start_time = time.time()
         print(f"Starting plotting...")
-        plot_all(df=df_concat, sim_name=name, nruns=len(nruns), star_catalog=star_catalog, use_multiprocessing=True)
+        plot_all(df=df_concat, sim_name=name, nruns=len(nruns), star_catalog=star_catalog, use_multiprocessing=False)
         plot_end_time = time.time()
         plot_elapsed = plot_end_time - plot_start_time
         plot_hours = int(plot_elapsed // 3600)
@@ -147,7 +147,10 @@ if __name__ == "__main__":
 
     NRUNS = np.arange(500)
     
-    run_sim(func=main_hwo, name = 'hwo', parallel=True, nruns=NRUNS, star_catalog='Gaia', run_anew=False)
-    # run_sim(func=main_lifesim, name='lifesim', parallel=True, nruns=NRUNS, star_catalog='LTC_3', run_anew=False)
-    run_sim(func=main_lifesim, name='lifesim', parallel=True, nruns=NRUNS, star_catalog='Gaia', run_anew=False)
+    # run_sim(func=main_hwo, name = 'hwo', parallel=True, nruns=NRUNS, star_catalog='Gaia', run_anew=False)
+    # print('Completed HWO')
+    # run_sim(func=main_lifesim, name='lifesim', parallel=True, nruns=NRUNS, star_catalog='Gaia', run_anew=False)
+    print('Completed Lifesim Gaia')
+    run_sim(func=main_lifesim, name='lifesim', parallel=True, nruns=NRUNS, star_catalog='LTC_3', run_anew=False)
+    print('Completed Lifesim LTC_3')
     print('done')

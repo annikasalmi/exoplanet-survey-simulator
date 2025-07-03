@@ -11,6 +11,8 @@ from shapely.geometry import Polygon
 from plot.base_plotter import BasePlotter
 from tools import physics_constants as const
 
+plt.rcParams.update({'font.size': 16})
+
 class PlotHZLimits(BasePlotter):
     """
     Plotter for M-dwarf HZ limits and related plots.
@@ -281,7 +283,7 @@ class PlotHZLimits(BasePlotter):
             Patch(facecolor='blue', alpha=0.3, label='IWA Rejected'),
             Patch(facecolor='green', alpha=1.0, label='Detected')
         ]
-        ax.legend(handles=legend_elements, loc='upper left', frameon=True, fancybox=True, shadow=True)
+        ax.legend(handles=legend_elements, loc='upper left', fontsize=14)
         plt.tight_layout()
         self._save_plot(fig, 'panel_temp_s_vs_semimajor_p')
 
@@ -342,7 +344,7 @@ class PlotHZLimits(BasePlotter):
         cmap = ListedColormap(['#f7cac9', '#88b04b'])  # pink, green
 
         # --- Plotting ---
-        fig, ax = plt.subplots(figsize=(12, 8))
+        fig, ax = plt.subplots(figsize=(8, 6))
         if isinstance(ax, np.ndarray):
             ax = ax.flat[0]
         L_edges = np.logspace(np.log10(L_vals[0]), np.log10(L_vals[-1]), L_vals.size + 1)
@@ -402,7 +404,7 @@ class PlotHZLimits(BasePlotter):
                 f'{pc_m_val:.2e}'
             )
         )
-        ax.text(0.05, 0.85, eqn, transform=ax.transAxes, fontsize=10, verticalalignment='top', color='black', bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
+        ax.text(0.05, 0.85, eqn, transform=ax.transAxes, fontsize=14, verticalalignment='top', color='black', bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
 
         # --- Legend construction ---
         legend_elements = [
@@ -413,10 +415,89 @@ class PlotHZLimits(BasePlotter):
             plt.Line2D([0], [0], color='purple', linestyle=':', linewidth=2, label='Flux Limit Boundary (1.0 R⊕)'),
             plt.Line2D([0], [0], color='black', linestyle='--', linewidth=2, label='HWO Angular Sep. Limit (1.0 R⊕)')
         ]
-        ax.legend(handles=legend_elements, loc='lower right')
+        ax.legend(handles=legend_elements, loc='lower right', fontsize=14)
 
         plt.tight_layout()
         self._save_plot(fig, 'detectability_panel')
+
+    def plot_detectability_panel_au_vs_distance(self):
+        """Plot detectability as AU vs distance, with two panels: (1) ylim up to 20, (2) ylim up to 14 and xlim is M-dwarf region."""
+        # --- Grid ---
+        AU_vals = np.linspace(0.01, 1e3, 1000)  # AU
+        D_vals = np.linspace(4, 20, 1000)  # Distance [pc] (max 20 for both panels)
+        AU_grid, D_grid = np.meshgrid(AU_vals, D_vals)
+
+        # --- Constants ---
+        R_earth_m = const.R_earth if hasattr(const, 'R_earth') else 6.371e6
+        AU_m = const.au_to_m if hasattr(const, 'au_to_m') else 1.496e11
+        pc_m = 3.086e16
+        rad2arcsec = 206265
+        A_g = getattr(const, 'A_g_earth', 0.2)
+        Phi = getattr(const, 'Phi_alpha', 1.0)
+        flux_threshold = getattr(self, 'best_flux_limit', 2.5e-11)
+        theta_limit_arcsec = getattr(self, 'theta_limit_rad', 0.0206) * rad2arcsec if hasattr(self, 'theta_limit_rad') else 0.0206
+
+        # --- For each AU and D, compute fraction of L in [0.08, 1e3] that is detectable ---
+        L_vals = np.logspace(np.log10(0.08), 3, 100)
+        fraction_detectable = np.zeros_like(AU_grid, dtype=float)
+        for idx in range(AU_grid.shape[0]):
+            for jdx in range(AU_grid.shape[1]):
+                a_au = AU_grid[idx, jdx]
+                d_pc = D_grid[idx, jdx]
+                a_m = a_au * AU_m
+                d_m = d_pc * pc_m
+                theta_arcsec = (a_m / d_m) * rad2arcsec
+                count = 0
+                for L in L_vals:
+                    flux_ratio = A_g * (R_earth_m / a_m) ** 2 * Phi
+                    if (flux_ratio >= flux_threshold) and (theta_arcsec >= theta_limit_arcsec):
+                        count += 1
+                fraction_detectable[idx, jdx] = count / len(L_vals)
+
+        import matplotlib.pyplot as plt
+        from matplotlib.colors import LinearSegmentedColormap
+        # Red (0) -> Yellow (0.5) -> Green (1)
+        cmap = LinearSegmentedColormap.from_list('redyellowgreen', ['#f44336', '#fff176', '#4caf50'])
+
+        # --- Plotting: Two panels ---
+        fig, axs = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
+        AU_edges = np.linspace(AU_vals[0], AU_vals[-1], AU_vals.size + 1)
+        D_edges = np.linspace(D_vals[0], D_vals[-1], D_vals.size + 1)
+
+        # Panel 1: Full AU, D up to 20
+        im0 = axs[0].pcolormesh(AU_edges, D_edges, fraction_detectable, cmap=cmap, shading='auto', vmin=0, vmax=1)
+        axs[0].set_xscale('log')
+        axs[0].set_xlabel('Semi-major Axis [AU]')
+        axs[0].set_ylabel('Distance [pc]')
+        axs[0].set_ylim(4, 20)
+        axs[0].set_xlim(0.01, 1e3)
+        axs[0].set_title('All Stars (up to 20 pc)')
+        for L, color in zip([0.08, 0.6, 1.5], ['red', 'gold', 'gold']):
+            axs[0].axvline(np.sqrt(L), color=color, linestyle='--', linewidth=2)
+
+        # Panel 2: M-dwarf region, D up to 14
+        im1 = axs[1].pcolormesh(AU_edges, D_edges, fraction_detectable, cmap=cmap, shading='auto', vmin=0, vmax=1)
+        axs[1].set_xscale('log')
+        axs[1].set_xlabel('Semi-major Axis [AU]')
+        axs[1].set_ylim(4, 14)
+        axs[1].set_xlim(0.01, 0.4)
+        axs[1].set_title('M-dwarf Region (up to 14 pc)')
+        for L, color in zip([0.08, 0.6, 1.5], ['red', 'gold', 'gold']):
+            axs[1].axvline(np.sqrt(L), color=color, linestyle='--', linewidth=2)
+
+        # --- Colorbar ---
+        cbar = fig.colorbar(im0, ax=axs, location='right', shrink=0.8, label='Fraction of L detectable (0.08–1e3)')
+
+        # --- Legend ---
+        from matplotlib.lines import Line2D
+        legend_elements = [
+            Line2D([0], [0], color='red', linestyle='--', label='M-dwarf Region (a=√0.08)'),
+            Line2D([0], [0], color='gold', linestyle='--', label='G Star Region (a=√0.6, √1.5)')
+        ]
+        axs[0].legend(handles=legend_elements, loc='lower right', fontsize=14)
+
+        plt.tight_layout()
+        self._save_plot(fig, 'detectability_panel_au_vs_distance_twopanel')
 
     def plot_density_bins(self, data, xcol, ycol, ax, kind='hist2d', cmap='Greys', gridsize=50, **kwargs):
         """Plot a density map (hexbin or hist2d) for the given data and axis."""

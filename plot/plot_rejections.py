@@ -6,6 +6,8 @@ from tools.physics_constants import HWOConstants
 import pandas as pd
 from tools.plotting_constants import REJECTION_COLUMN_MAPPING, REJECTION_COLORS, REJECTION_SCENARIO_LABELS
 
+plt.rcParams.update({'font.size': 16})
+
 class PlanetRejectionPlotter(BasePlotter):
     """
     Class for generating rejection/failure plots (pie chart and histograms) for planet detection.
@@ -50,9 +52,12 @@ class PlanetRejectionPlotter(BasePlotter):
         for j, reason in enumerate(reasons):
             count = rejection_counts[reason]
             percentage = (count / total_planets) * 100
-            ax.bar(reasons[j], count, color=colors[j], alpha=0.8, label=f'{reason}: {percentage:.1f}%')
+            ax.bar(reasons[j], count, color=colors[reason], alpha=0.8, label=f'{reason}: {percentage:.1f}%')
             ax.text(j, count + total_planets * 0.01, f'{percentage:.1f}%', 
-                   ha='center', va='bottom', fontsize=10)
+                   ha='center', va='bottom', fontsize=16)
+        # Set custom x-axis labels for the bar plot
+        labels = [r if r != '# photons hitting detector' else '# photons\nhitting detector' for r in reasons]
+        ax.set_xticklabels(labels)
 
     def _add_total_rejection_line(self, ax, total_planets):
         """Add a horizontal line showing total rejection percentage."""
@@ -67,7 +72,7 @@ class PlanetRejectionPlotter(BasePlotter):
         ax.set_title(f"Total: {total_planets}, Rejected: {rejected_planets}")
         ax.set_ylabel("Number of planets")
         ax.set_ylim(0, total_planets * 1.1)
-        ax.legend(fontsize=8, loc='upper right')
+        ax.legend(fontsize=14, loc='upper right')
         ax.tick_params(axis='x', rotation=0)
 
     def plot_failures_percentages(self) -> None:
@@ -94,6 +99,10 @@ class PlanetRejectionPlotter(BasePlotter):
         
         if plotted:
             plt.suptitle(f"Rejection Reasons for All Planets")
+            # Set custom x-axis labels for the bar plot
+            ax = axs[0]
+            labels = [label if label != '# photons hitting detector' else '# photons\nhitting detector' for label in ax.get_xticklabels()]
+            ax.set_xticklabels(labels)
             plt.tight_layout(rect=[0, 0, 1, 0.93])
             self._save_plot(fig, 'failure_detected', 'best_case')
 
@@ -158,41 +167,54 @@ class PlanetRejectionPlotter(BasePlotter):
         return (rejected_best / total_planets) * 100
 
     def _calculate_worst_case_percentage(self, df, reason):
-        """Calculate worst case rejection percentage."""
+        """Calculate worst case rejection percentage for any reason with a _worst column."""
+        # Map reason to the corresponding _worst column
+        column_mapping = {
+            '# photons hitting detector': 'min_photons_pass_worst',
+            'Flux Ratio': 'flux_pass_worst',
+            'IWA': 'iwa_pass_worst',
+            'Exozodi': None  # handled separately
+        }
         if reason == 'Exozodi':
             mask_worst = (df['z'] <= HWOConstants('worst').max_z)
             rejected_worst = len(df[~mask_worst])
             total_planets = len(df)
             return (rejected_worst / total_planets) * 100
-        elif reason in ['# photons hitting detector', 'Flux Ratio']:
-            pass_col_worst = 'min_photons_pass_worst' if reason == '# photons hitting detector' else 'flux_pass_worst'
-            if pass_col_worst in df.columns:
-                mask_worst = df[pass_col_worst].astype(bool)
-                rejected_worst = len(df[~mask_worst])
-                total_planets = len(df)
-                return (rejected_worst / total_planets) * 100
+        pass_col_worst = column_mapping.get(reason)
+        if pass_col_worst and pass_col_worst in df.columns:
+            mask_worst = df[pass_col_worst].astype(bool)
+            rejected_worst = len(df[~mask_worst])
+            total_planets = len(df)
+            return (rejected_worst / total_planets) * 100
         return 0
 
     def _add_rejection_percentage_text(self, ax, pct_best, pct_worst=None):
         """Add rejection percentage text to the plot."""
-        ax.text(0.05, 0.95, f'Best: {pct_best:.1f}% rejected',
-                transform=ax.transAxes, verticalalignment='top',
+        ax.text(0.05, 0.05, f'Best: {pct_best:.1f}% rejected',
+                transform=ax.transAxes, verticalalignment='bottom',
                 bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
         
         if pct_worst is not None and pct_worst > 0:
-            ax.text(0.05, 0.85, f'Worst: {pct_worst:.1f}% rejected',
-                    transform=ax.transAxes, verticalalignment='top',
+            ax.text(0.05, 0.15, f'Worst: {pct_worst:.1f}% rejected',
+                    transform=ax.transAxes, verticalalignment='bottom',
                     bbox=dict(boxstyle='round', facecolor='white', alpha=0.5))
 
     def _add_threshold_lines(self, ax, reason, hwo_best, hwo_worst):
         """Add threshold lines for best and worst case scenarios."""
-        if reason == 'Exozodi':
+        if reason == '# photons hitting detector':
             best_threshold = HWOConstants('best').max_z
             worst_threshold = HWOConstants('worst').max_z
             ax.axvline(best_threshold, color='green', linestyle='--', alpha=0.7, 
                       label=f'Best case cutoff = {best_threshold:.2e}')
             ax.axvline(worst_threshold, color='red', linestyle='--', alpha=0.7, 
                       label=f'Worst case cutoff = {worst_threshold:.2e}')
+        elif reason == 'Exozodi':
+            best_threshold = HWOConstants('best').max_z
+            worst_threshold = HWOConstants('worst').max_z
+            ax.axvline(best_threshold, color='green', linestyle='--', alpha=0.7, 
+                      label=f'{best_threshold:.2e}')
+            ax.axvline(worst_threshold, color='red', linestyle='--', alpha=0.7, 
+                      label=f'{worst_threshold:.2e}')
         else:
             threshold_name = {
                 '# photons hitting detector': 'min_photons',
@@ -207,105 +229,86 @@ class PlanetRejectionPlotter(BasePlotter):
                 thresh_0 = f'{best_threshold[0]:.2f}' if reason == '# photons hitting detector' else f'{best_threshold[0]:.2e}'
                 thresh_1 = f'{best_threshold[1]:.2f}' if reason == '# photons hitting detector' else f'{best_threshold[1]:.2e}'
                 ax.axvline(best_threshold[0], color='green', linestyle='--', alpha=0.7, 
-                          label=f'Best case cutoff = {thresh_0}')
+                          label=f'{thresh_0}')
                 ax.axvline(best_threshold[1], color='green', linestyle=':', alpha=0.7, 
                           label=f'Best case max = {thresh_1}')
             else:
                 ax.axvline(best_threshold, color='green', linestyle='--', alpha=0.7, 
-                          label=f'Best case cutoff = {best_threshold:.2e}')
+                          label=f'{best_threshold:.2e}')
             
             # Add worst case threshold lines
             if isinstance(worst_threshold, tuple):
                 thresh_0 = f'{worst_threshold[0]:.2f}' if reason == '# photons hitting detector' else f'{worst_threshold[0]:.2e}'
                 thresh_1 = f'{worst_threshold[1]:.2f}' if reason == '# photons hitting detector' else f'{worst_threshold[1]:.2e}'
                 ax.axvline(worst_threshold[0], color='red', linestyle='--', alpha=0.7, 
-                          label=f'Worst case cutoff = {thresh_0}')
+                          label=f'{thresh_0}')
                 ax.axvline(worst_threshold[1], color='red', linestyle=':', alpha=0.7, 
                           label=f'Worst case max = {thresh_1}')
             else:
                 ax.axvline(worst_threshold, color='red', linestyle='--', alpha=0.7, 
-                          label=f'Worst case cutoff = {worst_threshold:.2e}')
+                          label=f'{worst_threshold:.2e}')
+
+    def _get_edgecolor(self, reason):
+        """Return edgecolor for a given rejection reason."""
+        return {
+            'Flux Ratio': 'red',
+            'IWA': 'blue',
+            'Exozodi': 'gold',
+        }.get(reason, 'black')
+
+    def _get_x_label(self, reason):
+        if reason == 'IWA':
+            return 'Maximum angular separation'
+        elif reason == 'Exozodi':
+            return 'z (zodis)'
+        elif reason == '# photons hitting detector':
+            return '# photons\nhitting detector'
+        else:
+            return reason.replace('_', ' ').capitalize()
+
+    def _plot_histogram(self, ax, df, reason, col, bins):
+        edgecolor = self._get_edgecolor(reason)
+        ax.hist(df[col], bins=bins, color='lightgray', alpha=0.7, edgecolor=edgecolor,
+                    log=True)
+
+    def _add_rejection_percentages(self, ax, df, reason):
+        pass_col_best = self._get_pass_fail_column(reason)
+        if pass_col_best in df.columns:
+            pct_best = self._calculate_rejection_percentage(df, reason, pass_col_best)
+            pct_worst = self._calculate_worst_case_percentage(df, reason)
+            self._add_rejection_percentage_text(ax, pct_best, pct_worst)
 
     def _setup_histogram_axes(self, ax, reason):
-        """Setup histogram axes with appropriate labels and scales."""
-        if reason == 'IWA':
-            ax.set_xlabel('Maximum angular separation')
-        elif reason == 'Exozodi':
-            ax.set_xlabel('z (zodis)')
-        else:
-            ax.set_xlabel(reason.replace('_', ' ').capitalize())
-        
+        ax.set_xlabel(self._get_x_label(reason))
         ax.set_ylabel("Number of planets")
         ax.set_title(f"{reason}")
-        
-        # Set logarithmic x-axis for all except IWA and Exozodi
         if reason not in ['IWA']:
             ax.set_xscale('log')
-        
-        ax.legend(fontsize=8, loc='upper right')
+        ax.legend(fontsize=14, loc='upper right')
 
     def plot_failures_histogram(self) -> None:
         """Plot histograms of rejection reasons for non-detected planets."""
         df = self.df.copy()
         if df.empty:
             return
-            
-        # Setup subplots
         nrows, ncols = 2, 2
         fig, axs = plt.subplots(nrows, ncols, figsize=(12, 6), sharey=True)
         axs = axs.flatten()
-        
         column_mapping = REJECTION_COLUMN_MAPPING
-        
         for i, (reason, col) in enumerate(column_mapping.items()):
             ax = axs[i]
-            
-            # Check column existence
             if reason != 'Exozodi' and col not in df.columns:
                 print(f"Warning: Column '{col}' not found in DataFrame. Available columns: {list(df.columns)}")
                 continue
-            
-            # Get bins and create histogram
             bins = self._get_bins_for_reason(reason, df, col)
-            
-            # Set edgecolor based on reason
-            if reason == 'Flux Ratio':
-                edgecolor = 'red'
-            elif reason == 'IWA':
-                edgecolor = 'blue'
-            elif reason == 'Exozodi':
-                edgecolor = 'gold'
-            else:
-                edgecolor = 'black'
-            
-            if reason == 'IWA':
-                ax.hist(df['maxangsep'], bins=bins, color='lightgray', alpha=0.7, edgecolor=edgecolor,
-                        log=True, label='Maximum angular separation')
-            else:
-                ax.hist(df[col], bins=bins, color='lightgray', alpha=0.7, edgecolor=edgecolor, 
-                        log=True, label='Best case')
-            
-            # Calculate and display rejection percentages
-            if reason != 'IWA':
-                pass_col_best = self._get_pass_fail_column(reason)
-                if pass_col_best in df.columns:
-                    pct_best = self._calculate_rejection_percentage(df, reason, pass_col_best)
-                    pct_worst = self._calculate_worst_case_percentage(df, reason)
-                    self._add_rejection_percentage_text(ax, pct_best, pct_worst)
-            
-            # Add threshold lines
+            self._plot_histogram(ax, df, reason, col, bins)
+            self._add_rejection_percentages(ax, df, reason)
             hwo_best = HWOConstants('best')
             hwo_worst = HWOConstants('worst')
             self._add_threshold_lines(ax, reason, hwo_best, hwo_worst)
-            
-            # Setup axes
             self._setup_histogram_axes(ax, reason)
-        
-        # Remove unused subplots
         for j in range(i+1, nrows*ncols):
             fig.delaxes(axs[j])
-        
-        # Add overall title
         total_planets = len(df)
         if 'detected_best' in df.columns:
             mask_detected_best = df['detected_best'].astype(bool)
@@ -314,8 +317,7 @@ class PlanetRejectionPlotter(BasePlotter):
             suptitle = f"Actual Values vs. Cutoff Thresholds for Planet Rejection\nBest case: {pct_best:.1f}% rejected"
         else:
             suptitle = "Actual Values vs. Cutoff Thresholds for Planet Rejection"
-        
-        plt.suptitle(suptitle, fontsize=14)
+        plt.suptitle(suptitle, fontsize=30)
         plt.tight_layout(rect=[0, 0, 1, 0.95])
         self._save_plot(fig, 'failure_multipanel', 'actual_values')
 
@@ -324,66 +326,33 @@ class PlanetRejectionPlotter(BasePlotter):
         df = self.df.copy()
         if df.empty:
             return
-
-        # Setup combined subplots: 2 rows x 3 columns, with the rightmost column merged for the bar plot
         fig = plt.figure(figsize=(18, 10))
         gs = fig.add_gridspec(2, 3, width_ratios=[1, 1, 1.1])
         axs_hist = [fig.add_subplot(gs[0, 0]), fig.add_subplot(gs[0, 1]),
                     fig.add_subplot(gs[1, 0]), fig.add_subplot(gs[1, 1])]
         ax_bar = fig.add_subplot(gs[:, 2])
-
-        # --- 2x2 Histogram plots (reuse logic from plot_failures_histogram) ---
         column_mapping = REJECTION_COLUMN_MAPPING
         for i, (reason, col) in enumerate(column_mapping.items()):
             ax = axs_hist[i]
-            # Check column existence
             if reason != 'Exozodi' and col not in df.columns:
                 print(f"Warning: Column '{col}' not found in DataFrame. Available columns: {list(df.columns)}")
                 continue
-            # Get bins and create histogram
             bins = self._get_bins_for_reason(reason, df, col)
-            # Set edgecolor based on reason
-            if reason == 'Flux Ratio':
-                edgecolor = 'red'
-            elif reason == 'IWA':
-                edgecolor = 'blue'
-            elif reason == 'Exozodi':
-                edgecolor = 'gold'
-            else:
-                edgecolor = 'black'
-            if reason == 'IWA':
-                ax.hist(df['maxangsep'], bins=bins, color='lightgray', alpha=0.7, edgecolor=edgecolor,
-                        log=True, label='Maximum angular separation')
-            else:
-                ax.hist(df[col], bins=bins, color='lightgray', alpha=0.7, edgecolor=edgecolor, 
-                        log=True, label='Best case')
-            # Calculate and display rejection percentages
-            if reason != 'IWA':
-                pass_col_best = self._get_pass_fail_column(reason)
-                if pass_col_best in df.columns:
-                    pct_best = self._calculate_rejection_percentage(df, reason, pass_col_best)
-                    pct_worst = self._calculate_worst_case_percentage(df, reason)
-                    self._add_rejection_percentage_text(ax, pct_best, pct_worst)
-            # Add threshold lines
+            self._plot_histogram(ax, df, reason, col, bins)
+            self._add_rejection_percentages(ax, df, reason)
             hwo_best = HWOConstants('best')
             hwo_worst = HWOConstants('worst')
             self._add_threshold_lines(ax, reason, hwo_best, hwo_worst)
-            # Setup axes
             self._setup_histogram_axes(ax, reason)
-
-        # Remove unused subplot axes if any
         for j in range(i+1, 4):
             fig.delaxes(axs_hist[j])
-
-        # --- Percentages bar plot (reuse logic from plot_failures_percentages) ---
         scenario = 'best'
         total_planets = len(df)
         rejection_counts = self._calculate_rejection_counts()
         self._create_rejection_bar_plot(ax_bar, rejection_counts, total_planets, REJECTION_COLORS)
         rejected_planets = self._add_total_rejection_line(ax_bar, total_planets)
         self._setup_plot_axes(ax_bar, total_planets, rejected_planets)
-
-        # --- Shared title and layout ---
+        ax_bar.legend(fontsize=14, loc='upper right')
         if 'detected_best' in df.columns:
             mask_detected_best = df['detected_best'].astype(bool)
             rejected_best = len(df[~mask_detected_best])
@@ -391,6 +360,6 @@ class PlanetRejectionPlotter(BasePlotter):
             suptitle = f"Actual Values vs. Cutoff Thresholds for Planet Rejection\nBest case: {pct_best:.1f}% rejected"
         else:
             suptitle = "Actual Values vs. Cutoff Thresholds for Planet Rejection"
-        plt.suptitle(suptitle, fontsize=16)
+        plt.suptitle(suptitle, fontsize=20)
         plt.tight_layout(rect=[0, 0, 1, 0.95])
         self._save_plot(fig, 'failure_combined', 'combined')

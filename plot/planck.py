@@ -7,6 +7,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from tools import physics_constants as const
 from tools.paths import PLOTS_DIR
 
+plt.rcParams.update({'font.size': 16})
+
 def planck(wavelength_m, temperature):
     """Calculate spectral radiance using Planck's Law."""
     h, c, k = const.h, const.c, const.k
@@ -59,19 +61,19 @@ def plot_absorption_features(ax, wavelength_um, fluxes):
         for wavelength in wavelengths:
             if 0.2 <= wavelength <= 2.5:
                 idx = np.argmin(np.abs(wavelength_um - wavelength))
-                max_flux = max(fluxes[idx] for fluxes in fluxes)
+                max_flux = max(fluxes[idx] for fluxes in fluxes) - 2
                 ax.axvline(x=wavelength, color=color, alpha=0.7, linestyle=linestyle, linewidth=1)
                 # Special handling for 2.0 μm overlap
                 if wavelength == 2.0 and molecule == 'CO₂':
-                    ax.text(wavelength + 0.01, max_flux * 1.7, molecule, rotation=90, fontsize=8,
+                    ax.text(wavelength + 0.01, max_flux * 1.7, molecule, rotation=90, fontsize=12,
                             color=color, ha='left', va='bottom')
                 elif wavelength == 2.0 and molecule == 'NH₃':
-                    ax.text(wavelength - 0.01, max_flux * 1.3, molecule, rotation=90, fontsize=8,
+                    ax.text(wavelength - 0.01, max_flux * 1.3, molecule, rotation=90, fontsize=12,
                             color=color, ha='right', va='bottom')
                 else:
                     # Offset label if another molecule is already at this wavelength
                     y_offset = 1.5
-                    ax.text(wavelength, max_flux * y_offset, molecule, rotation=90, fontsize=8,
+                    ax.text(wavelength, max_flux * y_offset, molecule, rotation=90, fontsize=12,
                             color=color, ha='right', va='bottom')
 
 def main():
@@ -114,7 +116,6 @@ def main():
     ax.set_yscale('log')
     ax.set_xlim(0, 3)
     ax.set_ylim(1e-30, 10)
-    ax.set_title('Planet Emission + Reflected Starlight')
     # Add HWO box and contrast info
     HWO_box = Rectangle((0.2, 1e-50), 2.3, 20 - 1e-10, linewidth=2, edgecolor='black',
                         facecolor='none', label='HWO observable')

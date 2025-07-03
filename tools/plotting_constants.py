@@ -62,5 +62,10 @@ REJECTION_COLUMN_MAPPING = {
     'Exozodi': 'z',
 }
 REJECTION_LABELS = ['Maximum angular separation', 'Flux Ratio', 'IWA', 'Exozodi']
-REJECTION_COLORS = ['black', 'red', 'blue', 'gold']
+REJECTION_COLORS = {
+    '# photons hitting detector': 'black',
+    'Flux Ratio': 'red',
+    'IWA': 'blue',
+    'Exozodi': 'gold',
+}
 REJECTION_SCENARIO_LABELS = {'best': 'Best Case Scenario'}

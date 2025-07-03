@@ -10,6 +10,8 @@ from tools.plotting_constants import (
     STAR_COLORS, STAR_HATCHES, BIN_LABELS, BAR_WIDTH_STAR
 )
 
+plt.rcParams.update({'font.size': 16})
+
 class PlotPlanetType(BasePlotter):
     """
     Class for generating grouped bar plots of planet statistics by star type, planet type, and distance.
@@ -201,7 +203,7 @@ class PlotPlanetType(BasePlotter):
             for star in STAR_ORDER:
                 total_heights.append(get_count(bin_data, star=star))
                 detected_heights.append(get_count(bin_detected, star=star))
-            self._add_percentage_labels(ax, x + i * bar_width, detected_heights, total_heights)
+            self._add_percentage_labels(ax, x + i * bar_width, detected_heights, total_heights, offset=8)
         
         # Add detected/total labels above each stellar type
         for idx, star in enumerate(STAR_ORDER):
@@ -212,13 +214,40 @@ class PlotPlanetType(BasePlotter):
             # Find the tallest bar for this star
             heights = [get_count(total_mean, star=star, bin_label=bin_label) + get_count(detected_mean, star=star, bin_label=bin_label) for bin_label in BIN_LABELS]
             max_height = max(heights) if heights else 0
-            ax.text(
-                x[idx] + 1.5 * bar_width, max_height,
-                f"{int(detected_count)} detected/{int(total_count)} simulated",
-                ha='center', va='bottom', fontsize=10, fontweight='bold', color='black', rotation=0
-            )
+            if self.name == 'HWO':
+                if star == 'M':
+                    ax.text(
+                            x[idx] + 1.5 * bar_width, max_height + 5,
+                            f"{int(detected_count)} detected out of \n {int(total_count)} simulated",
+                            ha='center', va='bottom', fontsize=12
+                        )
+                elif star == 'K':
+                    ax.text(
+                            x[idx] + 1.5 * bar_width, max_height-5,
+                            f"{int(detected_count)} detected out of \n {int(total_count)} simulated",
+                            ha='center', va='bottom', fontsize=12
+                        )
+                else:
+                    ax.text(
+                            x[idx] + 1.5 * bar_width, max_height - 15,
+                            f"{int(detected_count)} detected out of \n {int(total_count)} simulated",
+                            ha='center', va='bottom', fontsize=12
+                        )
+            else:
+                if star == 'K':
+                    ax.text(
+                            x[idx] + 1.5 * bar_width, max_height-50,
+                            f"{int(detected_count)} detected out of \n {int(total_count)} simulated",
+                            ha='center', va='bottom', fontsize=12
+                        )
+                else:
+                    ax.text(
+                            x[idx] + 1.5 * bar_width, max_height,
+                            f"{int(detected_count)} detected out of \n {int(total_count)} simulated",
+                            ha='center', va='bottom', fontsize=12
+                        )
         
-        plt.tight_layout()
+        plt.tight_layout(rect=[0, 0, 1, 0.92])
         plt.savefig(os.path.join(self.data_dir, 
                                 self._output_filename('stellar_type_overlay')), 
                    dpi=300, bbox_inches='tight')
@@ -265,7 +294,7 @@ class PlotPlanetType(BasePlotter):
         stats, detected_stats = self._calculate_planet_stats(self.df)
         
         # Setup plot
-        fig, ax = plt.subplots(figsize=(12, 8))
+        fig, ax = plt.subplots(figsize=(8, 6))
         categories = ['Rocky', 'Super-Earths', 'Sub-Neptunes', 'Sub-Jovians']
         x = np.arange(len(categories))
         # Ensure ax is a matplotlib Axes, not an ndarray
@@ -303,9 +332,10 @@ class PlotPlanetType(BasePlotter):
                 stats, detected_stats, bin_label
             )
             self._add_percentage_labels(
-                ax, x + i * BAR_WIDTH_TEMP, detected_heights, total_heights
+                ax, x + i * BAR_WIDTH_TEMP, detected_heights, total_heights, offset=16
             )
         
+        plt.tight_layout(rect=[0, 0, 1, 0.92])
         self._save_plot(fig, 'planet_detection_by_type')
 
     def _calculate_distance_stats(self, df):
@@ -378,7 +408,7 @@ class PlotPlanetType(BasePlotter):
         stats, detected_stats = self._calculate_distance_stats(self.df)
         
         # Setup plot
-        fig, ax = plt.subplots(figsize=(12, 8))
+        fig, ax = plt.subplots(figsize=(8, 6))
         x = np.arange(len(DISTANCE_LABELS))
         # Ensure ax is a matplotlib Axes, not an ndarray
         if isinstance(ax, np.ndarray):
@@ -416,14 +446,28 @@ class PlotPlanetType(BasePlotter):
             ax, 'Distance Bin', 'Number of Planets', 
             f'Planet Detection by Distance Bin for {self.name} ({self.nruns} runs)\nStar Catalog: {self.star_catalog}'
         )
-        
+       
         # Set x-axis
         ax.set_xticks(x)
         ax.set_xticklabels(DISTANCE_LABELS)
         
         # Add percentage labels
         self._add_percentage_labels(
-            ax, x, detected_counts, total_counts
+            ax, x, detected_counts, total_counts, offset=12
         )
         
+        plt.tight_layout(rect=[0, 0, 1, 0.92])
         self._save_plot(fig, 'planet_detection_by_distance')
+
+    # After all subplots are created and twin_axes is filled:
+    def _create_legend(self, fig, axs, twin_axes):
+        handles, labels = [], []
+        for ax, ax2 in zip(axs, twin_axes):
+            if ax2 is not None:
+                h1, l1 = ax.get_legend_handles_labels()
+                h2, l2 = ax2.get_legend_handles_labels()
+                handles += h1 + h2
+                labels += l1 + l2
+        # Remove duplicates
+        unique = dict(zip(labels, handles))
+        fig.legend(unique.values(), unique.keys(), loc='upper left', bbox_to_anchor=(0.08, 0.92), fontsize=14)

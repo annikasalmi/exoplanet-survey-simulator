@@ -30,11 +30,14 @@ class HWOData():
     """
     def __init__(self, data: Union[Data, pd.DataFrame]):
         if isinstance(data, Data):
-            self.catalog = data.catalog
+            self.catalog = pd.DataFrame(data.catalog)
         elif isinstance(data, pd.DataFrame):
             self.catalog = data
         else:
-            raise TypeError('Needs to be a pd.DataFrame or type Data object for data.')
+            # Try to convert to DataFrame if possible
+            self.catalog = pd.DataFrame(data)
+        if self.catalog is None or not isinstance(self.catalog, pd.DataFrame):
+            raise ValueError("Catalog must be a valid pandas DataFrame.")
         
         # Validate that required columns exist
         self._validate_catalog()
@@ -180,13 +183,11 @@ class HWOData():
     def calc_iwa_constraint(self):
         iwa_constraint = self.catalog.maxangsep
         return iwa_constraint
-    
     def determine_detectable(self):
         """
-        Evaluate individual constraints and determine detectability.
-        Exclude objects based on exozodi z value:
-        - Exclude if z > 1 for 'worst' case
-        - Exclude if z > 10 for 'best' case
+        Evaluate individual constraints and determine detectability. 
+        The individual constraints are stored in physics_constants.py in the class HWOConstants.
+        Depending on the case, the constraints are defined differently.
         """
         cases = ['best', 'worst']
 
@@ -201,12 +202,14 @@ class HWOData():
             self.catalog['flux_pass_' + c] = flux_condition
             self.catalog['min_photons_pass_' + c] = min_photon_rate_condition
             self.catalog['z_pass_' + c] = z_condition
-            
             # Store actual values (separate columns)
             self.catalog['flux_ratio_value_' + c] = self.calc_flux_ratio(c)
             self.catalog['photon_rate_value_' + c] = self.calc_photons(c)
 
             # Total combined detection condition (now includes z_condition)
-            total_condition = iwa_condition & flux_condition & min_photon_rate_condition & z_condition
-            self.catalog['detected_' + c] = total_condition
+            condition = iwa_condition & flux_condition & min_photon_rate_condition & z_condition
+            self.catalog['detected_' + c] = condition
         return self.catalog
+
+
+

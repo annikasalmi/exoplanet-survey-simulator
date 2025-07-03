@@ -6,6 +6,9 @@ from plot.plot_by_type import PlotPlanetType
 from plot.plot_detections import PlanetDetectionPlotter
 from plot.plot_rejections import PlanetRejectionPlotter
 from plot.plot_hz_limits import PlotHZLimits
+import matplotlib.pyplot as plt
+
+plt.rcParams.update({'font.size': 16})
 
 
 def _run_plotter_class(plotter_class, df, nruns, star_catalog, sim_name, **kwargs):

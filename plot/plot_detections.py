@@ -5,6 +5,8 @@ from matplotlib import gridspec
 from plot.base_plotter import BasePlotter
 from tools.plotting_constants import PLOT_CONFIGS, PANEL_CONFIGS
 
+plt.rcParams.update({'font.size': 16})
+
 class PlanetDetectionPlotter(BasePlotter):
     """
     Class for generating detection efficiency plots for HWO scenarios.
@@ -36,30 +38,25 @@ class PlanetDetectionPlotter(BasePlotter):
         
         return total_counts, detected_counts, efficiency, mask_best
 
-    def _create_bar_plot_with_efficiency(self, ax1, bin_centers, total_counts, detected_counts, 
-                                        efficiency, x_label, title, bins):
-        """Create a bar plot with efficiency overlay."""
+    def _collect_legend_handles(self, ax):
+        """Helper to collect legend handles and labels from two axes."""
+        h1, l1 = ax.get_legend_handles_labels()
+        return h1, l1 
+
+    def _setup_bar_and_efficiency_axes(self, ax, bin_centers, total_counts, detected_counts, efficiency, x_label, title, bins):
+        """Helper to setup bar plot and efficiency overlay."""
         # Plot bars
-        ax1.bar(bin_centers, total_counts, width=np.diff(bins), 
-                color='lightgrey', align='center', label='Total')
-        ax1.bar(bin_centers, detected_counts, width=np.diff(bins), 
-                color='green', alpha=0.8, align='center', label='Detected')
-        
+        ax.bar(bin_centers, total_counts, width=np.diff(bins), color='lightgrey', align='center', label='Total')
+        ax.bar(bin_centers, detected_counts, width=np.diff(bins), color='green', alpha=0.8, align='center', label='Detected')
         # Setup primary axis
-        ax1.set_xlabel(x_label)
-        ax1.set_ylabel("Number of Planets")
-        ax1.set_title(title)
-        
+        ax.set_xlabel(x_label)
+        ax.set_ylabel("Number of Planets")
+        ax.set_title(title)
         # Add efficiency line on secondary axis
-        ax2 = ax1.twinx()
+        ax2 = ax.twinx()
         ax2.plot(bin_centers, efficiency, 'r--', linewidth=2, label='Efficiency')
         ax2.set_ylabel("Detection Efficiency")
         ax2.set_ylim(0, 1.0)
-        
-        # Combine legends
-        h1, l1 = ax1.get_legend_handles_labels()
-        h2, l2 = ax2.get_legend_handles_labels()
-        ax1.legend(h1 + h2, l1 + l2, loc='upper left')
         
         return ax2
 
@@ -69,66 +66,51 @@ class PlanetDetectionPlotter(BasePlotter):
             x_col = config['col']
             x_label = config['label']
             x_range = config['range']
-            
             # Setup figure and bins
             fig, axs = plt.subplots(2, 2, figsize=(16, 12), sharey=False)
             axs = axs.flatten()
             bins = np.linspace(x_range[0], x_range[1], 40)
             bin_centers = 0.5 * (bins[:-1] + bins[1:])
-            
             # Define combined categories: stellar type + planet type
             combined_categories = {
-                'M dwarf + Rocky HZ': lambda df: (df['habitable'] == True) & 
-                                                 (df['radius_p'] < 1.5) & 
-                                                 (df['stype'].str.contains('M')) & 
-                                                 (df['temp_p'] <= 350),
-                'G/K star + Rocky HZ': lambda df: (df['habitable'] == True) & 
-                                                  (df['radius_p'] < 1.5) & 
-                                                  (df['stype'].isin(['G', 'K'])) & 
-                                                  (df['temp_p'] <= 350),
-                'M dwarf + Hycean HZ': lambda df: (df['habitable'] == True) & 
-                                                  (df['radius_p'] >= 1.1) & 
-                                                  (df['radius_p'] <= 2.6) & 
-                                                  (df['stype'].str.contains('M')) & 
-                                                  (df['temp_p'] <= 350),
-                'All Planets (≤350K)': lambda df: (df['temp_p'] <= 350)
+                'M dwarf + Rocky HZ': lambda df: (df['habitable'] == True) & (df['radius_p'] < 1.5) & (df['stype'].str.contains('M')),
+                'G/K star + Rocky HZ': lambda df: (df['habitable'] == True) & (df['radius_p'] < 1.5) & (df['stype'].isin(['G', 'K'])),
+                'M dwarf + Hycean HZ': lambda df: (df['habitable'] == True) & (df['radius_p'] >= 1.1) & (df['radius_p'] <= 2.6) & (df['stype'].str.contains('M')),
+                'All Planets': lambda df: np.ones(len(df), dtype=bool)
             }
-            
+            twin_axes = []
             # Plot each combined category
             for i, (label, filter_func) in enumerate(combined_categories.items()):
-                if i >= 4:  # Only plot first 4 categories for 2x2
+                if i >= 4:
                     break
-                    
                 subset = self.df[filter_func(self.df)]
                 if len(subset) == 0:
+                    twin_axes.append(None)
                     continue
-                
                 # Calculate data
                 total_counts, detected_counts, efficiency, mask_best = self._calculate_efficiency_data(subset, x_col, bins)
                 total_planets = len(subset) / self.nruns
                 detected_planets = np.sum(detected_counts)
-                
                 # Create subplot
                 title = f"{label}\nTotal: {total_planets:.1f}, Detected: {detected_planets:.1f}"
-                ax2 = self._create_bar_plot_with_efficiency(
-                    axs[i], bin_centers, total_counts, detected_counts, efficiency, 
-                    x_label, title, bins
+                ax2 = self._setup_bar_and_efficiency_axes(
+                    axs[i], bin_centers, total_counts, detected_counts, efficiency, x_label, title, bins
                 )
-                
+                twin_axes.append(ax2)
                 # Set y-labels only for leftmost subplots (0 and 2)
                 if i in [0, 2]:
                     axs[i].set_ylabel("Number of Planets")
                     ax2.set_ylabel("Detection Efficiency")
-                
                 # Set xlim to 350 for temperature plots
                 if x_col == 'temp_p':
                     axs[i].set_xlim([bins[0], 305])
                     ax2.set_xlim([bins[0], 305])
-            
+            # Add a single legend for the whole figure using the first subplot and its twin axis
+            handles, labels = self._collect_legend_handles(axs[0])
+            axs[0].legend(handles, labels, loc='upper left', fontsize=14)
             # Finalize plot
-            fig.suptitle(f"Detection Efficiency by {x_axis.capitalize()} "
-                        f"for {self.name} ({self.nruns} Runs)\nStar Catalog: {self.star_catalog}", 
-                        fontsize=14)
+            title = f"Detection Efficiency by {x_axis.capitalize()} for {self.name} ({self.nruns} Runs)\nStar Catalog: {self.star_catalog}"
+            fig.suptitle(title, fontsize=20, y=0.96)
             plt.tight_layout(rect=[0, 0, 1, 0.95])
             self._save_plot(fig, f'detection_efficiency_by_type_{x_axis}')
 
@@ -142,7 +124,7 @@ class PlanetDetectionPlotter(BasePlotter):
         mask_best = mask_best[df.index]  # Align mask with filtered df
         category_str = f" ({category_label})" if category_label else ""
         
-        fig = plt.figure(figsize=(15, 4))
+        fig = plt.figure(figsize=(20, 6))
         gs = gridspec.GridSpec(1, 4, width_ratios=[1, 1, 1, 0.04], wspace=0.3)
 
         axs = [fig.add_subplot(gs[i]) for i in range(3)]
@@ -154,14 +136,17 @@ class PlanetDetectionPlotter(BasePlotter):
 
         self._enhance_panel_layout(axs)
 
+        # Add legend to just the far left axis
+        handles, labels = axs[0].get_legend_handles_labels()
+        axs[0].legend(handles, labels, loc='upper left', fontsize=14)
+
         # Shared colorbar in the 4th column
         cbar_ax = fig.add_subplot(gs[3])
         cbar = fig.colorbar(all_meshes[0], cax=cbar_ax)
         cbar.set_label('Detection Efficiency')
 
-        fig.suptitle(f'Detection Efficiency {category_str} for {self.name} ({self.nruns} runs)')
-
-        plt.tight_layout(rect=[0, 0, 1, 0.96])
+        fig.suptitle(f'Detection Efficiency for {self.name} ({self.nruns} runs)', fontsize=20, y=1)
+        plt.tight_layout(rect=[0, 0, 1, 0.92])
         self._save_plot(fig, 'detection_efficiency_3d_panels')
 
     def _create_efficiency_panel(self, ax, df, mask_best, panel):
@@ -198,7 +183,6 @@ class PlanetDetectionPlotter(BasePlotter):
         
         # Add reference lines
         self._add_reference_lines(ax, x, y)
-        ax.legend(loc='upper right', fontsize=10)
         
         return mesh
 

@@ -73,7 +73,7 @@ class BasePlotter:
         return True
 
     def _add_percentage_labels(self, ax, x, y_values, total_values, y_errors=None, 
-                              offset=1.0, fontsize=8, color='black'):
+                              offset=1.0, fontsize=12, color='black'):
         """Add percentage labels to bars."""
         for i, (y_val, total_val) in enumerate(zip(y_values, total_values)):
             if y_val > 0 and total_val > 0:
@@ -122,13 +122,13 @@ class BasePlotter:
         total_label = 'Total' if add_total_label else None
         ax.bar(x, total_heights, width=bar_width, color=total_color, 
                alpha=0.5, edgecolor='black', yerr=total_errors, capsize=3,
-               label=total_label)
+               label=total_label, ecolor='darkgray')
         
         # Plot detected bars (overlay)
         ax.bar(x, detected_heights, width=bar_width, color=detected_color,
                alpha=0.8, edgecolor='black', yerr=detected_errors, capsize=3,
                bottom=np.zeros_like(detected_heights), hatch=detected_hatch,
-               label=detected_label)
+               label=detected_label, ecolor='darkgray')
         
         # Fix the numpy array truth value ambiguity
         if detected_errors is not None:

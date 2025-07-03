@@ -147,10 +147,10 @@ if __name__ == "__main__":
 
     NRUNS = np.arange(500)
     
-    # run_sim(func=main_hwo, name = 'hwo', parallel=True, nruns=NRUNS, star_catalog='Gaia', run_anew=False)
+    run_sim(func=main_hwo, name = 'hwo', parallel=True, nruns=NRUNS, star_catalog='Gaia', run_anew=False)
     # print('Completed HWO')
     # run_sim(func=main_lifesim, name='lifesim', parallel=True, nruns=NRUNS, star_catalog='Gaia', run_anew=False)
-    print('Completed Lifesim Gaia')
-    run_sim(func=main_lifesim, name='lifesim', parallel=True, nruns=NRUNS, star_catalog='LTC_3', run_anew=False)
-    print('Completed Lifesim LTC_3')
+    # print('Completed Lifesim Gaia')
+    # run_sim(func=main_lifesim, name='lifesim', parallel=True, nruns=NRUNS, star_catalog='LTC_3', run_anew=False)
+    # print('Completed Lifesim LTC_3')
     print('done')

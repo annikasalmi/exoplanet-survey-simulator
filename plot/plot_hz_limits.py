@@ -7,9 +7,12 @@ from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 import alphashape
 from shapely.geometry import Polygon
+from matplotlib.colors import LinearSegmentedColormap
+import os
 
 from plot.base_plotter import BasePlotter
 from tools import physics_constants as const
+from plot.exoplanet_data_utils import load_exoplanet_luminosity_distance
 
 plt.rcParams.update({'font.size': 16})
 
@@ -43,6 +46,7 @@ class PlotHZLimits(BasePlotter):
         # 3x1 boundary plots
         self.plot_boundaries()
         self.plot_detectability_panel()
+        self.plot_detectability_panel_au_vs_distance()
 
     def _validate_and_filter_points(self, points: np.ndarray, xcol: str, ycol: str) -> Optional[np.ndarray]:
         """
@@ -287,6 +291,7 @@ class PlotHZLimits(BasePlotter):
         plt.tight_layout()
         self._save_plot(fig, 'panel_temp_s_vs_semimajor_p')
 
+
     def _get_axis_label(self, var_name: str) -> str:
         """Get formatted axis label for a variable name."""
         labels = {
@@ -300,81 +305,68 @@ class PlotHZLimits(BasePlotter):
         }
         return labels.get(var_name, var_name)
 
+    def _compute_fraction_detectable(self, AU_grid, D_grid, A_g, Phi, L_check):
+        """Compute the fraction of L values for which a planet is detectable at each AU and D (vectorized)."""
+        # Vectorized calculation
+        a_m = AU_grid[..., None] * const.au_to_m   # shape (N, M, 1)
+        d_m = D_grid[..., None] * const.pc_to_m   # shape (N, M, 1)
+        theta_arcsec = (a_m / d_m) * const.rad_to_arcsec
+        flux_ratio = A_g * (const.R_earth / a_m) ** 2 * Phi
+        # L_check is shape (K,), broadcast to (N, M, K)
+        detectable = (flux_ratio >= const.HWOConstants('best').min_planet_flux_star_ratio) & (theta_arcsec >= const.HWOConstants('best').iwa)
+        fraction_detectable = detectable.sum(axis=2) / len(L_check)
+        return fraction_detectable
+
+    def _plot_reference_lines(self, ax, xvals, is_au=False):
+        """Plot reference lines for M-dwarf and G-star regions."""
+        for L, color in zip([0.08, 0.6, 1.5], ['red', 'gold', 'gold']):
+            val = np.sqrt(L) if is_au else L
+            ax.axvline(val, color=color, linestyle='--', linewidth=2)
+
     def plot_detectability_panel(self):
-        """Plot detectability for 0.5–2.6 R⊕ and 'none' as a single figure, using pcolormesh for log axes."""
-
-        # --- Grid ---
-        L_vals = np.logspace(-2, 1, 1000)  # Stellar Luminosity [L☉]
-        D_vals = np.linspace(4, 15, 1000)  # Distance [pc]
-        L_grid, D_grid = np.meshgrid(L_vals, D_vals)
-
+        """Plot detectability for 0.5–2.6 R⊕ and 'none' as a two-panel figure, overlaying exoplanet data in the zoomed panel."""
         # --- Constants ---
-        R_earth_m = const.R_earth if hasattr(const, 'R_earth') else 6.371e6
-        AU_m = const.au_to_m if hasattr(const, 'au_to_m') else 1.496e11
-        pc_m = 3.086e16
-        rad2arcsec = 206265
+        AU_m = const.au_to_m 
         A_g = getattr(const, 'A_g_earth', 0.2)
         Phi = getattr(const, 'Phi_alpha', 1.0)
-        flux_threshold = getattr(self, 'best_flux_limit', 2.5e-11)
-        theta_limit_arcsec = getattr(self, 'theta_limit_rad', 0.0206) * rad2arcsec if hasattr(self, 'theta_limit_rad') else 0.0206
+        flux_threshold = const.HWOConstants('best').min_planet_flux_star_ratio
+        theta_limit_arcsec = const.HWOConstants('best').iwa
 
-        # --- Derived HZ orbit (a = sqrt(L) * AU) ---
+        # --- Panel 1: L vs D, region coloring ---
+        L_vals = np.logspace(-2, 1, 300)
+        D_vals = np.linspace(4, 20, 300)
+        L_grid, D_grid = np.meshgrid(L_vals, D_vals)
         a_hz_m = np.sqrt(L_grid) * AU_m
-        distance_m = D_grid * pc_m
-        theta_arcsec = (a_hz_m / distance_m) * rad2arcsec
-
-        # --- Planet flux ratio for 0.5 R_earth and 2.6 R_earth ---
-        Rp_small = 0.5 * R_earth_m
-        Rp_large = 2.6 * R_earth_m
+        distance_m = D_grid * const.pc_to_m
+        theta_arcsec = (a_hz_m / distance_m) * const.rad_to_arcsec
+        Rp_small = 0.5 * const.R_earth
+        Rp_large = 2.6 * const.R_earth
         flux_ratio_small = A_g * (Rp_small / a_hz_m) ** 2 * Phi
         flux_ratio_large = A_g * (Rp_large / a_hz_m) ** 2 * Phi
-
-        # --- Check detectability for each radius ---
         detect_small = (flux_ratio_small >= flux_threshold) & (theta_arcsec >= theta_limit_arcsec)
         detect_large = (flux_ratio_large >= flux_threshold) & (theta_arcsec >= theta_limit_arcsec)
-
-        # --- Assign region codes ---
-        # 1 = detectable (0.5–2.6 R⊕)
-        # 0 = not detectable
         region = np.zeros_like(L_grid, dtype=int)
         region[detect_small | detect_large] = 1
 
-        # --- Custom colormap for the 2 categories ---
-        from matplotlib.colors import ListedColormap
-        cmap = ListedColormap(['#f7cac9', '#88b04b'])  # pink, green
-
-        # --- Plotting ---
-        fig, ax = plt.subplots(figsize=(8, 6))
-        if isinstance(ax, np.ndarray):
-            ax = ax.flat[0]
+        # --- Plotting: Two panels ---
+        fig, ax = plt.subplots(figsize=(10, 6))
         L_edges = np.logspace(np.log10(L_vals[0]), np.log10(L_vals[-1]), L_vals.size + 1)
         D_edges = np.linspace(D_vals[0], D_vals[-1], D_vals.size + 1)
-        im = ax.pcolormesh(L_edges, D_edges, region, cmap=cmap, shading='auto', vmin=0, vmax=1)
+        # Single panel
+        im = ax.pcolormesh(L_edges, D_edges, region, cmap=LinearSegmentedColormap.from_list('pinkgreen', ['#f7cac9', '#88b04b']), shading='auto', vmin=0, vmax=1)
         ax.set_xscale('log')
         ax.set_xlabel('Stellar Luminosity [L☉]')
         ax.set_ylabel('Distance [pc]')
-        ax.set_ylim(4, 15)
-        ax.set_title('Detectable Radius Range (0.5–2.6 R⊕)\n% of Full Range Detectable')
+        ax.set_ylim(4, 20)
+        ax.set_xlim(L_vals[0], L_vals[-1])
+        ax.set_title('Detectable Radius Range (0.5–2.6 R⊕)')
+        self._plot_reference_lines(ax, L_vals, is_au=False)
 
-        # --- Reference lines for M-dwarf and G-star regions ---
-        ax.axvline(0.08, color='red', linestyle='--', linewidth=2)
-        ax.axvline(0.6, color='gold', linestyle='--', linewidth=2)
-        ax.axvline(1.5, color='gold', linestyle='--', linewidth=2)
-
-        # --- Add flux threshold boundary (vertical purple line) ---
-        A_g_val = A_g
-        Rp_one_earth_m = R_earth_m
-        Phi_val = Phi
-        flux_threshold_val = flux_threshold
+        # --- Restore flux threshold boundary (vertical purple line) ---
         try:
             AU_m_val = float(AU_m)
         except Exception:
             AU_m_val = 1.496e11
-        L_flux_boundary = (A_g_val * Rp_one_earth_m**2 * Phi_val) / (flux_threshold_val * AU_m_val**2)
-        ax.axvline(x=L_flux_boundary, color='purple', linestyle=':', linewidth=2,
-                   label=f'Flux Limit Boundary (1.0 R⊕)')
-
-        # --- Add angular separation threshold boundary (black dashed curve) ---
         try:
             rad2arcsec_val = float(rad2arcsec)
         except Exception:
@@ -387,57 +379,60 @@ class PlotHZLimits(BasePlotter):
             pc_m_val = float(pc_m)
         except Exception:
             pc_m_val = 3.086e16
-        L_star_vals = L_vals
-        D_theta_boundary = (np.sqrt(L_star_vals) * AU_m_val * rad2arcsec_val) / \
-                           (theta_limit_arcsec_val * pc_m_val)
-        # Only plot where D_theta_boundary <= 15
-        mask = D_theta_boundary <= 15
-        ax.plot(L_star_vals[mask], D_theta_boundary[mask], color='black', linestyle='--', linewidth=2,
-                label=f'HWO Angular Sep. Limit (1.0 R⊕)')
-        # Annotate the equation on the plot with actual values
-        eqn = (
-            r"$D = \frac{{\sqrt{{L}} \times {}\,\mathrm{{m}} \times {}}}{{{}\,\mathrm{{arcsec}} \times {}\,\mathrm{{m}}}}$"
-            .format(
-                f'{AU_m_val:.2e}',
-                f'{rad2arcsec_val:.1f}',
-                f'{theta_limit_arcsec_val:.4f}',
-                f'{pc_m_val:.2e}'
-            )
-        )
-        ax.text(0.05, 0.85, eqn, transform=ax.transAxes, fontsize=14, verticalalignment='top', color='black', bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
+        A_g_val = A_g
+        Phi_val = Phi
+        flux_threshold_val = flux_threshold
+        L_flux_boundary = (A_g_val * const.R_earth**2 * Phi_val) / (flux_threshold_val * AU_m_val**2)
+        ax.axvline(x=L_flux_boundary, color='purple', linestyle=':', linewidth=2, label='Flux Limit Boundary (1.0 R⊕)')
 
-        # --- Legend construction ---
+        # --- Restore angular separation threshold boundary (black dashed curve) ---
+        L_star_vals = L_vals
+        D_theta_boundary = (np.sqrt(L_star_vals) * AU_m_val * rad2arcsec_val) / (theta_limit_arcsec_val * pc_m_val)
+        mask = D_theta_boundary <= 20
+        ax.plot(L_star_vals[mask], D_theta_boundary[mask], color='black', linestyle='--', linewidth=2, label='HWO Angular Sep. Limit (1.0 R⊕)')
+
+        # --- (Optional) Fitted line (if previously present) ---
+        # Example: Fit a line to the boundary (customize as needed)
+        # from numpy.polynomial.polynomial import Polynomial
+        # fit_mask = (L_star_vals > 0.01) & (L_star_vals < 0.4)
+        # p = Polynomial.fit(np.log10(L_star_vals[fit_mask]), np.log10(D_theta_boundary[fit_mask]), 1)
+        # ax.plot(L_star_vals[fit_mask], 10**p(np.log10(L_star_vals[fit_mask])), color='blue', linestyle='-', linewidth=2, label='Fitted Line')
+
         legend_elements = [
-            Patch(facecolor='#f7cac9', label='None'),
-            Patch(facecolor='#88b04b', label='0.5–2.6 R⊕'),
-            Line2D([0], [0], color='red', linestyle='--', label='M-dwarf Region'),
-            Line2D([0], [0], color='gold', linestyle='--', label='G Star Region'),
-            plt.Line2D([0], [0], color='purple', linestyle=':', linewidth=2, label='Flux Limit Boundary (1.0 R⊕)'),
-            plt.Line2D([0], [0], color='black', linestyle='--', linewidth=2, label='HWO Angular Sep. Limit (1.0 R⊕)')
+            Line2D([0], [0], color='red', linestyle='--', label='M-dwarf Region (L = 0.001, L=0.08)'),
+            Line2D([0], [0], color='gold', linestyle='--', label='G Star Region (L=0.6, 1.5)'),
+            Line2D([0], [0], color='purple', linestyle=':', linewidth=2, label='Flux Limit Boundary (1.0 R⊕)'),
+            Line2D([0], [0], color='black', linestyle='--', linewidth=2, label='HWO Angular Sep. Limit (1.0 R⊕)')
         ]
         ax.legend(handles=legend_elements, loc='lower right', fontsize=14)
 
+        # --- Exoplanet overlay using utility function (left panel) ---
+        exo_df_left = load_exoplanet_luminosity_distance(region_lum=(0.01, 10), region_dist=(4, 20), return_names=True)
+        if exo_df_left is not None and not exo_df_left.empty:
+            ax.scatter(exo_df_left['Luminosity'], exo_df_left['Distance'], color='black', s=8, alpha=0.5, label='2025 Exoplanet Hosts')
+            if 'Planet Name' in exo_df_left.columns:
+                for _, row in exo_df_left.iterrows():
+                    ax.text(row['Luminosity'], row['Distance']+0.15, str(row['Planet Name']), fontsize=7, ha='center', va='bottom', rotation=30)
+
+        # --- Colorbar ---
+        cbar = fig.colorbar(im, ax=ax, location='right', shrink=0.8, label='Fraction of L detectable (0.08–1e3)')
         plt.tight_layout()
-        self._save_plot(fig, 'detectability_panel')
+        self._save_plot(fig, 'detectability_panel_twopanel')
 
     def plot_detectability_panel_au_vs_distance(self):
-        """Plot detectability as AU vs distance, with two panels: (1) ylim up to 20, (2) ylim up to 14 and xlim is M-dwarf region."""
+        """Plot detectability as AU vs distance, with background gradient showing fraction of L detectable (single panel)."""
         # --- Grid ---
         AU_vals = np.linspace(0.01, 1e3, 1000)  # AU
-        D_vals = np.linspace(4, 20, 1000)  # Distance [pc] (max 20 for both panels)
+        D_vals = np.linspace(4, 20, 1000)  # Distance [pc]
         AU_grid, D_grid = np.meshgrid(AU_vals, D_vals)
-
         # --- Constants ---
-        R_earth_m = const.R_earth if hasattr(const, 'R_earth') else 6.371e6
-        AU_m = const.au_to_m if hasattr(const, 'au_to_m') else 1.496e11
+        AU_m = const.au_to_m
         pc_m = 3.086e16
         rad2arcsec = 206265
         A_g = getattr(const, 'A_g_earth', 0.2)
         Phi = getattr(const, 'Phi_alpha', 1.0)
-        flux_threshold = getattr(self, 'best_flux_limit', 2.5e-11)
-        theta_limit_arcsec = getattr(self, 'theta_limit_rad', 0.0206) * rad2arcsec if hasattr(self, 'theta_limit_rad') else 0.0206
-
-        # --- For each AU and D, compute fraction of L in [0.08, 1e3] that is detectable ---
+        flux_threshold = const.HWOConstants('best').min_planet_flux_star_ratio
+        theta_limit_arcsec = const.HWOConstants('best').iwa
         L_vals = np.logspace(np.log10(0.08), 3, 100)
         fraction_detectable = np.zeros_like(AU_grid, dtype=float)
         for idx in range(AU_grid.shape[0]):
@@ -449,55 +444,31 @@ class PlotHZLimits(BasePlotter):
                 theta_arcsec = (a_m / d_m) * rad2arcsec
                 count = 0
                 for L in L_vals:
-                    flux_ratio = A_g * (R_earth_m / a_m) ** 2 * Phi
+                    flux_ratio = A_g * (const.R_earth / a_m) ** 2 * Phi
                     if (flux_ratio >= flux_threshold) and (theta_arcsec >= theta_limit_arcsec):
                         count += 1
                 fraction_detectable[idx, jdx] = count / len(L_vals)
-
-        import matplotlib.pyplot as plt
-        from matplotlib.colors import LinearSegmentedColormap
-        # Red (0) -> Yellow (0.5) -> Green (1)
         cmap = LinearSegmentedColormap.from_list('redyellowgreen', ['#f44336', '#fff176', '#4caf50'])
-
-        # --- Plotting: Two panels ---
-        fig, axs = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
+        fig, ax = plt.subplots(figsize=(8, 6))
         AU_edges = np.linspace(AU_vals[0], AU_vals[-1], AU_vals.size + 1)
         D_edges = np.linspace(D_vals[0], D_vals[-1], D_vals.size + 1)
-
-        # Panel 1: Full AU, D up to 20
-        im0 = axs[0].pcolormesh(AU_edges, D_edges, fraction_detectable, cmap=cmap, shading='auto', vmin=0, vmax=1)
-        axs[0].set_xscale('log')
-        axs[0].set_xlabel('Semi-major Axis [AU]')
-        axs[0].set_ylabel('Distance [pc]')
-        axs[0].set_ylim(4, 20)
-        axs[0].set_xlim(0.01, 1e3)
-        axs[0].set_title('All Stars (up to 20 pc)')
+        im = ax.pcolormesh(AU_edges, D_edges, fraction_detectable, cmap=cmap, shading='auto', vmin=0, vmax=1)
+        ax.set_xscale('log')
+        ax.set_xlabel('Semi-major Axis [AU]')
+        ax.set_ylabel('Distance [pc]')
+        ax.set_ylim(4, 20)
+        ax.set_xlim(0.01, 1e3)
+        ax.set_title('Detectability by Stellar Luminosity (1 R⊕, L ≥ 0.08 L☉)')
         for L, color in zip([0.08, 0.6, 1.5], ['red', 'gold', 'gold']):
-            axs[0].axvline(np.sqrt(L), color=color, linestyle='--', linewidth=2)
-
-        # Panel 2: M-dwarf region, D up to 14
-        im1 = axs[1].pcolormesh(AU_edges, D_edges, fraction_detectable, cmap=cmap, shading='auto', vmin=0, vmax=1)
-        axs[1].set_xscale('log')
-        axs[1].set_xlabel('Semi-major Axis [AU]')
-        axs[1].set_ylim(4, 14)
-        axs[1].set_xlim(0.01, 0.4)
-        axs[1].set_title('M-dwarf Region (up to 14 pc)')
-        for L, color in zip([0.08, 0.6, 1.5], ['red', 'gold', 'gold']):
-            axs[1].axvline(np.sqrt(L), color=color, linestyle='--', linewidth=2)
-
-        # --- Colorbar ---
-        cbar = fig.colorbar(im0, ax=axs, location='right', shrink=0.8, label='Fraction of L detectable (0.08–1e3)')
-
-        # --- Legend ---
-        from matplotlib.lines import Line2D
+            ax.axvline(np.sqrt(L), color=color, linestyle='--', linewidth=2)
+        cbar = fig.colorbar(im, ax=ax, label='Fraction of L detectable (0.08–1e3)')
         legend_elements = [
             Line2D([0], [0], color='red', linestyle='--', label='M-dwarf Region (a=√0.08)'),
             Line2D([0], [0], color='gold', linestyle='--', label='G Star Region (a=√0.6, √1.5)')
         ]
-        axs[0].legend(handles=legend_elements, loc='lower right', fontsize=14)
-
+        ax.legend(handles=legend_elements, loc='lower right', fontsize=14)
         plt.tight_layout()
-        self._save_plot(fig, 'detectability_panel_au_vs_distance_twopanel')
+        self._save_plot(fig, 'detectability_panel_au_vs_distance')
 
     def plot_density_bins(self, data, xcol, ycol, ax, kind='hist2d', cmap='Greys', gridsize=50, **kwargs):
         """Plot a density map (hexbin or hist2d) for the given data and axis."""

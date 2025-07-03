@@ -12,6 +12,7 @@ au_to_m = 1.496e11      # 1 au in meters
 A_g_earth = 0.3         # Albedo of Earth
 Phi_alpha = 0.5         # Phase function at quadrature
 arcsec_to_radians = np.pi / (180 * 3600)  # 1 arcsecond in radians
+rad_to_arcsec = 206265
 
 # HWO specific
 class HWOConstants():

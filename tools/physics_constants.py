@@ -14,6 +14,25 @@ Phi_alpha = 0.5         # Phase function at quadrature
 arcsec_to_radians = np.pi / (180 * 3600)  # 1 arcsecond in radians
 rad_to_arcsec = 206265
 
+# Habitable planet radius limits
+R_earth_min_habitable = 0.5  # Minimum habitable planet radius (Earth radii)
+R_earth_max_habitable = 2.6  # Maximum habitable planet radius (Earth radii)
+
+# Stellar luminosity limits for M-dwarf and G-star regions
+L_m_dwarf_min = 0.001  # Minimum M-dwarf luminosity (L☉)
+L_m_dwarf_max = 0.08   # Maximum M-dwarf luminosity (L☉)
+L_g_star_min = 0.6     # Minimum G-star luminosity (L☉)
+L_g_star_max = 1.5     # Maximum G-star luminosity (L☉)
+
+# Distance limits for exoplanet analysis
+D_min_pc = 4.0         # Minimum distance (pc)
+D_max_pc = 20.0        # Maximum distance (pc)
+
+# Grid resolution parameters
+L_GRID_SIZE = 300      # Grid size for luminosity calculations
+D_GRID_SIZE = 300      # Grid size for distance calculations
+AU_GRID_SIZE = 1000    # Grid size for AU calculations
+
 # HWO specific
 class HWOConstants():
     def __init__(self, scenario='best'):

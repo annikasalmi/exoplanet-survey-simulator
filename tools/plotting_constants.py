@@ -69,3 +69,13 @@ REJECTION_COLORS = {
     'Exozodi': 'gold',
 }
 REJECTION_SCENARIO_LABELS = {'best': 'Best Case Scenario'}
+
+DETECTION_COLORS = {
+    'Radial Velocity': 'blue',
+    'Transit': 'green', 
+    'Imaging': 'red',
+    'Microlensing': 'orange',
+    'Astrometry': 'purple',
+    'Timing': 'brown',
+    'Other': 'gray'
+}

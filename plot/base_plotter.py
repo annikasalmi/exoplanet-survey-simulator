@@ -142,14 +142,14 @@ class BasePlotter:
                 (np.exp((const.h * const.c) / (wavelength * const.k * temperature)) - 1))
 
     def _setup_mdwarf_parameters(self):
-        """Setup M-dwarf and planet parameters for HZ limit calculations."""
+        """Setup M dwarf and planet parameters for HZ limit calculations."""
         return {
-            'T_star': 3200,  # K (typical M-dwarf)
+            'T_star': 3200,  # K (typical M dwarf)
             'R_star': 0.2 * const.R_sun,  # 0.2 solar radii
             'T_planet': 288,  # K (Earth-like)
             'R_planet': const.R_earth,
             'lambda_obs': 10e-6,  # m (mid-IR, 10 micron)
-            'hz_au': 0.1  # AU (habitable zone for M-dwarf)
+            'hz_au': 0.1  # AU (habitable zone for M dwarf)
         }
 
     def plot_all(self) -> None:

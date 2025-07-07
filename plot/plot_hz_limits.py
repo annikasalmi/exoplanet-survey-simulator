@@ -12,12 +12,13 @@ from matplotlib.colors import LinearSegmentedColormap
 
 from plot.base_plotter import BasePlotter
 from tools import physics_constants as const
+from tools.plotting_constants import DETECTION_COLORS
 
 plt.rcParams.update({'font.size': 16})
 
 class PlotHZLimits(BasePlotter):
     """
-    Plotter for M-dwarf HZ limits and detectability analysis.
+    Plotter for M dwarf HZ limits and detectability analysis.
     
     Features:
     - Boundary plots for data analysis
@@ -25,20 +26,9 @@ class PlotHZLimits(BasePlotter):
     - Vectorized calculations for performance
     """
     
-    # Detection method color mapping
-    DETECTION_COLORS = {
-        'Radial Velocity': 'blue',
-        'Transit': 'green', 
-        'Imaging': 'red',
-        'Microlensing': 'orange',
-        'Astrometry': 'purple',
-        'Timing': 'brown',
-        'Other': 'gray'
-    }
-    
     def __init__(self, df: Optional[pd.DataFrame] = None, name: str = 'HWO',
                  nruns: int = 1, star_catalog: str = 'Gaia', 
-                 xlim_min: float = 0.01, xlim_max: float = 2.0,
+                 xlim_min: float = 0.01, xlim_max: float = 15.0,
                  ylim_min: float = 4.0, ylim_max: float = 15.0, **kwargs):
         """Initialize with optional dataframe and parameters."""
         if df is None:
@@ -57,9 +47,12 @@ class PlotHZLimits(BasePlotter):
         self.iwa_limit = float(self.hwo_best.iwa)
         self.max_z = float(self.hwo_best.max_z)
         self.theta_limit_rad = self.iwa_limit * const.arcsec_to_radians
+        
+        # Add detection colors mapping
+        self.DETECTION_COLORS = DETECTION_COLORS
 
     def plot_all(self) -> None:
-        """Generate all M-dwarf HZ limit plots."""
+        """Generate all M dwarf HZ limit plots."""
         if not self._validate_data():
             return
             
@@ -247,7 +240,7 @@ class PlotHZLimits(BasePlotter):
         D_edges = np.linspace(D_vals[0], D_vals[-1], D_vals.size + 1)
         
         im = ax.pcolormesh(L_edges, D_edges, region, 
-                          cmap=LinearSegmentedColormap.from_list('pinkgreen', ['#f7cac9', '#88b04b']), 
+                          cmap=LinearSegmentedColormap.from_list('pink', ['#f7cac9', '#88b04b']), 
                           shading='auto', vmin=0, vmax=1)
         ax.set_xscale('log')
         ax.set_xlabel('Stellar Luminosity [L☉]')
@@ -374,7 +367,7 @@ class PlotHZLimits(BasePlotter):
         return labels.get(var_name, var_name)
 
     def _plot_reference_lines(self, ax: Axes, xvals: np.ndarray, is_au: bool = False) -> None:
-        """Plot reference lines for M-dwarf and G-star regions."""
+        """Plot reference lines for M dwarf and G-star regions."""
         for L, color in zip([const.L_m_dwarf_max, const.L_g_star_min, const.L_g_star_max], ['red', 'gold', 'gold']):
             val = np.sqrt(L) if is_au else L
             ax.axvline(float(val), color=color, linestyle='--', linewidth=2)
@@ -399,14 +392,20 @@ class PlotHZLimits(BasePlotter):
 
         # --- Plotting ---
         fig, ax = plt.subplots(figsize=(10, 6))
+        if isinstance(ax, np.ndarray):
+            ax = ax.flat[0]
         im = self._setup_detectability_plot(ax, L_vals, D_vals, region, 
                                            f'Detectable Radius Range ({const.R_earth_min_habitable}–{const.R_earth_max_habitable} R⊕)')
         ax.set_ylim(self.ylim_min, self.ylim_max)
         ax.set_xlim(self.xlim_min, self.xlim_max)
 
-        # --- Flux threshold boundary (vertical purple line) ---
+        # --- Flux threshold boundary (vertical black line) ---
         L_flux_boundary = (const.A_g_earth * const.R_earth**2 * const.Phi_alpha) / (self.best_flux_limit * const.au_to_m**2)
-        ax.axvline(x=float(L_flux_boundary), color='purple', linestyle=':', linewidth=2, label='Flux Limit Boundary (1.0 R⊕)')
+        ax.axvline(x=float(L_flux_boundary), color='black', linestyle=':', linewidth=2, label='Flux Limit Boundary (1.0 R⊕)')
+        
+        # --- Pink fill for region outside flux limit (too faint to detect) ---
+        ax.fill_betweenx([0, self.ylim_max], L_flux_boundary, self.xlim_max, 
+                        color='pink', alpha=0.3, label='Too faint to detect')
 
         # --- Angular separation threshold boundary (black dashed curve) ---
         L_star_vals = L_vals
@@ -415,25 +414,28 @@ class PlotHZLimits(BasePlotter):
         ax.plot(L_star_vals[mask], D_theta_boundary[mask], color='black', linestyle='--', linewidth=2, label='HWO Angular Sep. Limit (1.0 R⊕)')
 
         # --- Shaded box for M dwarfs observable region ---
-        # Find the distance where the angular separation limit intersects with M-dwarf luminosity
-        m_dwarf_lum = const.L_m_dwarf_max  # 0.08 L☉
-        m_dwarf_au = np.sqrt(m_dwarf_lum)  # ~0.28 AU
-        intersection_distance = (m_dwarf_au * const.au_to_m * const.rad_to_arcsec) / (self.theta_limit_rad * const.rad_to_arcsec * const.pc_to_m)
-        if intersection_distance <= self.ylim_max:
-            # Create a shaded box from the horizontal line to the M-dwarf vertical line
-            ax.fill_betweenx([0, intersection_distance], 0, const.L_m_dwarf_max, 
-                           color='grey', alpha=0.2, label='M dwarfs observable by HWO')
+        # Use the black dashed curve (angular separation limit) as the top boundary
+        # The observable region is below the black curve and within the M dwarf luminosity range
+        L_m_dwarf_range = np.linspace(0, const.L_m_dwarf_max, 100)
+        D_theta_boundary_mdwarf = (np.sqrt(L_m_dwarf_range) * const.au_to_m * const.rad_to_arcsec) / (self.theta_limit_rad * const.rad_to_arcsec * const.pc_to_m)
+        
+        # Only fill where the boundary is within plot limits
+        mask = (D_theta_boundary_mdwarf <= self.ylim_max) & (D_theta_boundary_mdwarf >= 0)
+        if np.any(mask):
+            ax.fill_between(L_m_dwarf_range[mask], 0, D_theta_boundary_mdwarf[mask], 
+                           color='darkgreen', alpha=1, label='M dwarfs observable by HWO')
 
         # --- Exoplanet overlay ---
         plotted_methods = self._plot_exoplanet_overlay(ax, region_lum=(self.xlim_min, self.xlim_max), region_dist=(self.ylim_min, self.ylim_max))
 
         # --- Legend (after exoplanet overlay so detection methods are included) ---
         legend_elements = [
-            Line2D([0], [0], color='red', linestyle='--', label=f'M-dwarf Region (L = {const.L_m_dwarf_min}, {const.L_m_dwarf_max})'),
+            Line2D([0], [0], color='red', linestyle='--', label=f'M dwarf Region (L = {const.L_m_dwarf_min}, {const.L_m_dwarf_max})'),
             Line2D([0], [0], color='gold', linestyle='--', label=f'G Star Region (L={const.L_g_star_min}, {const.L_g_star_max})'),
-            Line2D([0], [0], color='purple', linestyle=':', linewidth=2, label='Flux Limit Boundary (1.0 R⊕)'),
+            Line2D([0], [0], color='black', linestyle=':', linewidth=2, label='Flux Limit Boundary (1.0 R⊕)'),
             Line2D([0], [0], color='black', linestyle='--', linewidth=2, label='HWO Angular Sep. Limit (1.0 R⊕)'),
-            Patch(facecolor='grey', alpha=0.2, label='M dwarfs with habitable planetsobservable by HWO')
+            Patch(facecolor='darkgreen', alpha=1, label='M dwarfs with habitable planets observable by HWO'),
+            Patch(facecolor='pink', alpha=0.3, label='Too faint to detect')
         ]
         
         # Add exoplanet detection method colors to legend

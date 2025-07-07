@@ -72,7 +72,7 @@ REJECTION_SCENARIO_LABELS = {'best': 'Best Case Scenario'}
 
 DETECTION_COLORS = {
     'Radial Velocity': 'blue',
-    'Transit': 'green', 
+    'Transit': 'black', 
     'Imaging': 'red',
     'Microlensing': 'orange',
     'Astrometry': 'purple',

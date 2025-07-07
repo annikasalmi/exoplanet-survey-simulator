@@ -6,6 +6,7 @@ from matplotlib.patches import Rectangle
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from tools import physics_constants as const
 from tools.paths import PLOTS_DIR
+from lifesim.util.habitable import single_habitable_zone
 
 plt.rcParams.update({'font.size': 16})
 
@@ -39,7 +40,8 @@ def calculate_system_fluxes(T_star, T_planet, R_star, R_planet, D, wavelength_m,
     
     # Total planet flux and contrast
     total_planet_flux = flux_planet + reflected_flux
-    contrast = total_planet_flux / flux_star
+    # Avoid division by zero or very small values
+    contrast = np.where(flux_star > 1e-50, total_planet_flux / flux_star, 0)
     
     return flux_star, flux_planet, reflected_flux, contrast
 
@@ -61,20 +63,22 @@ def plot_absorption_features(ax, wavelength_um, fluxes):
         for wavelength in wavelengths:
             if 0.2 <= wavelength <= 2.5:
                 idx = np.argmin(np.abs(wavelength_um - wavelength))
-                max_flux = max(fluxes[idx] for fluxes in fluxes) - 2
+                max_flux = max(fluxes[idx] for fluxes in fluxes) + 1000
                 ax.axvline(x=wavelength, color=color, alpha=0.7, linestyle=linestyle, linewidth=1)
                 # Special handling for 2.0 μm overlap
                 if wavelength == 2.0 and molecule == 'CO₂':
-                    ax.text(wavelength + 0.01, max_flux * 1.7, molecule, rotation=90, fontsize=12,
+                    ax.text(wavelength + 0.01, max_flux * 1.7, molecule, rotation=90, fontsize=14,
                             color=color, ha='left', va='bottom')
                 elif wavelength == 2.0 and molecule == 'NH₃':
-                    ax.text(wavelength - 0.01, max_flux * 1.3, molecule, rotation=90, fontsize=12,
+                    ax.text(wavelength - 0.01, max_flux * 1.3, molecule, rotation=90, fontsize=14,
                             color=color, ha='right', va='bottom')
                 else:
                     # Offset label if another molecule is already at this wavelength
                     y_offset = 1.5
-                    ax.text(wavelength, max_flux * y_offset, molecule, rotation=90, fontsize=12,
+                    ax.text(wavelength, max_flux * y_offset, molecule, rotation=90, fontsize=14,
                             color=color, ha='right', va='bottom')
+
+
 
 def main():
     """Main analysis and plotting function."""
@@ -84,54 +88,100 @@ def main():
     
     # System parameters
     params = {
-        'mdwarf': {'T_star': 3000, 'R_star': 0.2},
-        'sun': {'T_star': 5778, 'R_star': 1.0}
+        'mdwarf': {'T_star': 3000, 'R_star': 0.13},  # Correct radius for 3000K M dwarf
+        'sun': {'T_star': const.temp_sun, 'R_star': 1.0}
     }
-    T_planet, R_planet, D, Ag, alpha_rad = 288, 1, 1, 0.3, np.pi/4
+    
+    # Calculate habitable zone for M dwarf
+    _, _, _, _, _, hz_center = single_habitable_zone(
+        model='MS', temp_s=params['mdwarf']['T_star'], radius_s=params['mdwarf']['R_star']
+    )
+    
+    # Use habitable zone center for M dwarf, 1 AU for Sun-like
+    T_planet, R_planet, Ag, alpha_rad = const.T_earth, const.R_earth_example, const.A_g_earth, np.pi/4
+    D_mdwarf = hz_center  # Use habitable zone center for M dwarf
+    D_sun = 1.0  # Use 1 AU for Sun-like star
     
     # Calculate fluxes for both systems
     results = {}
-    for system, p in params.items():
-        results[system] = calculate_system_fluxes(
-            p['T_star'], T_planet, p['R_star'], R_planet, D, wavelength_m, Ag, alpha_rad
-        )
+    # M dwarf system with habitable zone distance
+    results['mdwarf'] = calculate_system_fluxes(
+        params['mdwarf']['T_star'], T_planet, params['mdwarf']['R_star'], 
+        R_planet, D_mdwarf, wavelength_m, Ag, alpha_rad
+    )
+    # Sun-like system with 1 AU distance
+    results['sun'] = calculate_system_fluxes(
+        params['sun']['T_star'], T_planet, params['sun']['R_star'], 
+        R_planet, D_sun, wavelength_m, Ag, alpha_rad
+    )
     
     # Extract results
-    flux_planet_mdwarf, reflected_mdwarf, contrast_mdwarf = results['mdwarf'][1:4]
-    reflected_sun, contrast_sun = results['sun'][2:4]
+    _, flux_planet_mdwarf, reflected_mdwarf, _ = results['mdwarf']
+    _, flux_planet_sun, reflected_sun, _ = results['sun']
     
-    # Create plot
-    fig, ax = plt.subplots(figsize=(10, 6))
+    # Create single plot for both systems
+    fig, ax = plt.subplots(1, 1, figsize=(10, 6))
     if isinstance(ax, np.ndarray):
         ax = ax.flat[0]
     
-    # Plot spectral radiance
-    ax.plot(wavelength_um, flux_planet_mdwarf, label='Habitable planet', lw=3, color='green')
-    ax.plot(wavelength_um, reflected_mdwarf, label='Reflected (M-dwarf)', lw=1, color='red')
-    ax.plot(wavelength_um, reflected_sun, label='Reflected (Sun-like)', lw=1, color='gold')
+    # Plot M dwarf system
+    ax.plot(wavelength_um, flux_planet_mdwarf, label='M dwarf planet emission (288K)', lw=2, color='darkgreen')
+    ax.plot(wavelength_um, reflected_mdwarf, label='M dwarf reflected starlight', lw=2, color='red')
+    
+    # Plot Sun-like system
+    ax.plot(wavelength_um, flux_planet_sun, label='Sun-like planet emission (288K)', lw=2, color='lightgreen')
+    ax.plot(wavelength_um, reflected_sun, label='Sun-like reflected starlight', lw=2, color='orange')
     
     # Setup plot
     ax.set_ylabel('Spectral Radiance\n(W·m⁻³·sr⁻¹)')
     ax.set_xlabel('Wavelength (µm)')
     ax.set_yscale('log')
     ax.set_xlim(0, 3)
-    ax.set_ylim(1e-30, 10)
-    # Add HWO box and contrast info
-    HWO_box = Rectangle((0.2, 1e-50), 2.3, 20 - 1e-10, linewidth=2, edgecolor='black',
-                        facecolor='none', label='HWO observable')
-    ax.add_patch(HWO_box)
     
-    # contrast_info = f'Planet/Star Flux Ratios:\nM-dwarf: {np.max(contrast_mdwarf):.2e}\nSun-like: {np.max(contrast_sun):.2e}'
-    # ax.text(0.02, 0.98, contrast_info, transform=ax.transAxes, fontsize=10, 
-    #         verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+    # Calculate proper y limits to include all data
+    all_fluxes = [flux_planet_mdwarf, reflected_mdwarf, flux_planet_mdwarf + reflected_mdwarf,
+                  flux_planet_sun, reflected_sun, flux_planet_sun + reflected_sun]
+    min_flux = min([np.min(flux) for flux in all_fluxes if np.any(flux > 0)])
+    max_flux = max([np.max(flux) for flux in all_fluxes])
+    # Ensure positive limits for log scale and make room for reflected light
+    min_flux = max(min_flux * 0.01, 1e-30)  # Lower minimum to see reflected light
+    max_flux = max(max_flux * 10e4, 1e-20)    # Adjust maximum
+    ax.set_ylim(min_flux, max_flux)
     
-    # Add absorption features
-    plot_absorption_features(ax, wavelength_um, [flux_planet_mdwarf, reflected_mdwarf, reflected_sun])
     ax.legend()
+    ax.grid(True, alpha=0.3)
+
+    # Add absorption features
+    plot_absorption_features(ax, wavelength_um, all_fluxes)
+    # Calculate contrast using approximation: T_p * R_p^2 / (T_star * R_star^2)
+    T_planet_K = const.T_earth  # Planet temperature in Kelvin
+    R_planet_earth = const.R_earth_example  # Planet radius in Earth radii
     
-    fig.suptitle('Planet Blackbody Emission + Reflected Starlight\nM-dwarf vs Sun-like Systems', fontsize=14)
-    plt.tight_layout()
-    plt.savefig(os.path.join(PLOTS_DIR, 'other_useful', 'flux_ratios_no_text.png'))
+    # Convert to SI units using physics constants
+    T_planet_SI = T_planet_K
+    R_planet_SI = R_planet_earth * const.R_earth
+    R_star_mdwarf_SI = params['mdwarf']['R_star'] * const.R_sun
+    R_star_sun_SI = params['sun']['R_star'] * const.R_sun
+    
+    # Calculate contrast ratios
+    contrast_mdwarf_approx = (T_planet_SI * R_planet_SI**2) / (params['mdwarf']['T_star'] * R_star_mdwarf_SI**2)
+    contrast_sun_approx = (T_planet_SI * R_planet_SI**2) / (params['sun']['T_star'] * R_star_sun_SI**2)
+    
+    # # Add Fp/F* text boxes using the approximation (styled like legend)
+    # ax.text(0.02, 0.12, f'M dwarf Fp/F*: {contrast_mdwarf_approx:.2e}', 
+    #         transform=ax.transAxes, fontsize=14, verticalalignment='bottom',
+    #         bbox=dict(boxstyle='round', facecolor='white', alpha=0.8, edgecolor='black', linewidth=0.5))
+    # ax.text(0.02, 0.04, f'Sun-like Fp/F*: {contrast_sun_approx:.2e}', 
+    #         transform=ax.transAxes, fontsize=14, verticalalignment='bottom',
+    #         bbox=dict(boxstyle='round', facecolor='white', alpha=0.8, edgecolor='black', linewidth=0.5))
+    
+    fig.suptitle('Planet Spectral Characteristics: M dwarf vs Sun-like Systems', fontsize=16, y=0.95)
+    
+    # Add system info as proper subtitle
+    # system_info = f'M dwarf: T={params["mdwarf"]["T_star"]}K, R={params["mdwarf"]["R_star"]}R☉ at {D_mdwarf:.4f} AU | Sun-like: T={const.temp_sun}K, R={params["sun"]["R_star"]}R☉ at {D_sun:.1f} AU'
+    # fig.text(0.5, 0.92, system_info, fontsize=14, horizontalalignment='center')
+    plt.subplots_adjust(top=0.9, bottom=0.1, left=0.1, right=0.95)
+    plt.savefig(os.path.join(PLOTS_DIR, 'other_useful', 'planet_spectra_separate.png'), dpi=150, bbox_inches='tight')
 
 if __name__ == "__main__":
     main() 

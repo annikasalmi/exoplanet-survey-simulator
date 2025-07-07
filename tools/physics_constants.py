@@ -56,6 +56,16 @@ L_m_dwarf_max = 0.08   # Maximum M dwarf luminosity (L☉)
 L_g_star_min = 0.6     # Minimum G-star luminosity (L☉)
 L_g_star_max = 1.5     # Maximum G-star luminosity (L☉)
 
+# Stellar temperature limits for M dwarf and G-star regions (calculated from luminosity)
+T_m_dwarf_min = temp_sun * (L_m_dwarf_min ** 0.25)  # Minimum M dwarf temperature (K)
+T_m_dwarf_max = temp_sun * (L_m_dwarf_max ** 0.25)  # Maximum M dwarf temperature (K)
+T_g_star_min = temp_sun * (L_g_star_min ** 0.25)    # Minimum G-star temperature (K)
+T_g_star_max = temp_sun * (L_g_star_max ** 0.25)    # Maximum G-star temperature (K)
+
+# Actual M-dwarf temperature range from data (hot M-dwarfs M0-M2)
+T_m_dwarf_data_min = 1000  # Minimum M dwarf temperature from data (K)
+T_m_dwarf_data_max = 4000  # Maximum M dwarf temperature (K) - extended to include all M-dwarfs
+
 # Grid resolution parameters
 L_GRID_SIZE = 300      # Grid size for luminosity calculations
 D_GRID_SIZE = 300      # Grid size for distance calculations

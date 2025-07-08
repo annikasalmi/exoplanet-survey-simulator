@@ -149,7 +149,6 @@ def main():
     ax.set_ylim(min_flux, max_flux)
     
     ax.legend()
-    ax.grid(True, alpha=0.3)
 
     # Add absorption features
     plot_absorption_features(ax, wavelength_um, all_fluxes)

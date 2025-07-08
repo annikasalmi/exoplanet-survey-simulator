@@ -10,6 +10,8 @@ from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 from matplotlib.axes import Axes
 from matplotlib.colors import LinearSegmentedColormap
+from lifesim.util.habitable import single_habitable_zone
+from plot.exoplanet_data_utils import load_exoplanet_luminosity_distance
 
 plt.rcParams.update({'font.size': 16})
 
@@ -26,7 +28,7 @@ class PlotHZLimits(BasePlotter):
     def __init__(self, df: Optional[pd.DataFrame] = None, name: str = 'HWO',
                  nruns: int = 1, star_catalog: str = 'Gaia', 
                  xlim_min: float = 0.01, xlim_max: float = 15.0,
-                 ylim_min: float = 4.0, ylim_max: float = 15.0, **kwargs):
+                 ylim_min: float = 1.0, ylim_max: float = 35.0, **kwargs):
         """Initialize with optional dataframe and parameters."""
         if df is None:
             df = self._create_minimal_dataframe()
@@ -84,7 +86,6 @@ class PlotHZLimits(BasePlotter):
         """Plot exoplanet overlay with detection method colors."""
         plotted_methods = set()
         try:
-            from plot.exoplanet_data_utils import load_exoplanet_luminosity_distance
             exo_df = load_exoplanet_luminosity_distance(region_lum=region_lum, 
                                                        region_dist=region_dist, 
                                                        return_names=True)
@@ -92,20 +93,19 @@ class PlotHZLimits(BasePlotter):
                 return plotted_methods
                 
             # Plot exoplanets by detection method
-            for _, row in exo_df.iterrows():
-                method = str(row.get('Detection Method', 'Other'))
-                color = self.DETECTION_COLORS.get(method, 'gray')
-                if method not in plotted_methods:
-                    ax.scatter(row['Luminosity'], row['Distance'], color=color, s=8, alpha=0.7, 
-                              label=f'R<{const.R_earth_max_habitable}R⊕ found by {method}')
-                    plotted_methods.add(method)
-                else:
-                    ax.scatter(row['Luminosity'], row['Distance'], color=color, s=8, alpha=0.7)
-                    
+            for method in exo_df['Detection Method'].unique():
+                method_data = exo_df[exo_df['Detection Method'] == method]
+                color = self.DETECTION_COLORS.get(str(method), 'gray')
+                
+                ax.scatter(method_data['Luminosity'], method_data['Distance'], 
+                          color=color, s=8, alpha=0.7, 
+                          label=f'R<{const.R_earth_max_habitable}R⊕ found by {method}')
+                
                 # Add planet name labels
                 if 'Planet Name' in exo_df.columns:
-                    ax.text(row['Luminosity'], row['Distance']+0.15, str(row['Planet Name']), 
-                           fontsize=7, ha='center', va='bottom', rotation=30)
+                    for _, row in method_data.iterrows():
+                        ax.text(row['Luminosity'], row['Distance']+0.15, str(row['Planet Name']), 
+                               fontsize=7, ha='center', va='bottom', rotation=30)
         except ImportError:
             print("Warning: exoplanet_data_utils not available, skipping exoplanet overlay")
         
@@ -148,12 +148,6 @@ class PlotHZLimits(BasePlotter):
 
     def plot_boundaries(self) -> None:
         """Plot stellar temperature vs semi-major axis with boundaries."""
-        def _safe_float(val):
-            try:
-                return float(val)
-            except Exception:
-                return np.nan
-
         if self.df.empty:
             print("Warning: No data available for panel plot")
             return
@@ -162,10 +156,6 @@ class PlotHZLimits(BasePlotter):
         if x_var not in self.df.columns or y_var not in self.df.columns:
             print(f"Warning: Required columns not found: {x_var}, {y_var}")
             return
-
-
-
-
 
         # Create data subsets for different detection categories
         detected_mask = self._get_panel_detection_mask(self.df)
@@ -231,27 +221,13 @@ class PlotHZLimits(BasePlotter):
         ax.set_xlabel(self._get_axis_label(x_var))
         ax.set_ylabel(self._get_axis_label(y_var))
         ax.set_title(f'{self._get_axis_label(x_var)} vs {self._get_axis_label(y_var)}')
-        
-        # Set axis limits to focus on actual data range (K, G, F stars)
-        # Data range: 3465-7498K, G-star T range: ~5000-6500K
         ax.set_xlim(3000, 8000)  # Cover K, G, F star temperature range
                 
-        y_data = self.df[y_var]
-        if isinstance(y_data, pd.Series):
-            y_data = y_data.dropna()
-        if len(y_data) > 0:
-            y_min = _safe_float(y_data.min())
-            y_max = _safe_float(y_data.max())
-            if np.isfinite(y_min) and np.isfinite(y_max) and y_max > y_min:
-                ax.set_ylim(y_min * 0.9, y_max * 1.1)
-                
-        # Add habitable zone line
+        # Add habitable zone line and reference lines
         self._add_habitable_zone_line(ax)
-        
-        # Add M-dwarf and G-star reference lines
         self._add_stellar_type_reference_lines(ax)
         
-        # Create legend with all elements
+        # Create legend
         legend_elements = [
             Patch(facecolor='red', alpha=0.3, label='Flux Rejected'),
             Patch(facecolor='gold', alpha=0.3, label='Exozodi Rejected'),
@@ -313,8 +289,10 @@ class PlotHZLimits(BasePlotter):
         D_vals = np.linspace(self.ylim_min, self.ylim_max, const.D_GRID_SIZE)
         L_grid, D_grid = np.meshgrid(L_vals, D_vals)
         
-        # Calculate angular separations
+        # Calculate angular separations using basic habitable zone calculation
+        # HZ distance scales as sqrt(L_star/L_sun) * 1 AU
         a_hz_m = np.sqrt(L_grid) * const.au_to_m
+        
         distance_m = D_grid * const.pc_to_m
         theta_arcsec = (a_hz_m / distance_m) * const.rad_to_arcsec
         
@@ -351,8 +329,9 @@ class PlotHZLimits(BasePlotter):
         ax.set_ylim(self.ylim_min, self.ylim_max)
         ax.set_xlim(self.xlim_min, 2.0)
         
-        # Add angular separation threshold boundary
+        # Add angular separation threshold boundary using basic habitable zone calculation
         D_theta_boundary = (np.sqrt(L_vals) * const.au_to_m * const.rad_to_arcsec) / (self.theta_limit_rad * const.rad_to_arcsec * const.pc_to_m)
+        
         mask = D_theta_boundary <= self.ylim_max
         ax.plot(L_vals[mask], D_theta_boundary[mask], color='black', linestyle='--', linewidth=2, 
                label='HWO Angular Sep. Limit (1.0 R⊕)')
@@ -360,17 +339,35 @@ class PlotHZLimits(BasePlotter):
         # Add reference lines
         self._plot_reference_lines(ax, L_vals, is_au=False)
 
-        # Add M dwarfs observable region
+        # Add M dwarfs observable region using basic habitable zone calculation
         L_m_dwarf_range = np.linspace(0, const.L_m_dwarf_max, 100)
         D_theta_boundary_mdwarf = (np.sqrt(L_m_dwarf_range) * const.au_to_m * const.rad_to_arcsec) / (self.theta_limit_rad * const.rad_to_arcsec * const.pc_to_m)
+        
         mask = (D_theta_boundary_mdwarf <= self.ylim_max) & (D_theta_boundary_mdwarf >= 0)
         if np.any(mask):
             ax.fill_between(L_m_dwarf_range[mask], 0, D_theta_boundary_mdwarf[mask], 
                            color='darkgreen', alpha=1, label='M dwarfs observable by HWO')
 
-        # Add exoplanet overlay
+        # Add exoplanet overlay with specific planet labels
         plotted_methods = self._plot_exoplanet_overlay(ax, region_lum=(self.xlim_min, self.xlim_max), 
                                                       region_dist=(self.ylim_min, self.ylim_max))
+        
+        # Add specific labels for Proxima Centauri b and TOI-700 planets
+        specific_planets = {
+            'Proxima Cen b': (0.0016, 1.3),  # (luminosity, distance)
+            'TOI-700 b': (0.023, 31.1),
+            'TOI-700 c': (0.023, 31.1),
+            'TOI-700 d': (0.023, 31.1),
+            'TOI-700 e': (0.023, 31.1)
+        }
+        
+        for planet_name, (lum, dist) in specific_planets.items():
+            if (self.xlim_min <= lum <= self.xlim_max and 
+                self.ylim_min <= dist <= self.ylim_max):
+                ax.annotate(planet_name, (lum, dist), 
+                           xytext=(5, 5), textcoords='offset points',
+                           fontsize=8, ha='left', va='bottom',
+                           bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.7))
 
         # Create legend
         legend_elements = [

@@ -95,7 +95,6 @@ class BasePlotter:
 
     def _calculate_efficiency_data(self, df, x_col: str, bins: np.ndarray):
         """Calculate detection efficiency data for given dataframe and bins."""
-        # Ensure df is a DataFrame
         if hasattr(df, 'to_frame'):
             df = df.to_frame()
         
@@ -118,39 +117,20 @@ class BasePlotter:
                            detected_color='green', detected_hatch=None,
                            add_total_label=True, detected_label='Detected'):
         """Create overlay bar plot with total and detected bars."""
-        # Plot total bars (background)
         total_label = 'Total' if add_total_label else None
         ax.bar(x, total_heights, width=bar_width, color=total_color, 
                alpha=0.5, edgecolor='black', yerr=total_errors, capsize=3,
                label=total_label, ecolor='darkgray')
         
-        # Plot detected bars (overlay)
         ax.bar(x, detected_heights, width=bar_width, color=detected_color,
                alpha=0.8, edgecolor='black', yerr=detected_errors, capsize=3,
                bottom=np.zeros_like(detected_heights), hatch=detected_hatch,
                label=detected_label, ecolor='darkgray')
         
-        # Fix the numpy array truth value ambiguity
         if detected_errors is not None:
             return detected_heights, detected_errors
         else:
             return detected_heights, np.zeros_like(detected_heights)
-
-    def _planck_function(self, wavelength: float, temperature: float) -> float:
-        """Calculate Planck function for given wavelength and temperature."""
-        return (2 * const.h * const.c**2) / (wavelength**5 * 
-                (np.exp((const.h * const.c) / (wavelength * const.k * temperature)) - 1))
-
-    def _setup_mdwarf_parameters(self):
-        """Setup M dwarf and planet parameters for HZ limit calculations."""
-        return {
-            'T_star': 3200,  # K (typical M dwarf)
-            'R_star': 0.2 * const.R_sun,  # 0.2 solar radii
-            'T_planet': 288,  # K (Earth-like)
-            'R_planet': const.R_earth,
-            'lambda_obs': 10e-6,  # m (mid-IR, 10 micron)
-            'hz_au': 0.1  # AU (habitable zone for M dwarf)
-        }
 
     def plot_all(self) -> None:
         """Base plot_all method - should be overridden by subclasses."""

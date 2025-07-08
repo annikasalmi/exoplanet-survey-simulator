@@ -255,10 +255,24 @@ class PlotPlanetType(BasePlotter):
 
     def _calculate_planet_stats(self, df):
         """Calculate statistics for planet-based plots."""
-        # Add categories
+        # Add categories using vectorized operations (much faster than apply)
         df = df.copy()
-        df['categories'] = df.apply(self._assign_category, axis=1)
-        df = df.explode('categories')
+        
+        # Vectorized category assignment
+        conditions = [
+            (df['radius_p'] < 1.5),
+            (df['radius_p'] < 1.5) & (df['stype'] == 'M'),
+            (df['radius_p'] < 1.5) & (df['stype'].isin(['G', 'K'])),
+            (df['radius_p'] >= 1.5) & (df['radius_p'] < 2.0),
+            (df['radius_p'] >= 2.0) & (df['radius_p'] < 4.0),
+            (df['radius_p'] >= 4.0) & (df['radius_p'] < 8.0)
+        ]
+        choices = ['Rocky', 'Rocky, M stars', 'Rocky, G and K stars', 'Super-Earths', 'Sub-Neptunes', 'Sub-Jovians']
+        df['categories'] = np.select(conditions, choices, default='')
+        
+        # Filter for valid categories only
+        valid_categories = ['Rocky', 'Rocky, M stars', 'Rocky, G and K stars', 'Super-Earths', 'Sub-Neptunes', 'Sub-Jovians']
+        df = df[df['categories'].isin(valid_categories)]
         
         # Calculate statistics
         stats = self._pivot_stats(df, ['categories', 'temp_zone'])
@@ -267,8 +281,6 @@ class PlotPlanetType(BasePlotter):
         mask_best, _ = self._get_detection_masks()
         mask_best = mask_best[df.index]  # Align mask with filtered df
         df_detected = df[mask_best].copy()
-        df_detected['categories'] = df_detected.apply(self._assign_category, axis=1)
-        df_detected = df_detected.explode('categories')
         
         # Calculate detected statistics
         detected_stats = self._pivot_stats(df_detected, ['categories', 'temp_zone'])

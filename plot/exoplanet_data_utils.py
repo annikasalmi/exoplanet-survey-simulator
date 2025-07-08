@@ -3,24 +3,29 @@ import pandas as pd
 from tools.paths import LIFESIM_OUTER_DIR
 from tools import physics_constants as const
 
-def load_exoplanet_luminosity_distance(region_lum=(0.001, 10), region_dist=(4, 35), return_names=False):
-    """Load exoplanets_2025.csv and return DataFrame with 'Luminosity', 'Distance', and optionally 'Planet Name' in the specified region.
-    Uses columns: 'pl_name' (planet name), 'st_lum' (luminosity), 'sy_dist' (distance), 'pl_rade' (radius)."""
+def load_exoplanet_luminosity_distance(region_lum=(0.001, 10), region_dist=(1, 35), return_names=False):
+    """Load exoplanets_2025.csv and return DataFrame with 'Luminosity', 'Distance', and optionally 'Planet Name' in the specified region."""
     exo_path = os.path.join(LIFESIM_OUTER_DIR, 'exoplanets_2025.csv')
     exo_df = pd.read_csv(exo_path)
     if not isinstance(exo_df, pd.DataFrame):
         exo_df = pd.DataFrame(exo_df)
 
-    # Filter for valid luminosity, distance, and radius
-    exo_df = exo_df[(exo_df['st_lum'].notnull()) & (exo_df['sy_dist'].notnull()) & (exo_df['pl_rade'].notnull())]
+    # Filter for valid luminosity and distance
+    exo_df = exo_df[(exo_df['st_lum'].notnull()) & (exo_df['sy_dist'].notnull())]
     if not isinstance(exo_df, pd.DataFrame) or exo_df.empty:
-        print("No planets with valid luminosity, distance, and radius data")
+        print("No planets with valid luminosity and distance data")
         return None
 
-    # Filter for radius < 2.6 Earth radii
-    exo_df = exo_df[exo_df['pl_rade'] < const.R_earth_max_habitable]
+    # Include specific planets of interest
+    specific_planets = ['Proxima Cen b', 'TOI-700 b', 'TOI-700 c', 'TOI-700 d', 'TOI-700 e']
+    specific_mask = exo_df['pl_name'].isin(specific_planets)
+    
+    # Filter for radius < 2.6 Earth radii (if radius data is available)
+    radius_filter = exo_df['pl_rade'].notnull()
+    habitable_filter = (exo_df['pl_rade'] < const.R_earth_max_habitable) | (~radius_filter) | specific_mask
+    exo_df = exo_df[habitable_filter]
     if not isinstance(exo_df, pd.DataFrame) or exo_df.empty:
-        print("No planets with radius < 2.6 Earth radii")
+        print("No planets with valid radius or habitable zone data")
         return None
 
     # Rename columns for consistency

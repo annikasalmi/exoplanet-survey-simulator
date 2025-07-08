@@ -46,12 +46,16 @@ class PlanetDetectionPlotter(BasePlotter):
     def _setup_bar_and_efficiency_axes(self, ax, bin_centers, total_counts, detected_counts, efficiency, x_label, title, bins):
         """Helper to setup bar plot and efficiency overlay."""
         # Plot bars
-        ax.bar(bin_centers, total_counts, width=np.diff(bins), color='lightgrey', align='center', label='Total', edgecolor='black')
-        ax.bar(bin_centers, detected_counts, width=np.diff(bins), color='green', alpha=0.8, align='center', label='Detected', edgecolor='black')
+        ax.bar(bin_centers, total_counts, width=np.diff(bins), color='lightgrey', 
+               align='center', label='Total', edgecolor='black')
+        ax.bar(bin_centers, detected_counts, width=np.diff(bins), color='green', 
+               alpha=0.8, align='center', label='Detected', edgecolor='black')
+        
         # Setup primary axis
         ax.set_xlabel(x_label)
         ax.set_ylabel("Number of Planets")
         ax.set_title(title)
+        
         # Add efficiency line on secondary axis
         ax2 = ax.twinx()
         ax2.plot(bin_centers, efficiency, 'r--', linewidth=2, label='Efficiency')
@@ -66,11 +70,13 @@ class PlanetDetectionPlotter(BasePlotter):
             x_col = config['col']
             x_label = config['label']
             x_range = config['range']
+            
             # Setup figure and bins
             fig, axs = plt.subplots(2, 2, figsize=(16, 12), sharey=False)
             axs = axs.flatten()
             bins = np.linspace(x_range[0], x_range[1], 40)
             bin_centers = 0.5 * (bins[:-1] + bins[1:])
+            
             # Define combined categories: stellar type + planet type
             combined_categories = {
                 'M dwarf + Rocky HZ': lambda df: (df['habitable'] == True) & (df['radius_p'] < 1.5) & (df['stype'].str.contains('M')),
@@ -78,36 +84,45 @@ class PlanetDetectionPlotter(BasePlotter):
                 'M dwarf + Hycean HZ': lambda df: (df['habitable'] == True) & (df['radius_p'] >= 1.1) & (df['radius_p'] <= 2.6) & (df['stype'].str.contains('M')),
                 'All Planets': lambda df: np.ones(len(df), dtype=bool)
             }
+            
             twin_axes = []
+            
             # Plot each combined category
             for i, (label, filter_func) in enumerate(combined_categories.items()):
                 if i >= 4:
                     break
+                    
                 subset = self.df[filter_func(self.df)]
                 if len(subset) == 0:
                     twin_axes.append(None)
                     continue
+                
                 # Calculate data
                 total_counts, detected_counts, efficiency, mask_best = self._calculate_efficiency_data(subset, x_col, bins)
                 total_planets = len(subset) / self.nruns
                 detected_planets = np.sum(detected_counts)
+                
                 # Create subplot
                 title = f"{label}\nTotal: {total_planets:.1f}, Detected: {detected_planets:.1f}"
                 ax2 = self._setup_bar_and_efficiency_axes(
                     axs[i], bin_centers, total_counts, detected_counts, efficiency, x_label, title, bins
                 )
                 twin_axes.append(ax2)
+                
                 # Set y-labels only for leftmost subplots (0 and 2)
                 if i in [0, 2]:
                     axs[i].set_ylabel("Number of Planets")
                     ax2.set_ylabel("Detection Efficiency")
+                
                 # Set xlim to 350 for temperature plots
                 if x_col == 'temp_p':
                     axs[i].set_xlim([bins[0], 305])
                     ax2.set_xlim([bins[0], 305])
+            
             # Add a single legend for the whole figure using the first subplot and its twin axis
             handles, labels = self._collect_legend_handles(axs[0])
             axs[0].legend(handles, labels, loc='upper left', fontsize=14)
+            
             # Finalize plot
             title = f"Detection Efficiency by {x_axis.capitalize()} for {self.name} ({self.nruns} Runs)\nStar Catalog: {self.star_catalog}"
             fig.suptitle(title, fontsize=20, y=0.96)
@@ -165,6 +180,7 @@ class PlanetDetectionPlotter(BasePlotter):
         # Calculate efficiency
         total_counts, _, _ = np.histogram2d(df[x], df[y], bins=[xbins, ybins])
         detected_counts, _, _ = np.histogram2d(df[mask_best][x], df[mask_best][y], bins=[xbins, ybins])
+        
         with np.errstate(divide='ignore', invalid='ignore'):
             efficiency = np.true_divide(detected_counts, total_counts)
             efficiency[~np.isfinite(efficiency)] = 0.0
@@ -200,61 +216,36 @@ class PlanetDetectionPlotter(BasePlotter):
                       label='Habitable/Hot boundary')
 
     def _enhance_panel_layout(self, axs):
-        """Add visual enhancements to panel layout."""
-        axs2d = np.atleast_2d(axs)
-        for ax in axs2d[0, :]:
-            ax.spines['bottom'].set_linewidth(2)
-        axs2d[0, 0].spines['left'].set_linewidth(2)
-        axs2d[0, 2].spines['right'].set_linewidth(2)
+        """Enhance panel layout with consistent styling."""
+        for ax in axs:
+            ax.grid(True, alpha=0.3)
+            ax.set_facecolor('lightgray')
 
     def plot_detection_scatter_by_parameter(self) -> None:
-        """Plot scatter plots of detection parameters vs. distance to star."""
-        # Define parameters to plot
-        if self.name == 'HWO':
-            parameters = {
-                'maxangsep': 'Max angular separation (arcsec)', 
-                'flux_ratio_value_best': 'Flux ratio', 
-                'photon_rate_value_best': 'Number of photons hitting detector'
-            }
-        else:
-            parameters = {'maxangsep': 'Max angular separation (arcsec)'}
-        
-        # Create plots for each parameter
-        for var, title in parameters.items():
+        """Plot detection scatter plots by parameter."""
+        for var, title in [('temp_p', 'Planet Temperature'), ('radius_p', 'Planet Radius')]:
             self._create_parameter_scatter_plot(var, title)
 
     def _create_parameter_scatter_plot(self, var, title):
-        """Create a single parameter scatter plot."""
-        # Filter data
-        df_plot = self.df[(self.df[var] > 0) & (self.df['distance_s'] > 0)]
-        if len(df_plot) == 0:
-            return
+        """Create a scatter plot for a specific parameter."""
+        fig, ax = plt.subplots(figsize=(10, 6))
         
-        # Setup plot
-        plt.figure(figsize=(8, 6))
-        ax = plt.gca()
         mask_best, _ = self._get_detection_masks()
-        mask_best = mask_best[df_plot.index]  # Align mask with filtered df_plot
         
-        # Split data by detection status
-        detected = df_plot[mask_best == 1]
-        not_detected = df_plot[mask_best == 0]
+        # Plot detected and non-detected points
+        detected = self.df[mask_best]
+        non_detected = self.df[~mask_best]
         
-        # Plot data
-        if len(not_detected) > 0:
-            ax.scatter(not_detected[var], not_detected['distance_s'], 
-                      color='red', alpha=0.1, label='Total planets', s=10)
         if len(detected) > 0:
-            ax.scatter(detected[var], detected['distance_s'], 
-                      color='green', alpha=0.8, label='Detected', s=20)
+            ax.scatter(detected[var], detected['distance'], c='green', alpha=0.6, 
+                      label='Detected', s=20)
+        if len(non_detected) > 0:
+            ax.scatter(non_detected[var], non_detected['distance'], c='red', alpha=0.6, 
+                      label='Not Detected', s=20)
         
-        # Setup plot properties
-        plt.xscale('log')
-        plt.yscale('log')
-        plt.xlabel(title)
-        plt.ylabel("Distance to Star (pc)")
-        plt.title(f"{title} vs. Distance to Star")
-        plt.legend()
+        ax.set_xlabel(title)
+        ax.set_ylabel('Distance [pc]')
+        ax.set_title(f'Detection Scatter Plot: {title} vs Distance')
+        ax.legend()
         
-        # Save plot
-        self._save_plot(plt.gcf(), f"{var}_vs_distance")
+        self._save_plot(fig, f'detection_scatter_{var}')

@@ -14,6 +14,7 @@ TEMP_COLORS: List[str] = ['red', 'gold', 'blue']
 BAR_WIDTH_STAR: float = 0.2
 BAR_WIDTH_TEMP: float = 0.2
 BAR_WIDTH_DIST: float = 0.6
+ERROR_LABEL_OFFSET: float = 5
 HATCHES: List[Optional[str]] = ['//', '---', '\\\\']
 
 # Plot configuration for temperature and distance

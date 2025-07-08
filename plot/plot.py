@@ -3,7 +3,7 @@ from functools import partial
 import matplotlib
 import os
 from plot.plot_by_type import PlotPlanetType
-from plot.plot_by_type_LTC3 import PlotPlanetTypeLTC3  # NEW IMPORT
+from plot.plot_by_type_LTC3 import PlotPlanetTypeLTC3, PlanetDetectionPlotterLTC3 
 from plot.plot_detections import PlanetDetectionPlotter
 from plot.plot_rejections import PlanetRejectionPlotter
 from plot.plot_hz_limits import PlotHZLimits
@@ -45,16 +45,18 @@ def plot_all(df, nruns=1, star_catalog='Gaia', sim_name='HWO', use_multiprocessi
     elif sim_name.lower() == 'lifesim':
         sim_name = 'LIFEsim'
     
-    # Use the LTC3 plotter if star_catalog is LTC_3
+    # Use the LTC3 plotters if star_catalog is LTC_3
     if star_catalog == 'LTC_3':
         main_plotter = PlotPlanetTypeLTC3
+        detection_plotter = PlanetDetectionPlotterLTC3
     else:
         main_plotter = PlotPlanetType
+        detection_plotter = PlanetDetectionPlotter
     
     # Define plotting tasks
     plotting_tasks = [
         (main_plotter, {}),
-        (PlanetDetectionPlotter, {}),
+        (detection_plotter, {}),
     ]
     
     # Add rejection plotting only for HWO

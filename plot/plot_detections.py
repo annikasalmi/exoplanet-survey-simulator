@@ -46,8 +46,8 @@ class PlanetDetectionPlotter(BasePlotter):
     def _setup_bar_and_efficiency_axes(self, ax, bin_centers, total_counts, detected_counts, efficiency, x_label, title, bins):
         """Helper to setup bar plot and efficiency overlay."""
         # Plot bars
-        ax.bar(bin_centers, total_counts, width=np.diff(bins), color='lightgrey', align='center', label='Total')
-        ax.bar(bin_centers, detected_counts, width=np.diff(bins), color='green', alpha=0.8, align='center', label='Detected')
+        ax.bar(bin_centers, total_counts, width=np.diff(bins), color='lightgrey', align='center', label='Total', edgecolor='black')
+        ax.bar(bin_centers, detected_counts, width=np.diff(bins), color='green', alpha=0.8, align='center', label='Detected', edgecolor='black')
         # Setup primary axis
         ax.set_xlabel(x_label)
         ax.set_ylabel("Number of Planets")

@@ -91,21 +91,23 @@ class PlotHZLimits(BasePlotter):
             if exo_df is None or exo_df.empty:
                 return plotted_methods
                 
-            # Plot exoplanets by detection method
-            for _, row in exo_df.iterrows():
-                method = str(row.get('Detection Method', 'Other'))
-                color = self.DETECTION_COLORS.get(method, 'gray')
-                if method not in plotted_methods:
-                    ax.scatter(row['Luminosity'], row['Distance'], color=color, s=8, alpha=0.7, 
-                              label=f'R<{const.R_earth_max_habitable}R⊕ found by {method}')
-                    plotted_methods.add(method)
-                else:
-                    ax.scatter(row['Luminosity'], row['Distance'], color=color, s=8, alpha=0.7)
+            # Plot exoplanets by detection method - vectorized for better performance
+            if not exo_df.empty:
+                # Vectorized plotting
+                for method in exo_df['Detection Method'].unique():
+                    method_data = exo_df[exo_df['Detection Method'] == method]
+                    color = self.DETECTION_COLORS.get(str(method), 'gray')
                     
-                # Add planet name labels
-                if 'Planet Name' in exo_df.columns:
-                    ax.text(row['Luminosity'], row['Distance']+0.15, str(row['Planet Name']), 
-                           fontsize=7, ha='center', va='bottom', rotation=30)
+                    # Plot all points for this method at once
+                    ax.scatter(method_data['Luminosity'], method_data['Distance'], 
+                              color=color, s=8, alpha=0.7, 
+                              label=f'R<{const.R_earth_max_habitable}R⊕ found by {method}')
+                    
+                    # Add planet name labels if available
+                    if 'Planet Name' in exo_df.columns:
+                        for _, row in method_data.iterrows():
+                            ax.text(row['Luminosity'], row['Distance']+0.15, str(row['Planet Name']), 
+                                   fontsize=7, ha='center', va='bottom', rotation=30)
         except ImportError:
             print("Warning: exoplanet_data_utils not available, skipping exoplanet overlay")
         

@@ -43,7 +43,7 @@ class PlotPlanetTypeLTC3(PlotPlanetType):
             for i, (height, error) in enumerate(zip(detected_heights, detected_errors)):
                 if height > 0:
                     label_text = f'{int(height)}±{int(error)}'
-                    ax.text(x[i], height + error + 0.3, label_text, ha='center', va='bottom', rotation=90)
+                    ax.text(x[i], height + error + 0.8, label_text, ha='center', va='bottom', rotation=90)
         return (detected_heights, detected_errors) if detected_errors is not None else (detected_heights, None)
 
     def _assign_category_LTC3(self, row):
@@ -98,7 +98,7 @@ class PlotPlanetTypeLTC3(PlotPlanetType):
             for j, (height, error) in enumerate(zip(heights, errors)):
                 if height > 0:
                     label_text = f'{int(round(height))}±{int(round(error))}'
-                    ax.text(x[j] + i * bar_width, height + error + 0.3, label_text, ha='center', va='bottom', rotation=90, fontsize=10)
+                    ax.text(x[j] + i * bar_width, height + error + 0.8, label_text, ha='center', va='bottom', rotation=90, fontsize=10)
         ax.set_xlabel('Star Type')
         ax.set_ylabel('Number of Planets')
         ax.set_title(f'Planet Detection by Star Type for {self.name} ({self.nruns} runs)\nStar Catalog: {self.star_catalog}')
@@ -119,7 +119,7 @@ class PlotPlanetTypeLTC3(PlotPlanetType):
         
         # Vectorized category assignment (much faster than apply)
         conditions = [
-            (df['radius_p'] >= 0.5) & (df['radius_p'] < 1.4) & (df['habitable'] == True),
+            (df['radius_p'] >= 0.5) & (df['radius_p'] < 1.4) & (df['habitable'] == True) & (df['stype'].isin(['G', 'K'])),
             (df['radius_p'] >= 0.5) & (df['radius_p'] < 1.4) & (df['habitable'] == True) & (df['stype'].isin(['G', 'K'])),
             (df['radius_p'] >= 1.0) & (df['radius_p'] < 1.4),
             (df['radius_p'] >= 1.4) & (df['radius_p'] < 2.6),
@@ -187,12 +187,12 @@ class PlotPlanetTypeLTC3(PlotPlanetType):
         # Add error bar labels efficiently
         if rocky_ehz_detected > 0:
             label_text = f'{rocky_ehz_detected}±{round(rocky_ehz_error)}'
-            ax.text(rocky_ehz_idx, rocky_ehz_detected + rocky_ehz_error + 0.3, label_text, 
+            ax.text(rocky_ehz_idx, rocky_ehz_detected + rocky_ehz_error + 0.8, label_text, 
                    ha='center', va='bottom', rotation=90, fontsize=10)
         
         if exo_earth_detected > 0:
             label_text = f'{exo_earth_detected}±{round(exo_earth_error)}'
-            ax.text(exo_earth_idx, exo_earth_detected + exo_earth_error + 0.3, label_text, 
+            ax.text(exo_earth_idx, exo_earth_detected + exo_earth_error + 0.8, label_text, 
                    ha='center', va='bottom', rotation=90, fontsize=10)
         
         # Add error bar labels for temperature zone bars
@@ -206,7 +206,7 @@ class PlotPlanetTypeLTC3(PlotPlanetType):
                 
                 if detected > 0:
                     label_text = f'{detected}±{round(detected_error)}'
-                    ax.text(idx + j * bar_width, detected + detected_error + 0.3, label_text, 
+                    ax.text(idx + j * bar_width, detected + detected_error + 0.8, label_text, 
                            ha='center', va='bottom', rotation=90, fontsize=10)
         
         # Custom legend
@@ -214,7 +214,7 @@ class PlotPlanetTypeLTC3(PlotPlanetType):
         for color, temp_zone in zip(TEMP_COLORS, TEMP_ZONES):
             handles.append(plt.Rectangle((0,0),1,1, color=color,ec='black'))
             labels.append(temp_zone)
-        ax.legend(handles, labels, loc='upper left')
+        ax.legend(handles, labels, loc='upper right')
         
         # Extend y-axis for labels
         y_max = ax.get_ylim()[1]
@@ -239,12 +239,13 @@ class PlotPlanetTypeLTC3(PlotPlanetType):
         for i, (count, error) in enumerate(zip(detected_counts, detected_errors)):
             if count > 0:
                 label_text = f'{int(round(count))}±{int(round(error))}'
-                ax.text(i, count + error + 0.3, label_text, ha='center', va='bottom', rotation=90, fontsize=10)
+                ax.text(i, count + error + 0.8, label_text, ha='center', va='bottom', rotation=90, fontsize=10)
         ax.set_xlabel('Distance [pc]')
         ax.set_ylabel('Number of Planets')
         ax.set_title(f'Planet Detection by Distance Bin for {self.name} ({self.nruns} runs)\nStar Catalog: {self.star_catalog}')
         ax.set_xticks(x)
         ax.set_xticklabels(DISTANCE_LABELS)
+        ax.set_ylim(0,300)
         plt.tight_layout(rect=[0, 0, 1, 0.92])
         self._save_plot(fig, 'planet_detection_by_distance_LTC3')
 

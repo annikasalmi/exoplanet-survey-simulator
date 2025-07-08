@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This project simulates and analyses the efficiency of detecting habitable exoplanets around M dwarf stars with LIFE and HWO. It includes tools for running simulations, analysing detection statistics, and visualising results.
+This project simulates and analyses the efficiency of detecting habitable exoplanets around M dwarf stars with LIFE and HWO. It includes tools for running simulations, analysing detection statistics, and visualising results. Cursor was used to optimize and speed up plotting.
 
 ## Features
 - Simulation of exoplanet populations multiple times

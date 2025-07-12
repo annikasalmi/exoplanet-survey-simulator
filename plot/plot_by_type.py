@@ -57,8 +57,7 @@ class PlotPlanetType(BasePlotter):
         """Initialize the plotter with data and metadata."""
         super().__init__(df, nruns, star_catalog, name)
         # Ensure temp_zone column is present for all plotting methods that need it
-        if 'temp_zone' not in self.df.columns:
-            self.df['temp_zone'] = self.df['temp_p'].apply(self._temp_zone)
+        self.df['temp_zone'] = self.df['temp_p'].apply(self._temp_zone)
 
     def plot_all(self) -> None:
         """Generate all planet type plots."""
@@ -101,22 +100,33 @@ class PlotPlanetType(BasePlotter):
         df = self.df.copy()
         x = np.arange(len(STAR_ORDER))
         
-        # Add radius bins and ensure 'Rocky HZ' is a category
-        df['radius_bin'] = pd.cut(df['radius_p'], 
-                                 bins=[0, 1.5, 3.0, 6.0, float('inf')], 
-                                 labels=['<1.5', '1.5–3.0', '3.0–6.0', '>6.0'],
-                                 include_lowest=True)
+        # Drop any existing radius_bin column to avoid contamination from input data
+        if 'radius_bin' in df.columns:
+            df = df.drop(columns=['radius_bin'])
+        # Always recalculate radius_bin from scratch
+        df['radius_bin'] = pd.cut(
+            df['radius_p'],
+            bins=[0, 1.5, 3.0, 6.0, float('inf')],
+            labels=['<1.5', '1.5–3.0', '3.0–6.0', '>6.0'],
+            include_lowest=True
+        )
         df['radius_bin'] = df['radius_bin'].cat.add_categories(['Rocky HZ'])
         
-        # Filter for rocky habitable zone planets and assign them to 'Rocky HZ' bin
+        # Assign Rocky HZ as before
         rocky_hz_mask = (df['habitable'] == True) & (df['radius_p'] < 1.5)
         df.loc[rocky_hz_mask, 'radius_bin'] = 'Rocky HZ'
         
         # Only keep bins in BIN_LABELS (removes '>6.0')
         df = df[df['radius_bin'].isin(BIN_LABELS)]
         
+        # Get detection mask BEFORE any further filtering to ensure alignment
+        mask_best, _ = self._get_detection_masks()
+        if hasattr(mask_best, 'reindex'):
+            mask_best = mask_best.reindex(self.df.index, fill_value=False)
+        detected_df = self.df[mask_best]
+
         # Total stats - simple groupby and sum across runs
-        total_per_run = df.groupby(['run', 'stype', 'radius_bin']).size().reset_index()
+        total_per_run = self.df.groupby(['run', 'stype', 'radius_bin']).size().reset_index()
         total_per_run.columns = ['run', 'stype', 'radius_bin', 'count']
         total_pivot = total_per_run.pivot_table(index=['stype', 'radius_bin'], columns='run', values='count', fill_value=0)
         total_mean = total_pivot.mean(axis=1)
@@ -125,19 +135,8 @@ class PlotPlanetType(BasePlotter):
         total_std = total_pivot.std(axis=1)
         if isinstance(total_std, pd.Series):
             total_std = total_std.to_frame('count').reset_index()
-        
-        # Detected stats
-        mask_best, _ = self._get_detection_masks()
-        mask_best = mask_best[df.index]  # Align mask with filtered df
-        if self.name == 'HWO':
-            df['detected_flag_best'] = mask_best.astype(bool)
-            detected_df = df[df['detected_flag_best']]
-        else:
-            df['detected_flag'] = mask_best.astype(bool)
-            detected_df = df[df['detected_flag']]
-        if not isinstance(detected_df, pd.DataFrame):
-            detected_df = pd.DataFrame(columns=df.columns)
-        
+
+        # Detected stats - use the mask to filter the DataFrame
         detected_per_run = detected_df.groupby(['run', 'stype', 'radius_bin']).size().reset_index()
         detected_per_run.columns = ['run', 'stype', 'radius_bin', 'count']
         detected_pivot = detected_per_run.pivot_table(index=['stype', 'radius_bin'], columns='run', values='count', fill_value=0)
@@ -149,7 +148,7 @@ class PlotPlanetType(BasePlotter):
             detected_std = detected_std.to_frame('count').reset_index()
         
         # Create the overlay plot
-        fig, ax = plt.subplots(figsize=(12, 8))
+        fig, ax = plt.subplots(figsize=(8,6))
         bar_width = BAR_WIDTH_STAR
         # Ensure ax is a matplotlib Axes, not an ndarray
         if isinstance(ax, np.ndarray):
@@ -187,7 +186,13 @@ class PlotPlanetType(BasePlotter):
         
         ax.set_xlabel('Star Type')
         ax.set_ylabel('Number of Planets')
-        ax.set_title(f'Planet Detection by Star Type for {self.name} ({self.nruns} runs)\nStar Catalog: {self.star_catalog}')
+        if self.name == 'HWO_exoplanets':
+            name = '\nHWO detection ability of exoplanet catalog'
+        elif self.name == 'LIFEsim_exoplanets':
+            name = '\nLIFEsim detection ability of exoplanet catalog'
+        else:
+            name = self.name
+        ax.set_title(f'Planet Detection by Star Type for {name}')
         ax.set_xticks(x + 1.5 * bar_width)
         ax.set_xticklabels(STAR_ORDER)
         ax.legend(title='Radius Bin')
@@ -203,6 +208,7 @@ class PlotPlanetType(BasePlotter):
             for star in STAR_ORDER:
                 total_heights.append(get_count(bin_data, star=star))
                 detected_heights.append(get_count(bin_detected, star=star))
+            
             self._add_percentage_labels(ax, x + i * bar_width, detected_heights, total_heights, offset=8)
         
         # Add detected/total labels above each stellar type
@@ -214,61 +220,68 @@ class PlotPlanetType(BasePlotter):
             # Find the tallest bar for this star
             heights = [get_count(total_mean, star=star, bin_label=bin_label) + get_count(detected_mean, star=star, bin_label=bin_label) for bin_label in BIN_LABELS]
             max_height = max(heights) if heights else 0
-            if self.name == 'HWO':
-                if star == 'M':
-                    ax.text(
-                            x[idx] + 1.5 * bar_width, max_height + 5,
-                            f"{int(detected_count)} detected out of \n {int(total_count)} simulated",
-                            ha='center', va='bottom', fontsize=12
-                        )
-                elif star == 'K':
-                    ax.text(
-                            x[idx] + 1.5 * bar_width, max_height-5,
-                            f"{int(detected_count)} detected out of \n {int(total_count)} simulated",
-                            ha='center', va='bottom', fontsize=12
-                        )
-                else:
-                    ax.text(
-                            x[idx] + 1.5 * bar_width, max_height - 15,
-                            f"{int(detected_count)} detected out of \n {int(total_count)} simulated",
-                            ha='center', va='bottom', fontsize=12
-                        )
-            else:
-                if star == 'K':
-                    ax.text(
-                            x[idx] + 1.5 * bar_width, max_height-50,
-                            f"{int(detected_count)} detected out of \n {int(total_count)} simulated",
-                            ha='center', va='bottom', fontsize=12
-                        )
-                else:
-                    ax.text(
-                            x[idx] + 1.5 * bar_width, max_height,
-                            f"{int(detected_count)} detected out of \n {int(total_count)} simulated",
-                            ha='center', va='bottom', fontsize=12
-                        )
+            # if self.name == 'HWO':
+            #     if star == 'M':
+            #         ax.text(
+            #                 x[idx] + 1.5 * bar_width, max_height + 5,
+            #                 f"{int(detected_count)} detected out of \n {int(total_count)} ",
+            #                 ha='center', va='bottom', fontsize=12
+            #             )
+            #     elif star == 'K':
+            #         ax.text(
+            #                 x[idx] + 1.5 * bar_width, max_height-5,
+            #                 f"{int(detected_count)} detected out of \n {int(total_count)}",
+            #                 ha='center', va='bottom', fontsize=12
+            #             )
+            #     else:
+            #         ax.text(
+            #                 x[idx] + 1.5 * bar_width, max_height - 15,
+            #                 f"{int(detected_count)} detected out of \n {int(total_count)}",
+            #                 ha='center', va='bottom', fontsize=12
+            #             )
+            # else:
+            #     if star == 'K':
+            #         ax.text(
+            #                 x[idx] + 1.5 * bar_width, max_height-50,
+            #                 f"{int(detected_count)} detected out of \n {int(total_count)}",
+            #                 ha='center', va='bottom', fontsize=12
+            #             )
+            #     else:
+            #         ax.text(
+            #                 x[idx] + 1.5 * bar_width, max_height,
+            #                 f"{int(detected_count)} detected out of \n {int(total_count)}",
+            #                 ha='center', va='bottom', fontsize=12
+            #             )
         
-        plt.tight_layout(rect=[0, 0, 1, 0.92])
+        plt.tight_layout()
+        
         plt.savefig(os.path.join(self.data_dir, 
-                                self._output_filename('stellar_type_overlay')), 
-                   dpi=300, bbox_inches='tight')
+                                self._output_filename('stellar_type_overlay')),
+                   bbox_inches='tight')
         plt.close(fig)
 
     def _calculate_planet_stats(self, df):
         """Calculate statistics for planet-based plots."""
-        # Add categories
+        # Add categories first
         df = df.copy()
         df['categories'] = df.apply(self._assign_category, axis=1)
         df = df.explode('categories')
         
-        # Calculate statistics
+        # Get detection mask BEFORE any further processing
+        mask_best, _ = self._get_detection_masks()
+        mask_best = mask_best[df.index]  # Align mask with exploded df
+        
+        # DEBUG: Print detection mask statistics for planet plotting
+        print(f"DEBUG: Detection mask analysis in _calculate_planet_stats")
+        print(f"  mask_best sum: {mask_best.sum()}")
+        print(f"  mask_best percentage: {mask_best.sum()/len(mask_best)*100:.1f}%")
+        print(f"  Sample mask_best values: {mask_best.head(5).tolist()}")
+        
+        # Calculate statistics for total
         stats = self._pivot_stats(df, ['categories', 'temp_zone'])
         
-        # Get detection masks
-        mask_best, _ = self._get_detection_masks()
-        mask_best = mask_best[df.index]  # Align mask with filtered df
+        # Calculate statistics for detected - use the mask directly
         df_detected = df[mask_best].copy()
-        df_detected['categories'] = df_detected.apply(self._assign_category, axis=1)
-        df_detected = df_detected.explode('categories')
         
         # Calculate detected statistics
         detected_stats = self._pivot_stats(df_detected, ['categories', 'temp_zone'])
@@ -314,11 +327,19 @@ class PlotPlanetType(BasePlotter):
                 total_errors, detected_errors, BAR_WIDTH_TEMP, 'lightgray', color, hatch,
                 add_total_label=add_total_label, detected_label=bin_label
             )
+
+        
+        if self.name == 'HWO_exoplanets':
+            name = '\nHWO detection ability of exoplanet catalog'
+        elif self.name == 'LIFEsim_exoplanets':
+            name = '\nLIFEsim detection ability of exoplanet catalog'
+        else:
+            name = self.name
         
         # Setup plot
         self._setup_plot_style(
             ax, 'Planet Type', 'Number of Planets', 
-            f'Planet Detection by Type for {self.name} ({self.nruns} runs)\nStar Catalog: {self.star_catalog}',
+            f'Planet Detection by Type for {name}',
             'Temperature Zone'
         )
         
@@ -334,7 +355,7 @@ class PlotPlanetType(BasePlotter):
             self._add_percentage_labels(
                 ax, x + i * BAR_WIDTH_TEMP, detected_heights, total_heights, offset=16
             )
-        
+        plt.ylim(0,7000)
         plt.tight_layout(rect=[0, 0, 1, 0.92])
         self._save_plot(fig, 'planet_detection_by_type')
 
@@ -444,7 +465,7 @@ class PlotPlanetType(BasePlotter):
         # Setup plot
         self._setup_plot_style(
             ax, 'Distance Bin', 'Number of Planets', 
-            f'Planet Detection by Distance Bin for {self.name} ({self.nruns} runs)\nStar Catalog: {self.star_catalog}'
+            f'Planet Detection by Distance Bin for {self.name} ({self.nruns} runs)'
         )
        
         # Set x-axis

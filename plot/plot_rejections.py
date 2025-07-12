@@ -15,9 +15,7 @@ class PlanetRejectionPlotter(BasePlotter):
     """
     
     def __init__(self, df: pd.DataFrame, nruns: int = 1, star_catalog: str = 'Gaia', name: str = 'HWO'):
-        """Initialize with data and metadata. Only supports HWO (name == 'HWO')."""
-        if name != 'HWO':
-            raise ValueError("PlanetRejectionPlotter only supports name == 'HWO'.")
+        """Initialize with data and metadata. Allow any name."""
         super().__init__(df, nruns, star_catalog, name)
 
     def plot_all(self, plot_percentages=True) -> None:
@@ -30,15 +28,22 @@ class PlanetRejectionPlotter(BasePlotter):
     def _calculate_rejection_counts(self) -> dict:
         """Calculate rejection counts for each reason across all planets."""
         rejection_counts = {}
-        if self.name == 'HWO':
-            # Use the individual pass/fail columns that are calculated in hwo_data.py
-            # These columns are created in the determine_detectable() method
-            rejection_counts['# photons hitting detector'] = len(self.df[~self.df['min_photons_pass_best']])
-            rejection_counts['Flux Ratio'] = len(self.df[~self.df['flux_pass_best']])
-            rejection_counts['IWA'] = len(self.df[~self.df['iwa_pass_best']])
-            rejection_counts['Exozodi'] = len(self.df[~self.df['z_pass_best']])
-        else:
-            rejection_counts['Not Detected'] = len(self.df[~self.df['detected_best']])
+        # List of required columns for detailed rejection
+        required_cols = [
+            'min_photons_pass_best',
+            'flux_pass_best',
+            'iwa_pass_best',
+            'z_pass_best',
+            'detected_best',
+        ]
+        missing = [col for col in required_cols if col not in self.df.columns]
+        if missing:
+            raise ValueError(f"Missing required columns for rejection analysis: {missing}")
+        # Use the individual pass/fail columns
+        rejection_counts['# photons hitting detector'] = len(self.df[~self.df['min_photons_pass_best']])
+        rejection_counts['Flux Ratio'] = len(self.df[~self.df['flux_pass_best']])
+        rejection_counts['IWA'] = len(self.df[~self.df['iwa_pass_best']])
+        rejection_counts['Exozodi'] = len(self.df[~self.df['z_pass_best']])
         return rejection_counts
 
     def _create_rejection_bar_plot(self, ax, rejection_counts, total_planets, colors):

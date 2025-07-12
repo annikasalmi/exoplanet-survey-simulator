@@ -45,6 +45,8 @@ __pycache__/*.pyc
 /lifesim/__pycache__/*.pyc
 /run/ppop/__pycache__/*.pyc
 /PPop/__pycache__/*.pyc
+/plot/old/*/*.png
+
 /mdwarfs/*
 /mdwarfs/*/*
 /mdwarfs/*/*/*

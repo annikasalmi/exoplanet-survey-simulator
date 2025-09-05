@@ -4,15 +4,32 @@ from tools.paths import LIFESIM_OUTER_DIR
 from tools import physics_constants as const
 
 def load_exoplanet_luminosity_distance(region_lum=(0.001, 10), region_dist=(1, 35), return_names=False):
-    """Load exoplanets_2025.csv and return DataFrame with 'Luminosity', 'Distance', and optionally 'Planet Name' in the specified region."""
+    """
+    Load exoplanets_2025.csv and return DataFrame with 'Luminosity', 'Distance', 
+    and optionally 'Planet Name' in the specified region.
+    
+    Args:
+        region_lum: Tuple of (min_luminosity, max_luminosity) in L☉
+        region_dist: Tuple of (min_distance, max_distance) in pc
+        return_names: Whether to include planet names and detection methods
+    
+    Returns:
+        DataFrame with filtered exoplanet data or None if no data found
+    """
     exo_path = os.path.join(LIFESIM_OUTER_DIR, 'exoplanets_2025.csv')
-    exo_df = pd.read_csv(exo_path)
+    
+    try:
+        exo_df = pd.read_csv(exo_path)
+    except FileNotFoundError:
+        print(f"Warning: Exoplanet data file not found at {exo_path}")
+        return None
+    
     if not isinstance(exo_df, pd.DataFrame):
         exo_df = pd.DataFrame(exo_df)
 
     # Filter for valid luminosity and distance
     exo_df = exo_df[(exo_df['st_lum'].notnull()) & (exo_df['sy_dist'].notnull())]
-    if not isinstance(exo_df, pd.DataFrame) or exo_df.empty:
+    if exo_df.empty:
         print("No planets with valid luminosity and distance data")
         return None
 
@@ -24,24 +41,31 @@ def load_exoplanet_luminosity_distance(region_lum=(0.001, 10), region_dist=(1, 3
     radius_filter = exo_df['pl_rade'].notnull()
     habitable_filter = (exo_df['pl_rade'] < const.R_earth_max_habitable) | (~radius_filter) | specific_mask
     exo_df = exo_df[habitable_filter]
-    if not isinstance(exo_df, pd.DataFrame) or exo_df.empty:
+    if exo_df.empty:
         print("No planets with valid radius or habitable zone data")
         return None
 
     # Rename columns for consistency
-    exo_df = exo_df.rename(columns={'st_lum': 'Luminosity', 'sy_dist': 'Distance', 'pl_name': 'Planet Name', 
-                                   'discoverymethod': 'Detection Method', 'pl_rade': 'Radius (R⊕)'})
+    exo_df = exo_df.rename(columns={
+        'st_lum': 'Luminosity', 
+        'sy_dist': 'Distance', 
+        'pl_name': 'Planet Name', 
+        'discoverymethod': 'Detection Method', 
+        'pl_rade': 'Radius (R⊕)'
+    })
     
     # Convert log10(luminosity) to linear luminosity for filtering
     exo_df['Luminosity_linear'] = 10**exo_df['Luminosity']
     
     # Only keep those in the specified region
     mask = (
-        (exo_df['Luminosity_linear'] >= region_lum[0]) & (exo_df['Luminosity_linear'] <= region_lum[1]) &
-        (exo_df['Distance'] >= region_dist[0]) & (exo_df['Distance'] <= region_dist[1])
+        (exo_df['Luminosity_linear'] >= region_lum[0]) & 
+        (exo_df['Luminosity_linear'] <= region_lum[1]) &
+        (exo_df['Distance'] >= region_dist[0]) & 
+        (exo_df['Distance'] <= region_dist[1])
     )
     exo_df = exo_df[mask]
-    if not isinstance(exo_df, pd.DataFrame) or exo_df.empty:
+    if exo_df.empty:
         print(f"No planets in specified region: L={region_lum}, D={region_dist}")
         return None
     

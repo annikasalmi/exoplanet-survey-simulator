@@ -1,6 +1,10 @@
 import os
-import lifesim
+import sys
 import numpy as np
+
+# Add the lifesim directory to the Python path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+import lifesim
 from run.ppop.ppop_generator import PPop
 import multiprocessing as mp
 import time
@@ -9,7 +13,7 @@ import numpy as np
 from functools import partial
 
 from tools.paths import PPOP_DATA_DIR, LIFESIM_DATA_DIR
-from PPop.StarCatalogs import CrossfieldBrightSample, ExoCat_1, LTC_2, LTC_3, gaia
+from PPop.StarCatalogs import ExoCat_1,LTC_3, gaia
 
 RUN_PPOP = False
 
@@ -109,6 +113,7 @@ def main(parallel=True, nruns=np.arange(1), star_catalog='Gaia', run_anew=True):
     # Step 2: Combine all runs into one DataFrame
     df_concat = pd.concat(results, keys=nruns).reset_index(level=0).rename(columns={'level_0': 'run'})
 
+    plot_all(df=df_concat, sim_name='LIFEsim_exoplanets', nruns=len(nruns), star_catalog=star_catalog, use_multiprocessing=False)
     print(f"Total time: {time.time() - start:.2f} seconds")
 
     return df_concat

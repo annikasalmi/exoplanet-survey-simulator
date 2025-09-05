@@ -5,52 +5,79 @@ import matplotlib.pyplot as plt
 from plot.plot_by_type import PlotPlanetType
 from plot.plot_detections import PlanetDetectionPlotter
 from tools.plotting_constants import (
-    TEMP_ZONES, TEMP_COLORS, HATCHES, STAR_ORDER, BIN_LABELS, STAR_COLORS, STAR_HATCHES, BAR_WIDTH_STAR, DISTANCE_LABELS, ERROR_LABEL_OFFSET
+    TEMP_ZONES, TEMP_COLORS, HATCHES, STAR_ORDER, BIN_LABELS, STAR_COLORS, 
+    STAR_HATCHES, BAR_WIDTH_STAR, DISTANCE_LABELS, ERROR_LABEL_OFFSET
 )
 
 class PlanetDetectionPlotterLTC3(PlanetDetectionPlotter):
     """LTC3-specific detection plotter: single panel for rocky habitable zone planets."""
+    
     def plot_detection_efficiency_by_planet_type(self) -> None:
-        df_filtered = self.df[(self.df['habitable'] == True) & (self.df['radius_p'] < 1.5) & (self.df['stype'].isin(['G', 'K']))].copy()
+        """Plot detection efficiency for rocky habitable zone planets (G/K stars only)."""
+        df_filtered = self.df[
+            (self.df['habitable'] == True) & 
+            (self.df['radius_p'] < 1.5) & 
+            (self.df['stype'].isin(['G', 'K']))
+        ].copy()
+        
         if len(df_filtered) == 0:
             print("No rocky planets in habitable zone found for LTC3 detection efficiency (G/K stars only)")
             return
+            
         config = {'col': 'temp_p', 'label': 'Temperature [K]', 'range': (125, 305)}
         x_col, x_label, x_range = config['col'], config['label'], config['range']
+        
         fig, ax = plt.subplots(1, 1, figsize=(12, 8))
         bins = np.linspace(x_range[0], x_range[1], 40)
         bin_centers = 0.5 * (bins[:-1] + bins[1:])
+        
         total_counts, detected_counts, efficiency, _ = self._calculate_efficiency_data(df_filtered, x_col, bins)
         total_planets = len(df_filtered) / self.nruns
         detected_planets = np.sum(detected_counts)
+        
         title = f"Rocky Planets in Habitable Zone\nTotal: {total_planets:.1f}, Detected: {detected_planets:.1f}"
         ax2 = self._setup_bar_and_efficiency_axes(ax, bin_centers, total_counts, detected_counts, efficiency, x_label, title, bins)
+        
         handles, labels = self._collect_legend_handles(ax)
         ax.legend(handles, labels, loc='upper left', fontsize=14)
         ax.set_ylabel("Number of Planets")
         ax2.set_ylabel("Detection Efficiency")
         ax.set_xlim([bins[0], 305])
         ax2.set_xlim([bins[0], 305])
+        
         plt.tight_layout(rect=[0, 0, 1, 0.95])
-        plt.savefig(os.path.join(self.data_dir, self._output_filename('detection_efficiency_by_type_temp')), dpi=300, bbox_inches='tight')
+        plt.savefig(os.path.join(self.data_dir, self._output_filename('detection_efficiency_by_type_temp')), 
+                   dpi=300, bbox_inches='tight')
         plt.close(fig)
 
 class PlotPlanetTypeLTC3(PlotPlanetType):
     """LTC3-specific plotter with custom habitability and styling."""
-    def _create_overlay_bars(self, ax, x, total_heights, detected_heights, total_errors=None, detected_errors=None, bar_width=0.8, total_color='lightgray', detected_color='green', detected_hatch=None, add_total_label=True, detected_label='Detected'):
-        ax.bar(x, detected_heights, width=bar_width, color=detected_color, alpha=0.8, edgecolor='black', yerr=detected_errors, capsize=3, bottom=None, hatch=detected_hatch, label=detected_label, ecolor='black')
+    
+    def _create_overlay_bars(self, ax, x, total_heights, detected_heights, 
+                           total_errors=None, detected_errors=None, bar_width=0.8, 
+                           total_color='lightgray', detected_color='green', 
+                           detected_hatch=None, add_total_label=True, detected_label='Detected'):
+        """Create overlay bars with error labels."""
+        ax.bar(x, detected_heights, width=bar_width, color=detected_color, 
+               alpha=0.8, edgecolor='black', yerr=detected_errors, capsize=3, 
+               bottom=None, hatch=detected_hatch, label=detected_label, ecolor='black')
+        
         if detected_errors is not None:
             for i, (height, error) in enumerate(zip(detected_heights, detected_errors)):
                 if height > 0:
                     label_text = f'{int(height)}±{int(error)}'
-                    ax.text(x[i], height + error + ERROR_LABEL_OFFSET, label_text, ha='center', va='bottom', rotation=90)
+                    ax.text(x[i], height + error + ERROR_LABEL_OFFSET, label_text, 
+                           ha='center', va='bottom', rotation=90)
+        
         return (detected_heights, detected_errors) if detected_errors is not None else (detected_heights, None)
 
     def _assign_category_LTC3(self, row):
+        """Assign planet categories for LTC3 analysis."""
         r = row['radius_p']
         stype = row['stype']
         hab = row.get('habitable', False)
         categories = []
+        
         if 0.5 <= r < 1.4 and hab:
             categories.append('Rocky eHZ')
         if 0.5 <= r < 1.4 and hab and stype in ['G', 'K']:
@@ -61,28 +88,46 @@ class PlotPlanetTypeLTC3(PlotPlanetType):
             categories.append('Sub-Neptunes')
         if 2.6 <= r < 4.0:
             categories.append('Sub-Jovians')
+        
         return categories if categories else None
 
     def plot_by_star(self) -> None:
         """Stellar type overlay: detected planets only, error bars, integer labels."""
         df = self.df.copy()
         x = np.arange(len(STAR_ORDER))
-        df['radius_bin'] = pd.cut(df['radius_p'], bins=[0, 1.5, 3.0, 6.0, float('inf')], labels=['<1.5', '1.5–3.0', '3.0–6.0', '>6.0'], include_lowest=True)
+        
+        # Create radius bins
+        df['radius_bin'] = pd.cut(df['radius_p'], 
+                                 bins=[0, 1.5, 3.0, 6.0, float('inf')], 
+                                 labels=['<1.5', '1.5–3.0', '3.0–6.0', '>6.0'], 
+                                 include_lowest=True)
         df['radius_bin'] = df['radius_bin'].cat.add_categories(['Rocky HZ'])
+        
+        # Mark rocky habitable zone planets
         rocky_hz_mask = (df['habitable'] == True) & (df['radius_p'] < 1.5)
         df.loc[rocky_hz_mask, 'radius_bin'] = 'Rocky HZ'
         df = df[df['radius_bin'].isin(BIN_LABELS)]
+        
+        # Get detection masks
         mask_best, _ = self._get_detection_masks()
         mask_best = mask_best[df.index]
         detected_df = df[mask_best].copy()
+        
+        # Calculate statistics
         detected_per_run = detected_df.groupby(['run', 'stype', 'radius_bin']).size().reset_index(name='count')
-        detected_pivot = detected_per_run.pivot_table(index=['stype', 'radius_bin'], columns='run', values='count', fill_value=0)
+        detected_pivot = detected_per_run.pivot_table(index=['stype', 'radius_bin'], 
+                                                   columns='run', values='count', fill_value=0)
         detected_mean = detected_pivot.mean(axis=1).reset_index(name='count')
         detected_std = detected_pivot.std(axis=1).reset_index(name='count')
+        
+        # Create plot
         fig, ax = plt.subplots(figsize=(12, 8))
         bar_width = BAR_WIDTH_STAR
+        
+        # Pre-compute data matrix
         data_matrix = np.zeros((len(BIN_LABELS), len(STAR_ORDER)))
         error_matrix = np.zeros((len(BIN_LABELS), len(STAR_ORDER)))
+        
         for i, bin_label in enumerate(BIN_LABELS):
             bin_data = detected_mean[detected_mean['radius_bin'] == bin_label]
             bin_std = detected_std[detected_std['radius_bin'] == bin_label]
@@ -91,14 +136,24 @@ class PlotPlanetTypeLTC3(PlotPlanetType):
                 star_std = bin_std[bin_std['stype'] == star]
                 data_matrix[i, j] = star_data['count'].iloc[0] if len(star_data) > 0 else 0
                 error_matrix[i, j] = star_std['count'].iloc[0] if len(star_std) > 0 else 0
+        
+        # Plot bars
         for i, bin_label in enumerate(BIN_LABELS):
             heights = data_matrix[i, :]
             errors = error_matrix[i, :]
-            ax.bar(x + i * bar_width, heights, width=bar_width, color=STAR_COLORS[i], alpha=0.8, edgecolor='black', yerr=errors, capsize=3, ecolor='black', hatch=STAR_HATCHES[i], label=bin_label)
+            
+            ax.bar(x + i * bar_width, heights, width=bar_width, color=STAR_COLORS[i], 
+                   alpha=0.8, edgecolor='black', yerr=errors, capsize=3, 
+                   ecolor='black', hatch=STAR_HATCHES[i], label=bin_label)
+            
+            # Add error labels
             for j, (height, error) in enumerate(zip(heights, errors)):
                 if height > 0:
                     label_text = f'{int(round(height))}±{int(round(error))}'
-                    ax.text(x[j] + i * bar_width, height + error + ERROR_LABEL_OFFSET, label_text, ha='center', va='bottom', rotation=90, fontsize=10)
+                    ax.text(x[j] + i * bar_width, height + error + ERROR_LABEL_OFFSET, label_text, 
+                           ha='center', va='bottom', rotation=90, fontsize=10)
+        
+        # Setup plot
         ax.set_xlabel('Star Type')
         ax.set_ylabel('Number of Planets')
         ax.set_title(f'Planet Detection by Star Type for {self.name} ({self.nruns} runs)\nStar Catalog: {self.star_catalog}')
@@ -108,8 +163,10 @@ class PlotPlanetTypeLTC3(PlotPlanetType):
         ax.set_ylim(bottom=0)
         y_max = ax.get_ylim()[1]
         ax.set_ylim(0, y_max * 1.3)
+        
         plt.tight_layout(rect=[0, 0, 1, 0.92])
-        plt.savefig(os.path.join(self.data_dir, self._output_filename('stellar_type_overlay')), dpi=300, bbox_inches='tight')
+        plt.savefig(os.path.join(self.data_dir, self._output_filename('stellar_type_overlay')), 
+                   dpi=300, bbox_inches='tight')
         plt.close(fig)
 
     def plot_by_planet(self) -> None:
@@ -174,7 +231,8 @@ class PlotPlanetTypeLTC3(PlotPlanetType):
                 detected_error = cat_temp_data['error'].iloc[0] if len(cat_temp_data) > 0 else 0
                 
                 ax.bar(x[idx] + j * bar_width, detected, width=bar_width, color=color, 
-                       edgecolor='black', alpha=0.8, hatch=hatch, yerr=detected_error, capsize=3, ecolor='black',
+                       edgecolor='black', alpha=0.8, hatch=hatch, yerr=detected_error, 
+                       capsize=3, ecolor='black',
                        label=f'{cat} ({temp_zone})' if i_cat == 0 else None)
         
         # Setup plot
@@ -205,76 +263,139 @@ class PlotPlanetTypeLTC3(PlotPlanetType):
                 
                 if detected > 0:
                     label_text = f'{detected}±{round(detected_error)}'
-                    ax.text(idx + j * bar_width, detected + detected_error + ERROR_LABEL_OFFSET, label_text, 
+                    ax.text(x[idx] + j * bar_width, detected + detected_error + ERROR_LABEL_OFFSET, label_text, 
                            ha='center', va='bottom', rotation=90, fontsize=10)
         
-        # Custom legend
-        handles, labels = [], []
-        for color, temp_zone in zip(TEMP_COLORS, TEMP_ZONES):
-            handles.append(plt.Rectangle((0,0),1,1, color=color,ec='black'))
-            labels.append(temp_zone)
-        ax.legend(handles, labels, loc='upper right')
-        
-        # Extend y-axis for labels
+        # Finalize plot
+        ax.legend(title='Temperature Zone', loc='upper right')
+        ax.set_ylim(bottom=0)
         y_max = ax.get_ylim()[1]
         ax.set_ylim(0, y_max * 1.3)
         
         plt.tight_layout(rect=[0, 0, 1, 0.92])
-        self._save_plot(fig, 'planet_detection_by_type_LTC3')
+        plt.savefig(os.path.join(self.data_dir, self._output_filename('planet_type_subcategory')), 
+                   dpi=300, bbox_inches='tight')
+        plt.close(fig)
 
     def plot_by_distance(self) -> None:
-        """Distance plot: detected bars only, error bars, integer labels."""
-        stats, detected_stats = self._calculate_distance_stats(self.df)
-        fig, ax = plt.subplots(figsize=(8, 6))
-        x = np.arange(len(DISTANCE_LABELS))
-        detected_counts = np.zeros(len(DISTANCE_LABELS))
-        detected_errors = np.zeros(len(DISTANCE_LABELS))
-        for bin_label in ['hot', 'habitable', 'cold']:
-            bin_detected = detected_stats[detected_stats['temp_zone'] == bin_label]
-            bin_detected = bin_detected.set_index('distance_bin').reindex(DISTANCE_LABELS).fillna(0)
-            detected_counts += bin_detected['count'].values
-            detected_errors = np.maximum(detected_errors, bin_detected['error'].values)
-        ax.bar(x, detected_counts, width=0.6, color='#c2b280', edgecolor='black', hatch='/', alpha=0.8, yerr=detected_errors, capsize=3, ecolor='black')
-        for i, (count, error) in enumerate(zip(detected_counts, detected_errors)):
-            if count > 0:
-                label_text = f'{int(round(count))}±{int(round(error))}'
-                ax.text(i, count + error + ERROR_LABEL_OFFSET, label_text, ha='center', va='bottom', rotation=90, fontsize=10)
+        """Distance-based analysis for LTC3."""
+        df = self.df.copy()
+        
+        # Create distance bins
+        df['distance_bin'] = pd.cut(df['distance'], 
+                                   bins=[0, 5, 10, 15, 20, float('inf')], 
+                                   labels=['0-5', '5-10', '10-15', '15-20', '>20'], 
+                                   include_lowest=True)
+        
+        # Get detection masks
+        mask_best, _ = self._get_detection_masks()
+        mask_best = mask_best[df.index]
+        detected_df = df[mask_best].copy()
+        
+        # Calculate statistics
+        detected_per_run = detected_df.groupby(['run', 'distance_bin']).size().reset_index(name='count')
+        detected_pivot = detected_per_run.pivot_table(index='distance_bin', 
+                                                   columns='run', values='count', fill_value=0)
+        detected_mean = detected_pivot.mean(axis=1).reset_index(name='count')
+        detected_std = detected_pivot.std(axis=1).reset_index(name='count')
+        
+        # Create plot
+        fig, ax = plt.subplots(figsize=(10, 6))
+        x = np.arange(len(detected_mean))
+        
+        heights = detected_mean['count'].values
+        errors = detected_std['count'].values
+        
+        ax.bar(x, heights, width=0.8, color='green', alpha=0.8, 
+               edgecolor='black', yerr=errors, capsize=3, ecolor='black')
+        
+        # Add error labels
+        for i, (height, error) in enumerate(zip(heights, errors)):
+            if height > 0:
+                label_text = f'{int(round(height))}±{int(round(error))}'
+                ax.text(x[i], height + error + ERROR_LABEL_OFFSET, label_text, 
+                       ha='center', va='bottom', rotation=90, fontsize=10)
+        
+        # Setup plot
         ax.set_xlabel('Distance [pc]')
         ax.set_ylabel('Number of Planets')
-        ax.set_title(f'Planet Detection by Distance Bin for {self.name} ({self.nruns} runs)\nStar Catalog: {self.star_catalog}')
+        ax.set_title(f'Planet Detection by Distance for {self.name} ({self.nruns} runs)\nStar Catalog: {self.star_catalog}')
         ax.set_xticks(x)
-        ax.set_xticklabels(DISTANCE_LABELS)
-        ax.set_ylim(0,350)
-        plt.tight_layout(rect=[0, 0, 1, 0.92])
-        self._save_plot(fig, 'planet_detection_by_distance_LTC3')
+        ax.set_xticklabels(detected_mean['distance_bin'].values)
+        ax.set_ylim(bottom=0)
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.data_dir, self._output_filename('distance_analysis')), 
+                   dpi=300, bbox_inches='tight')
+        plt.close(fig)
 
     def plot_detection_efficiency_rocky_habitable(self) -> None:
-        df_filtered = self.df[(self.df['habitable'] == True) & (self.df['radius_p'] < 1.5) & (self.df['stype'].isin(['G', 'K']))].copy()
+        """Plot detection efficiency specifically for rocky habitable zone planets."""
+        df_filtered = self.df[
+            (self.df['habitable'] == True) & 
+            (self.df['radius_p'] < 1.5)
+        ].copy()
+        
         if len(df_filtered) == 0:
-            print("No rocky planets in habitable zone found for LTC3 detection efficiency (G/K stars only)")
+            print("No rocky habitable zone planets found for efficiency analysis")
             return
-        detection_plotter = PlanetDetectionPlotter(df_filtered, self.nruns, self.star_catalog, self.name)
-        config = {'col': 'temp_p', 'label': 'Temperature [K]', 'range': (125, 305)}
-        x_col, x_label, x_range = config['col'], config['label'], config['range']
-        fig, ax = plt.subplots(1, 1, figsize=(12, 8))
-        bins = np.linspace(x_range[0], x_range[1], 40)
-        bin_centers = 0.5 * (bins[:-1] + bins[1:])
-        total_counts, detected_counts, efficiency, _ = detection_plotter._calculate_efficiency_data(df_filtered, x_col, bins)
-        total_planets = len(df_filtered) / self.nruns
-        detected_planets = np.sum(detected_counts)
-        title = f"Rocky Planets in Habitable Zone\nTotal: {total_planets:.1f}, Detected: {detected_planets:.1f}"
-        ax2 = detection_plotter._setup_bar_and_efficiency_axes(ax, bin_centers, total_counts, detected_counts, efficiency, x_label, title, bins)
-        handles, labels = detection_plotter._collect_legend_handles(ax)
-        ax.legend(handles, labels, loc='upper left', fontsize=14)
-        ax.set_ylabel("Number of Planets")
-        ax2.set_ylabel("Detection Efficiency")
-        ax.set_xlim([bins[0], 305])
-        ax2.set_xlim([bins[0], 305])
-        plt.tight_layout(rect=[0, 0, 1, 0.95])
-        plt.savefig(os.path.join(self.data_dir, self._output_filename('detection_efficiency_rocky_habitable')), dpi=300, bbox_inches='tight')
+        
+        # Calculate efficiency by stellar type
+        stellar_types = ['M', 'K', 'G']
+        efficiencies = []
+        errors = []
+        
+        for stype in stellar_types:
+            stype_data = df_filtered[df_filtered['stype'] == stype]
+            if len(stype_data) == 0:
+                efficiencies.append(0)
+                errors.append(0)
+                continue
+            
+            mask_best, _ = self._get_detection_masks()
+            mask_best = mask_best[stype_data.index]
+            detected_count = np.sum(mask_best)
+            total_count = len(stype_data)
+            
+            efficiency = detected_count / total_count if total_count > 0 else 0
+            efficiencies.append(efficiency)
+            
+            # Simple error estimate
+            error = np.sqrt(efficiency * (1 - efficiency) / total_count) if total_count > 0 else 0
+            errors.append(error)
+        
+        # Create plot
+        fig, ax = plt.subplots(figsize=(8, 6))
+        x = np.arange(len(stellar_types))
+        
+        ax.bar(x, efficiencies, width=0.8, color='green', alpha=0.8, 
+               edgecolor='black', yerr=errors, capsize=3, ecolor='black')
+        
+        # Add percentage labels
+        for i, (eff, err) in enumerate(zip(efficiencies, errors)):
+            if eff > 0:
+                label_text = f'{eff:.1%}±{err:.1%}'
+                ax.text(x[i], eff + err + 0.02, label_text, 
+                       ha='center', va='bottom', fontsize=10)
+        
+        # Setup plot
+        ax.set_xlabel('Stellar Type')
+        ax.set_ylabel('Detection Efficiency')
+        ax.set_title(f'Detection Efficiency for Rocky Habitable Zone Planets\n{self.name} ({self.nruns} runs)')
+        ax.set_xticks(x)
+        ax.set_xticklabels(stellar_types)
+        ax.set_ylim(0, 1.1)
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.data_dir, self._output_filename('detection_efficiency_rocky_habitable')), 
+                   dpi=300, bbox_inches='tight')
         plt.close(fig)
 
 def plot_by_type_LTC3(df, nruns=1, star_catalog='LTC_3', name='LIFEsim'):
-    plotter = PlotPlanetTypeLTC3(df=df, nruns=nruns, star_catalog=star_catalog, name=name)
+    """Main function to run LTC3 planet type analysis."""
+    plotter = PlotPlanetTypeLTC3(df, nruns, star_catalog, name)
     plotter.plot_all()
-    plotter.plot_detection_efficiency_rocky_habitable() 
+    
+    # Also run detection efficiency analysis
+    detection_plotter = PlanetDetectionPlotterLTC3(df, nruns, star_catalog, name)
+    detection_plotter.plot_detection_efficiency_by_planet_type() 

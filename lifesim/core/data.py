@@ -523,16 +523,19 @@ class Data(object):
 
     def import_catalog(self,
                        input_path: str,
-                       overwrite: bool = False):
+                       overwrite: bool = False,
+                       df: pd.DataFrame = None):
         """
-        Import catalog from external file of hdf-format.
+        Import catalog from external file or DataFrame.
 
         Parameters
         ----------
         input_path : str
-            path to the P-Pop output file in a .txt or .fits format.
+            path to the catalog file in .hdf, .txt, .fits, or .csv format.
         overwrite : bool
             if set to true, existing catalogs can overwritten.
+        df : pd.DataFrame, optional
+            DataFrame to import directly. If provided, input_path is ignored.
 
         Raises
         ------
@@ -542,8 +545,23 @@ class Data(object):
         if (self.catalog is not None) and (not overwrite):
             raise ValueError('Can not overwrite existing catalog')
 
-        self.catalog = pd.read_hdf(path_or_buf=input_path,
-                                   key='catalog')
+        if df is not None:
+            # Import DataFrame directly
+            self.catalog = df.copy()
+        else:
+            # Check file extension to determine how to read the file
+            file_extension = input_path.lower().split('.')[-1]
+            
+            if file_extension in ['hdf', 'hdf5', 'h5']:
+                self.catalog = pd.read_hdf(path_or_buf=input_path, key='catalog')
+            elif file_extension == 'csv':
+                self.catalog = pd.read_csv(input_path)
+            elif file_extension in ['txt', 'fits']:
+                # Handle other formats as before
+                self.catalog = pd.read_hdf(path_or_buf=input_path, key='catalog')
+            else:
+                raise ValueError(f'Unsupported file format: {file_extension}. Supported formats: hdf, hdf5, h5, csv, txt, fits')
+        
         self.str_to_obj(reverse=True)
 
     def str_to_obj(self,

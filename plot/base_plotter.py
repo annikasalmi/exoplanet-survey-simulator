@@ -50,12 +50,15 @@ class BasePlotter:
 
     def _get_detection_masks(self) -> Tuple[pd.Series, Optional[pd.Series]]:
         """Get detection masks for detected, detected_best, detected_worst depending on scenario."""
-        if self.name == 'HWO':
-            mask_best = self.df['detected_best'] if 'detected_best' in self.df else self.df['detected']
-            mask_worst = self.df['detected_worst'] if 'detected_worst' in self.df else None
+        if 'hwo' in self.name.lower():
+            if 'detected_best' in self.df:
+                mask_best = self.df['detected_best'].astype(bool)
+            else:
+                mask_best = self.df['detected'].astype(bool)
+            mask_worst = self.df['detected_worst'].astype(bool) if 'detected_worst' in self.df else None
             return mask_best, mask_worst
         else:
-            mask = self.df['detected']
+            mask = self.df['detected'].astype(bool)
             return mask, None
 
     def _save_plot(self, fig, filename: str, suffix: Optional[str] = None) -> None:
@@ -73,7 +76,7 @@ class BasePlotter:
         return True
 
     def _add_percentage_labels(self, ax, x, y_values, total_values, y_errors=None, 
-                              offset=1.0, fontsize=12, color='black'):
+                              offset=3.0, fontsize=14, color='black'):
         """Add percentage labels to bars."""
         for i, (y_val, total_val) in enumerate(zip(y_values, total_values)):
             if y_val > 0 and total_val > 0:

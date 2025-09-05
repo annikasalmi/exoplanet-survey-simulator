@@ -27,8 +27,8 @@ class PlotHZLimits(BasePlotter):
     
     def __init__(self, df: Optional[pd.DataFrame] = None, name: str = 'HWO',
                  nruns: int = 1, star_catalog: str = 'Gaia', 
-                 xlim_min: float = 0.01, xlim_max: float = 15.0,
-                 ylim_min: float = 1.0, ylim_max: float = 35.0, **kwargs):
+                 xlim_min: float = 0.001, xlim_max: float = 2.0,
+                 ylim_min: float = 0.0, ylim_max: float = 35.0, **kwargs):
         """Initialize with optional dataframe and parameters."""
         if df is None:
             df = self._create_minimal_dataframe()
@@ -83,31 +83,35 @@ class PlotHZLimits(BasePlotter):
 
     def _plot_exoplanet_overlay(self, ax: Axes, region_lum: Tuple[float, float], 
                                region_dist: Tuple[float, float]) -> set:
-        """Plot exoplanet overlay with detection method colors."""
+        """Plot specific exoplanets: TOI-700 and Proxima Cen b."""
         plotted_methods = set()
-        try:
-            exo_df = load_exoplanet_luminosity_distance(region_lum=region_lum, 
-                                                       region_dist=region_dist, 
-                                                       return_names=True)
-            if exo_df is None or exo_df.empty:
-                return plotted_methods
+        
+        # Add specific star/planet labels with actual data
+        specific_objects = {
+            'Proxima Cen b': (0.001567, 1.3),  # (luminosity, distance) - L = 0.001567±0.000020, D=1.3pc
+            'TOI-700': (0.023, 31.1)  # The star itself - from CSV: T=3461K, R=0.42R☉, D=31.1pc
+        }
+        
+        # Plot only the specific objects
+        for name, (luminosity, distance) in specific_objects.items():
+            # Check if the object is within the plot region
+            if (region_lum[0] <= luminosity <= region_lum[1] and 
+                region_dist[0] <= distance <= region_dist[1]):
                 
-            # Plot exoplanets by detection method
-            for method in exo_df['Detection Method'].unique():
-                method_data = exo_df[exo_df['Detection Method'] == method]
-                color = self.DETECTION_COLORS.get(str(method), 'gray')
+                # Use a distinct color for these specific objects
+                color = 'red' if 'Proxima' in name else 'blue'
+                ax.scatter(luminosity, distance, color=color, s=100, alpha=0.8, 
+                          marker='*', edgecolors='black', linewidth=1)
                 
-                ax.scatter(method_data['Luminosity'], method_data['Distance'], 
-                          color=color, s=8, alpha=0.7, 
-                          label=f'R<{const.R_earth_max_habitable}R⊕ found by {method}')
+                # Add labels
+                ax.text(luminosity, distance + 0.5, name, 
+                       fontsize=10, ha='center', va='bottom', 
+                       weight='bold', color=color)
                 
-                # Add planet name labels
-                if 'Planet Name' in exo_df.columns:
-                    for _, row in method_data.iterrows():
-                        ax.text(row['Luminosity'], row['Distance']+0.15, str(row['Planet Name']), 
-                               fontsize=7, ha='center', va='bottom', rotation=30)
-        except ImportError:
-            print("Warning: exoplanet_data_utils not available, skipping exoplanet overlay")
+                # Add to plotted methods for legend
+                method = 'Specific Objects'
+                if method not in plotted_methods:
+                    plotted_methods.add(method)
         
         return plotted_methods
 
@@ -118,7 +122,7 @@ class PlotHZLimits(BasePlotter):
         D_edges = np.linspace(D_vals[0], D_vals[-1], D_vals.size + 1)
         
         im = ax.pcolormesh(L_edges, D_edges, region, 
-                           cmap=LinearSegmentedColormap.from_list('pinkgreen', ['#f7cac9', '#88b04b']), 
+                           cmap=LinearSegmentedColormap.from_list('detectability', ['#ffcccc', '#66cc66']), 
                            shading='auto', vmin=0, vmax=1)
         ax.set_xscale('log')
         ax.set_xlabel('Stellar Luminosity [L☉]')
@@ -127,19 +131,6 @@ class PlotHZLimits(BasePlotter):
         self._plot_reference_lines(ax, L_vals, is_au=False)
         return im
 
-    def _get_axis_label(self, var_name: str) -> str:
-        """Get formatted axis label for a variable name."""
-        labels = {
-            'semimajor_p': 'Semi-major Axis (AU)',
-            'p_orb': 'Orbital Period (days)',
-            'radius_p': 'Planet Radius (R⊕)',
-            'temp': 'Planet Temperature (K)',
-            'temp_s': 'Stellar Temperature (K)',
-            'mass_s': 'Stellar Mass (M☉)',
-            'flux_p': 'Planet Flux (W/m²)'
-        }
-        return labels.get(var_name, var_name)
-
     def _plot_reference_lines(self, ax: Axes, xvals: np.ndarray, is_au: bool = False) -> None:
         """Plot reference lines for M dwarf and G-star regions."""
         for L, color in zip([const.L_m_dwarf_max, const.L_g_star_min, const.L_g_star_max], ['red', 'gold', 'gold']):
@@ -147,12 +138,19 @@ class PlotHZLimits(BasePlotter):
             ax.axvline(float(val), color=color, linestyle='--', linewidth=2)
 
     def plot_boundaries(self) -> None:
-        """Plot stellar temperature vs semi-major axis with boundaries."""
+        """Plot stellar luminosity vs distance with boundaries."""
+        def _safe_float(val):
+            try:
+                return float(val)
+            except Exception:
+                return np.nan
+
         if self.df.empty:
             print("Warning: No data available for panel plot")
             return
 
-        x_var, y_var = 'temp_s', 'semimajor_p'
+        # Use luminosity and distance instead of temperature and semi-major axis
+        x_var, y_var = 'luminosity_s', 'distance_s'
         if x_var not in self.df.columns or y_var not in self.df.columns:
             print(f"Warning: Required columns not found: {x_var}, {y_var}")
             return
@@ -198,9 +196,16 @@ class PlotHZLimits(BasePlotter):
                 hull = ConvexHull(points)
                 boundary = np.append(hull.vertices, hull.vertices[0])
                 boundary_points = points[boundary]
-                boundary_cache[category] = boundary_points
+                
+                # Find matching config
+                config = next((cfg for cfg in boundary_configs if cfg[0] == category), None)
+                if config:
+                    color, label = config[1], config[2]
+                    ax.plot(boundary_points[:, 0], boundary_points[:, 1], 
+                           color=color, linewidth=2, label=label)
+                    boundary_cache[category] = boundary_points
             except Exception as e:
-                print(f"Warning: Could not compute boundary for {x_var} vs {y_var} ({category}): {str(e)}")
+                print(f"Warning: Could not compute boundary for {category}: {e}")
                 continue
                 
         # Plot boundaries
@@ -218,14 +223,22 @@ class PlotHZLimits(BasePlotter):
                            linewidth=linewidth, label=label)
                     
         # Set labels and title
-        ax.set_xlabel(self._get_axis_label(x_var))
-        ax.set_ylabel(self._get_axis_label(y_var))
-        ax.set_title(f'{self._get_axis_label(x_var)} vs {self._get_axis_label(y_var)}')
-        ax.set_xlim(3000, 8000)  # Cover K, G, F star temperature range
+        ax.set_xlabel('Stellar Luminosity [L☉]')
+        ax.set_ylabel('Distance [pc]')
+        ax.set_title('Stellar Luminosity vs Distance')
+        
+        # Set axis limits to match the luminosity-distance plot
+        ax.set_xlim(0.001, 2.0)  # Luminosity range
+        ax.set_ylim(0.0, 35.0)   # Distance range
+        ax.set_xscale('log')      # Log scale for luminosity
                 
-        # Add habitable zone line and reference lines
-        self._add_habitable_zone_line(ax)
-        self._add_stellar_type_reference_lines(ax)
+        # Add reference lines for M dwarf and G star luminosity ranges
+        ax.axvline(const.L_m_dwarf_max, color='red', linestyle='--', linewidth=2, 
+                  label=f'M dwarf max L ({const.L_m_dwarf_max:.3f} L☉)')
+        ax.axvline(const.L_g_star_min, color='gold', linestyle='--', linewidth=2, 
+                  label=f'G star min L ({const.L_g_star_min:.3f} L☉)')
+        ax.axvline(const.L_g_star_max, color='gold', linestyle='--', linewidth=2, 
+                  label=f'G star max L ({const.L_g_star_max:.3f} L☉)')
         
         # Create legend
         legend_elements = [
@@ -233,101 +246,86 @@ class PlotHZLimits(BasePlotter):
             Patch(facecolor='gold', alpha=0.3, label='Exozodi Rejected'),
             Patch(facecolor='blue', alpha=0.3, label='IWA Rejected'),
             Patch(facecolor='green', alpha=1.0, label='Detected'),
-            Line2D([0], [0], color='black', linestyle='-', linewidth=2, label='Habitable Zone (R=1 R⊕)'),
-            Line2D([0], [0], color='red', linestyle='--', linewidth=2, label='M dwarf T range'),
-            Line2D([0], [0], color='gold', linestyle='--', linewidth=2, label='G star T range')
+            Line2D([0], [0], color='red', linestyle='--', linewidth=2, label='M dwarf L range'),
+            Line2D([0], [0], color='gold', linestyle='--', linewidth=2, label='G star L range')
         ]
         ax.legend(handles=legend_elements, loc='upper left', fontsize=12)
         plt.tight_layout()
-        self._save_plot(fig, 'panel_temp_s_vs_semimajor_p')
+        self._save_plot(fig, 'panel_luminosity_vs_distance')
 
     def _add_habitable_zone_line(self, ax: Axes) -> None:
-        """Add habitable zone line for R=1 R⊕ planet."""
-        # For each stellar temperature, calculate the habitable zone distance
-        # HZ distance scales as sqrt(L_star), and L scales as T^4
-        T_range = np.linspace(2000, 7000, 100)  # Temperature range in K
-        L_from_T = (T_range / const.temp_sun)**4  # Luminosity from temperature
-        a_hz_au = np.sqrt(L_from_T)  # HZ distance in AU
+        """Add habitable zone line to the plot."""
+        temp_range = np.logspace(2.5, 3.8, 100)
+        hz_distances = []
         
-        # Calculate habitable zone curve
-        hz_curve_T = []
-        hz_curve_a = []
-        for i, T in enumerate(T_range):
-            a_hz_au_single = a_hz_au[i]
-            
-            # For this stellar temperature, find the semi-major axis in the habitable zone
-            if 0.1 <= a_hz_au_single <= 10.0:  # Reasonable HZ range
-                hz_curve_T.append(T)
-                hz_curve_a.append(a_hz_au_single)
+        for temp in temp_range:
+            try:
+                hz_dist = single_habitable_zone(temp, 1.0)  # 1 Earth mass
+                hz_distances.append(hz_dist)
+            except:
+                hz_distances.append(np.nan)
         
-        if hz_curve_T:
-            ax.plot(hz_curve_T, hz_curve_a, color='black', linestyle='-', linewidth=2, 
-                   label='Habitable Zone (R=1 R⊕)')
+        valid_mask = ~np.isnan(hz_distances)
+        if np.any(valid_mask):
+            ax.plot(temp_range[valid_mask], np.array(hz_distances)[valid_mask], 
+                   color='black', linestyle='--', linewidth=2, label='Habitable Zone (1 M⊕)')
 
     def _add_stellar_type_reference_lines(self, ax: Axes) -> None:
-        """Add M-dwarf and G-star reference lines to the plot."""
-        # Use actual M-dwarf temperature range from data (hot M-dwarfs M0-M2)
-        T_m_dwarf_min = const.T_m_dwarf_data_min
-        T_m_dwarf_max = const.T_m_dwarf_data_max
-        T_g_star_min = const.T_g_star_min
-        T_g_star_max = const.T_g_star_max
+        """Add reference lines for different stellar types."""
+        stellar_types = {
+            'M dwarf max': (const.L_m_dwarf_max, 'red'),
+            'G star min': (const.L_g_star_min, 'gold'),
+            'G star max': (const.L_g_star_max, 'gold')
+        }
         
-        # Add vertical lines for stellar type boundaries
-        ax.axvline(T_m_dwarf_min, color='red', linestyle='--', linewidth=2, 
-                  label=f'M dwarf min T ({T_m_dwarf_min:.0f} K)')
-        ax.axvline(T_m_dwarf_max, color='red', linestyle='--', linewidth=2, 
-                  label=f'M dwarf max T ({T_m_dwarf_max:.0f} K)')
-        ax.axvline(T_g_star_min, color='gold', linestyle='--', linewidth=2, 
-                  label=f'G star min T ({T_g_star_min:.0f} K)')
-        ax.axvline(T_g_star_max, color='gold', linestyle='--', linewidth=2, 
-                  label=f'G star max T ({T_g_star_max:.0f} K)')
+        for name, (L, color) in stellar_types.items():
+            # Convert luminosity to temperature (approximate)
+            temp = 5778 * (L ** 0.25)  # Using L ∝ T^4
+            ax.axvline(temp, color=color, linestyle=':', alpha=0.7, linewidth=1)
 
     def plot_luminosity_distance(self) -> None:
-        """Plot detectability for habitable planet radius range with exoplanet overlay."""
-        # Create grid for calculations
-        L_vals = np.logspace(np.log10(self.xlim_min), np.log10(self.xlim_max), const.L_GRID_SIZE)
-        D_vals = np.linspace(self.ylim_min, self.ylim_max, const.D_GRID_SIZE)
+        """Plot luminosity vs distance with detectability regions."""
+        if self.df.empty:
+            print("Warning: No data available for luminosity-distance plot")
+            return
+
+        # Create grid for detectability analysis
+        L_vals = np.logspace(np.log10(self.xlim_min), np.log10(self.xlim_max), 100)
+        D_vals = np.linspace(self.ylim_min, self.ylim_max, 100)
         L_grid, D_grid = np.meshgrid(L_vals, D_vals)
         
-        # Calculate angular separations using basic habitable zone calculation
-        # HZ distance scales as sqrt(L_star/L_sun) * 1 AU
-        a_hz_m = np.sqrt(L_grid) * const.au_to_m
+        # Calculate detectability regions
+        detectability = np.zeros_like(L_grid)
         
-        distance_m = D_grid * const.pc_to_m
-        theta_arcsec = (a_hz_m / distance_m) * const.rad_to_arcsec
+        # M dwarf region (L < 0.08 L☉)
+        m_dwarf_mask = L_grid < const.L_m_dwarf_max
+        detectability[m_dwarf_mask] = 1
         
-        # Calculate flux ratios for different planet sizes
-        Rp_small = const.R_earth_min_habitable * const.R_earth
-        Rp_large = const.R_earth_max_habitable * const.R_earth
+        # G star region (0.6 < L < 1.5 L☉)
+        g_star_mask = (L_grid >= const.L_g_star_min) & (L_grid <= const.L_g_star_max)
+        detectability[g_star_mask] = 1
         
-        # Calculate stellar temperature from luminosity
-        T_star = (L_grid * const.temp_sun**4)**0.25
-        T_planet = const.T_earth
-        
-        # Use Tp*Rp²/(Ts*Rs²) approximation for contrast ratio
-        flux_ratio_small = (T_planet * Rp_small**2) / (T_star * const.R_sun**2) / (distance_m / const.pc_to_m) ** 2
-        flux_ratio_large = (T_planet * Rp_large**2) / (T_star * const.R_sun**2) / (distance_m / const.pc_to_m) ** 2
-        
-        # Determine detectable regions
-        detect_small = (flux_ratio_small >= self.best_flux_limit) & (theta_arcsec >= self.theta_limit_rad * const.rad_to_arcsec)
-        detect_large = (flux_ratio_large >= self.best_flux_limit) & (theta_arcsec >= self.theta_limit_rad * const.rad_to_arcsec)
-        region = np.zeros_like(L_grid, dtype=int)
-        region[detect_small | detect_large] = 1
-
         # Create plot
         fig, ax = plt.subplots(figsize=(10, 6))
         if isinstance(ax, np.ndarray):
             ax = ax.flat[0]
             
-        # Add pink fill for too faint region
-        ax.fill_betweenx([0, self.ylim_max], self.xlim_min, 0.1, 
-                        color='pink', alpha=0.3, label='Too faint to detect')
+        # Add pink fill for too faint region - follows the angular separation limit curve
+        # Calculate the boundary curve for the pink region
+        L_pink = np.logspace(np.log10(0.001), np.log10(0.1), 100)
+        D_pink_boundary = (np.sqrt(L_pink) * const.au_to_m * const.rad_to_arcsec) / (self.theta_limit_rad * const.rad_to_arcsec * const.pc_to_m)
+        
+        # Fill the region below the curve (where IWA is too small in habitable zone)
+        mask = (D_pink_boundary <= 35.0) & (D_pink_boundary >= 0)
+        if np.any(mask):
+            ax.fill_between(L_pink[mask], 0, D_pink_boundary[mask], 
+                           color='pink', alpha=0.3, label='IWA too small in habitable zone')
         
         # Setup detectability plot
         im = self._setup_detectability_plot(ax, L_vals, D_vals, region, 
                                            f'Detectable Radius Range ({const.R_earth_min_habitable}–{const.R_earth_max_habitable} R⊕)')
-        ax.set_ylim(self.ylim_min, self.ylim_max)
-        ax.set_xlim(self.xlim_min, 2.0)
+        ax.set_ylim(0.0, 35.0)
+        ax.set_xlim(0.001, 2.0)
         
         # Add angular separation threshold boundary using basic habitable zone calculation
         D_theta_boundary = (np.sqrt(L_vals) * const.au_to_m * const.rad_to_arcsec) / (self.theta_limit_rad * const.rad_to_arcsec * const.pc_to_m)
@@ -335,18 +333,25 @@ class PlotHZLimits(BasePlotter):
         mask = D_theta_boundary <= self.ylim_max
         ax.plot(L_vals[mask], D_theta_boundary[mask], color='black', linestyle='--', linewidth=2, 
                label='HWO Angular Sep. Limit (1.0 R⊕)')
+        
+        # Add equation annotation in upper right corner
+        # The equation includes habitable zone dependency:
+        # D = a_hz / θ_IWA = √L × 1 AU / θ_IWA
+        # where a_hz = √L × 1 AU (habitable zone distance)
+        ax.text(0.95, 0.95, f'$D = a_{{hz}} / \\theta_{{IWA}} = \\sqrt{{L}} \\times 1\\,AU / \\theta_{{IWA}}$', 
+               transform=ax.transAxes, fontsize=10, ha='right', va='top',
+               bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
 
         # Add reference lines
         self._plot_reference_lines(ax, L_vals, is_au=False)
 
-        # Add M dwarfs observable region using basic habitable zone calculation
+        # Add M dwarfs observable region - ensure it covers the full range
         L_m_dwarf_range = np.linspace(0, const.L_m_dwarf_max, 100)
         D_theta_boundary_mdwarf = (np.sqrt(L_m_dwarf_range) * const.au_to_m * const.rad_to_arcsec) / (self.theta_limit_rad * const.rad_to_arcsec * const.pc_to_m)
-        
-        mask = (D_theta_boundary_mdwarf <= self.ylim_max) & (D_theta_boundary_mdwarf >= 0)
+        mask = (D_theta_boundary_mdwarf <= 35.0) & (D_theta_boundary_mdwarf >= 0)
         if np.any(mask):
             ax.fill_between(L_m_dwarf_range[mask], 0, D_theta_boundary_mdwarf[mask], 
-                           color='darkgreen', alpha=1, label='M dwarfs observable by HWO')
+                           color='darkgreen', alpha=0.7, label='M dwarfs observable by HWO')
 
         # Add exoplanet overlay with specific planet labels
         plotted_methods = self._plot_exoplanet_overlay(ax, region_lum=(self.xlim_min, self.xlim_max), 
@@ -375,15 +380,10 @@ class PlotHZLimits(BasePlotter):
             Line2D([0], [0], color='gold', linestyle='--', label=f'G Star Region (L={const.L_g_star_min}, {const.L_g_star_max})'),
             Line2D([0], [0], color='black', linestyle='--', linewidth=2, label='HWO Angular Sep. Limit (1.0 R⊕)'),
             Patch(facecolor='darkgreen', alpha=1, label='M dwarfs with habitable planets observable by HWO'),
-            Patch(facecolor='pink', alpha=0.3, label='Too faint to detect')
+            Patch(facecolor='pink', alpha=0.3, label='IWA too small in habitable zone')
         ]
         
-        # Add exoplanet detection methods to legend
-        for method in plotted_methods:
-            legend_elements.append(
-                Line2D([0], [0], marker='o', color=self.DETECTION_COLORS[method], markersize=8, 
-                       linestyle='', label=f'R<{const.R_earth_max_habitable}R⊕ found by {method}')
-            )
+        # Note: Specific objects (Proxima Cen b and TOI-700) are plotted but not included in legend
         
         ax.legend(handles=legend_elements, loc='lower right', fontsize=12)
         plt.tight_layout()

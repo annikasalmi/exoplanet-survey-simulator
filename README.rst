@@ -1,16 +1,17 @@
-FORKED FROM https://github.com/fdannert/LIFEsim
+mdwarf-habitability
+===================
 
-Will eventually also contain forks of PPop and HWO.
+This repository contains tools to simulate and analyze detectability of potentially habitable exoplanets around M dwarfs for LIFE and HWO.
 
-Goal is to understand LIFE and HWO's ability to characterize exoplanets.
+For the most up-to-date usage instructions, please see the Markdown README at the project root (``README.md``).
 
-LIFEsim does that by MCing with PPop a potential distribution of exoplanets.
-It then simulates some S/N on them to see whether they would be detectable with different types/sizes of instrument.
-It then simulates extracting data. 
-**I believe - need to check all this.**
+Quick links
+-----------
 
-I aim to similarly use PPop and combine with hwo-tools ability to simulate SNR for any given exoplanet characteristics.
+* LIFEsim: https://github.com/fdannert/LIFEsim
+* P-pop: https://github.com/kammerje/P-pop
 
-If there is time I will look into extraction of spectra.
+License
+-------
 
-(Sorry for putting them all in one repo... maybe bad practice)
+GPL-3.0 (see ``LICENSE``).

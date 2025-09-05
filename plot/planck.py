@@ -45,7 +45,7 @@ def calculate_system_fluxes(T_star, T_planet, R_star, R_planet, D, wavelength_m,
     
     return flux_star, flux_planet, reflected_flux, contrast
 
-def plot_absorption_features(ax, wavelength_um, fluxes):
+def plot_absorption_features(ax, wavelength_um, all_fluxes):
     """Plot atmospheric absorption features as gray lines with different linestyles."""
     features = {
         'H₂O': [0.94, 1.13, 1.38, 1.87],
@@ -57,25 +57,26 @@ def plot_absorption_features(ax, wavelength_um, fluxes):
     gray_shades = ['#888888', '#AAAAAA', '#666666', '#BBBBBB', '#444444']
     linestyles = ['-', '--', '-.', ':', (0, (3, 5, 1, 5))]
 
+    # Calculate the maximum flux value for positioning labels
+    max_flux_value = max([np.max(flux) for flux in all_fluxes if np.any(flux > 0)])
+
     for i, (molecule, wavelengths) in enumerate(features.items()):
         color = gray_shades[i % len(gray_shades)]
         linestyle = linestyles[i % len(linestyles)]
         for wavelength in wavelengths:
             if 0.2 <= wavelength <= 2.5:
-                idx = np.argmin(np.abs(wavelength_um - wavelength))
-                max_flux = max(fluxes[idx] for fluxes in fluxes) + 1000
                 ax.axvline(x=wavelength, color=color, alpha=0.7, linestyle=linestyle, linewidth=1)
                 # Special handling for 2.0 μm overlap
                 if wavelength == 2.0 and molecule == 'CO₂':
-                    ax.text(wavelength + 0.01, max_flux * 1.7, molecule, rotation=90, fontsize=14,
+                    ax.text(wavelength + 0.01, max_flux_value * 1.7, molecule, rotation=90, fontsize=14,
                             color=color, ha='left', va='bottom')
                 elif wavelength == 2.0 and molecule == 'NH₃':
-                    ax.text(wavelength - 0.01, max_flux * 1.3, molecule, rotation=90, fontsize=14,
+                    ax.text(wavelength - 0.01, max_flux_value * 1.3, molecule, rotation=90, fontsize=14,
                             color=color, ha='right', va='bottom')
                 else:
                     # Offset label if another molecule is already at this wavelength
                     y_offset = 1.5
-                    ax.text(wavelength, max_flux * y_offset, molecule, rotation=90, fontsize=14,
+                    ax.text(wavelength, max_flux_value * y_offset, molecule, rotation=90, fontsize=14,
                             color=color, ha='right', va='bottom')
 
 
@@ -152,6 +153,10 @@ def main():
 
     # Add absorption features
     plot_absorption_features(ax, wavelength_um, all_fluxes)
+    
+    # Add HWO observable range (0.2-2.5 μm) as black vertical lines
+    ax.axvline(x=0.2, color='black', linestyle='-', linewidth=2, alpha=0.8, label='HWO Range (0.2-2.5 μm)')
+    ax.axvline(x=2.5, color='black', linestyle='-', linewidth=2, alpha=0.8)
     # Calculate contrast using approximation: T_p * R_p^2 / (T_star * R_star^2)
     T_planet_K = const.T_earth  # Planet temperature in Kelvin
     R_planet_earth = const.R_earth_example  # Planet radius in Earth radii

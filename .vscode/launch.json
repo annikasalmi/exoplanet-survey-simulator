@@ -35,6 +35,14 @@
             "cwd": "${workspaceFolder}"
         },
         {
+            "name": "lifesim_run_exoplanets.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/run/lifesim/lifesim_run_exoplanets.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}"
+        },
+        {
             "name": "Sim: HWO (Gaia)",
             "type": "debugpy",
             "request": "launch",

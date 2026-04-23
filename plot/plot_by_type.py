@@ -60,12 +60,6 @@ class PlotPlanetType(BasePlotter):
         
         return bin_stats['count'].values, bin_stats['error'].values, bin_detected['count'].values, bin_detected['error'].values
 
-    def __init__(self, df: pd.DataFrame, nruns: int = 1, star_catalog: str = 'Gaia', name: str = 'HWO'):
-        """Initialize the plotter with data and metadata."""
-        super().__init__(df, nruns, star_catalog, name)
-        # Ensure temp_zone column is present for all plotting methods that need it
-        self.df['temp_zone'] = self.df['temp_p'].apply(self._temp_zone)
-
     def plot_all(self) -> None:
         """Generate all planet type plots."""
         if not self._validate_data():

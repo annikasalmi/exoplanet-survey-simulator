@@ -157,7 +157,7 @@ class PPop():
             df['stype'] = [df['Star'][i].Stype for i in range(len(df))]
             df['id'] = np.arange(0, len(df['dec']), 1)
             df['name_s'] =  [df['Star'][i].Name for i in range(len(df))]
-            df = df.drop(columns=columns_to_drop, axis=1)
+            df = df.drop(columns=columns_to_drop)
 
             self.catalog = df
 

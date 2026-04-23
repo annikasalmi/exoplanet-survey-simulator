@@ -284,27 +284,31 @@ class PlotHZLimits(BasePlotter):
             ax.axvline(temp, color=color, linestyle=':', alpha=0.7, linewidth=1)
 
     def plot_luminosity_distance(self) -> None:
-        """Plot luminosity vs distance with detectability regions."""
-        if self.df.empty:
-            print("Warning: No data available for luminosity-distance plot")
-            return
-
-        # Create grid for detectability analysis
-        L_vals = np.logspace(np.log10(self.xlim_min), np.log10(self.xlim_max), 100)
-        D_vals = np.linspace(self.ylim_min, self.ylim_max, 100)
+        """Plot detectability for habitable planet radius range with exoplanet overlay."""
+        # Create grid for calculations
+        L_vals = np.logspace(np.log10(self.xlim_min), np.log10(self.xlim_max), const.L_GRID_SIZE)
+        D_vals = np.linspace(self.ylim_min, self.ylim_max, const.D_GRID_SIZE)
         L_grid, D_grid = np.meshgrid(L_vals, D_vals)
-        
-        # Calculate detectability regions
-        detectability = np.zeros_like(L_grid)
-        
-        # M dwarf region (L < 0.08 L☉)
-        m_dwarf_mask = L_grid < const.L_m_dwarf_max
-        detectability[m_dwarf_mask] = 1
-        
-        # G star region (0.6 < L < 1.5 L☉)
-        g_star_mask = (L_grid >= const.L_g_star_min) & (L_grid <= const.L_g_star_max)
-        detectability[g_star_mask] = 1
-        
+
+        # Calculate angular separations
+        a_hz_m = np.sqrt(L_grid) * const.au_to_m
+        distance_m = D_grid * const.pc_to_m
+        theta_arcsec = (a_hz_m / distance_m) * const.rad_to_arcsec
+
+        # Calculate flux ratios for small and large habitable planets
+        Rp_small = const.R_earth_min_habitable * const.R_earth
+        Rp_large = const.R_earth_max_habitable * const.R_earth
+        T_star = (L_grid * const.temp_sun**4)**0.25
+        T_planet = const.T_earth
+        flux_ratio_small = (T_planet * Rp_small**2) / (T_star * const.R_sun**2) / (distance_m / const.pc_to_m)**2
+        flux_ratio_large = (T_planet * Rp_large**2) / (T_star * const.R_sun**2) / (distance_m / const.pc_to_m)**2
+
+        # Determine detectable regions
+        detect_small = (flux_ratio_small >= self.best_flux_limit) & (theta_arcsec >= self.theta_limit_rad * const.rad_to_arcsec)
+        detect_large = (flux_ratio_large >= self.best_flux_limit) & (theta_arcsec >= self.theta_limit_rad * const.rad_to_arcsec)
+        region = np.zeros_like(L_grid, dtype=int)
+        region[detect_small | detect_large] = 1
+
         # Create plot
         fig, ax = plt.subplots(figsize=(10, 6))
         if isinstance(ax, np.ndarray):

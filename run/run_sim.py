@@ -22,6 +22,10 @@ from tools.exoplanet_catalog import load_and_filter_exoplanets
 def run_with_progress(func, name, estimated_minutes=12, *args, **kwargs):
     estimated_seconds = estimated_minutes * 60
     log_path = os.path.join(LOGGING, name, "run_log" + datetime.now().strftime("_%Y%m%d_%H%M%S") + ".txt")
+    log_dir = os.path.dirname(log_path)
+    if not os.path.isdir(log_dir):
+        os.makedirs(log_dir)
+    print(f"Writing log to: {log_path}")
     logging.basicConfig(filename=log_path, filemode='w', level=logging.INFO, format='%(asctime)s - %(message)s')
     def log(msg):
         print(msg)
@@ -152,12 +156,12 @@ def run_exoplanet_plotting(name='HWO_exoplanets', star_catalog='exoplanet_catalo
 # Run the whole thing
 if __name__ == "__main__":
 
-    NRUNS = np.arange(500)
+    NRUNS = np.arange(1)
     
     # Run exoplanet plotting
     # run_exoplanet_plotting(name='HWO_exoplanets', star_catalog='Gaia', plot=True)
     
-    run_sim(func=main_hwo, name = 'hwo', parallel=True, nruns=NRUNS, star_catalog='Gaia', run_anew=False)
+    run_sim(func=main_hwo, name = 'hwo', parallel=False, nruns=NRUNS, star_catalog='Gaia', run_anew=False)
     # # print('Completed HWO')
     # run_sim(func=main_lifesim, name='lifesim', parallel=True, nruns=NRUNS, star_catalog='Gaia', run_anew=False)
     # # print('Completed Lifesim Gaia')

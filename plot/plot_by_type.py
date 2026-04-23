@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 from plot.base_plotter import BasePlotter
 from tools.plotting_constants import (
-    STAR_ORDER, TEMP_ZONES, DISTANCE_LABELS,
+    STAR_ORDER, TEMP_ZONES,
     TEMP_COLORS,  BAR_WIDTH_TEMP, BAR_WIDTH_DIST, HATCHES,
     STAR_COLORS, STAR_HATCHES, BIN_LABELS, BAR_WIDTH_STAR
 )
@@ -204,6 +204,17 @@ class PlotPlanetType(BasePlotter):
         ax.legend(title='Radius Bin')
         ax.set_ylim(bottom=0)
         
+        def get_count(df, star=None, bin_label=None):
+            if not isinstance(df, pd.DataFrame):
+                return 0
+            if star is not None and bin_label is not None:
+                filtered = df[(df['radius_bin'] == bin_label) & (df['stype'] == star)] if 'radius_bin' in df.columns and 'stype' in df.columns else pd.DataFrame()
+            elif star is not None:
+                filtered = df[df['stype'] == star] if 'stype' in df.columns else pd.DataFrame()
+            else:
+                filtered = df
+            return filtered['count'].iloc[0] if isinstance(filtered, pd.DataFrame) and not filtered.empty and 'count' in filtered.columns else 0
+
         # Add percentage labels
         for i, bin_label in enumerate(BIN_LABELS):
             bin_data = total_mean[total_mean['radius_bin'] == bin_label] if isinstance(total_mean, pd.DataFrame) else pd.DataFrame()
@@ -266,71 +277,67 @@ class PlotPlanetType(BasePlotter):
 
     def _calculate_planet_stats(self, df):
         """Calculate statistics for planet-based plots."""
-        # Add categories first
         df = df.copy()
         df['categories'] = df.apply(self._assign_category, axis=1)
         df = df.explode('categories')
-        
-        # Get detection mask BEFORE any further processing
+
         mask_best, _ = self._get_detection_masks()
-        mask_best = mask_best[df.index]  # Align mask with exploded df
-        
-        # DEBUG: Print detection mask statistics for planet plotting
-        print(f"DEBUG: Detection mask analysis in _calculate_planet_stats")
-        print(f"  mask_best sum: {mask_best.sum()}")
-        print(f"  mask_best percentage: {mask_best.sum()/len(mask_best)*100:.1f}%")
-        print(f"  Sample mask_best values: {mask_best.head(5).tolist()}")
-        
-        # Calculate statistics for total
+        mask_best = mask_best[df.index]
+
         stats = self._pivot_stats(df, ['categories', 'temp_zone'])
-        
-        # Calculate statistics for detected - use the mask directly
         df_detected = df[mask_best].copy()
-        
-        # Calculate stats
         detected_stats = self._pivot_stats(df_detected, ['categories', 'temp_zone'])
-        
+
+        return stats, detected_stats
+
+    def _get_planet_data_for_bin(self, stats, detected_stats, bin_label):
+        """Get planet data for a specific temperature zone bin."""
+        categories = ['Rocky', 'Super-Earths', 'Sub-Neptunes', 'Sub-Jovians']
+        bin_stats = stats[stats['temp_zone'] == bin_label].set_index('categories').reindex(categories).fillna(0)
+        bin_detected = detected_stats[detected_stats['temp_zone'] == bin_label].set_index('categories').reindex(categories).fillna(0)
+        return bin_stats['count'].values, bin_stats['error'].values, bin_detected['count'].values, bin_detected['error'].values
+
+    def plot_by_planet(self) -> None:
+        """Plot planet counts by planet type with temperature zone breakdown."""
+        stats, detected_stats = self._calculate_planet_stats(self.df)
+
         # Setup plot
-        fig, ax = plt.subplots(figsize=(10, 6))
+        fig, ax = plt.subplots(figsize=(8, 6))
+        categories = ['Rocky', 'Super-Earths', 'Sub-Neptunes', 'Sub-Jovians']
         x = np.arange(len(categories))
         # Ensure ax is a matplotlib Axes, not an ndarray
         if isinstance(ax, np.ndarray):
             ax = ax.flatten()[0]
-        
+
         # Plot each temperature zone
         for i, (bin_label, color, hatch) in enumerate(zip(TEMP_ZONES, TEMP_COLORS, HATCHES)):
             total_heights, total_errors, detected_heights, detected_errors = self._get_planet_data_for_bin(
                 stats, detected_stats, bin_label
             )
-            
-            # Create overlay bars - only add "Total" label for the first temperature zone
-            add_total_label = (i == 0)  # Only add "Total" label for the first iteration
+
+            add_total_label = (i == 0)
             self._create_overlay_bars(
                 ax, x + i * BAR_WIDTH_TEMP, total_heights, detected_heights,
                 total_errors, detected_errors, BAR_WIDTH_TEMP, 'lightgray', color, hatch,
                 add_total_label=add_total_label, detected_label=bin_label
             )
 
-        
         if self.name == 'HWO_exoplanets':
             name = '\nHWO detection ability of exoplanet catalog'
         elif self.name == 'LIFEsim_exoplanets':
             name = '\nLIFEsim detection ability of exoplanet catalog'
         else:
             name = self.name
-        
-        # Setup plot
+
         self._setup_plot_style(
-            ax, 'Planet Type', 'Number of Planets', 
+            ax, 'Planet Type', 'Number of Planets',
             f'Planet Detection by Type for {name}',
             'Temperature Zone'
         )
-        
-        # Set x-axis
+
         ax.set_xticks(x + BAR_WIDTH_TEMP)
         ax.set_xticklabels(categories)
-        
-        # Add percentage labels
+
         for i, bin_label in enumerate(TEMP_ZONES):
             total_heights, _, detected_heights, _ = self._get_planet_data_for_bin(
                 stats, detected_stats, bin_label
@@ -338,9 +345,9 @@ class PlotPlanetType(BasePlotter):
             self._add_percentage_labels(
                 ax, x + i * BAR_WIDTH_TEMP, detected_heights, total_heights, offset=16
             )
-        plt.ylim(0,7000)
+        plt.ylim(0, 7000)
         plt.tight_layout(rect=[0, 0, 1, 0.92])
-        self._save_plot(fig, 'planet_type_subcategory')
+        self._save_plot(fig, 'planet_detection_by_type')
 
     def plot_by_distance(self) -> None:
         """Distance-based analysis."""
@@ -393,30 +400,14 @@ class PlotPlanetType(BasePlotter):
         self._save_plot(fig, 'distance_analysis')
 
     def _pivot_stats(self, df, groupby_cols):
-        """Calculate statistics for grouped data."""
+        """Compute mean and std of counts by run for arbitrary groupby columns."""
         if df.empty:
             return pd.DataFrame(columns=groupby_cols + ['count', 'error'])
-        
-        # Create overlay bars - total vs detected
-        self._create_overlay_bars(
-            ax, x, total_counts, detected_counts,
-            total_errors, detected_errors, 0.6, 'lightgray', 'green', None
-        )
-        
-        # Setup plot
-        self._setup_plot_style(
-            ax, 'Distance Bin', 'Number of Planets', 
-            f'Planet Detection by Distance Bin for {self.name} ({self.nruns} runs)'
-        )
-       
-        # Set x-axis
-        ax.set_xticks(x)
-        ax.set_xticklabels(DISTANCE_LABELS)
-        
-        # Calculate mean and standard deviation
-        mean_counts = pivot_table.mean(axis=1).reset_index(name='count')
-        std_counts = pivot_table.std(axis=1).reset_index(name='error')
-        
-        # Merge mean and std
-        result = mean_counts.merge(std_counts, on=groupby_cols)
-        return result
+        if 'run' in df.columns:
+            grouped = df.groupby(groupby_cols + ['run']).size().reset_index(name='count')
+            stats = grouped.groupby(groupby_cols).agg({'count': ['mean', 'std']}).reset_index()
+            stats.columns = groupby_cols + ['count', 'error']
+        else:
+            stats = df.groupby(groupby_cols).size().reset_index(name='count')
+            stats['error'] = 0.0
+        return stats

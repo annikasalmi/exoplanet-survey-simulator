@@ -59,3 +59,8 @@ __pycache__/*.pyc
 /mdwarfs/*/*/*/*/*/*/*/*/*/*
 /plot/old/*/*.png
 /plot/combined_edited/*
+
+# Local Python virtual environments
+/venv/
+/hwosim/
+.DS_Store

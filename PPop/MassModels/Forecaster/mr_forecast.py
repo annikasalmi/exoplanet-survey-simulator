@@ -201,7 +201,7 @@ def Rpost2M(radius, unit='Earth', grid_size = 1e3, classify = 'No', rng=np.rando
 
 	for i in range(sample_size):
 		prob = ProbRGivenM(logr[i], logm_grid, hyper[i,:])
-		logm[i] = rng.choice(logm_grid, size=1, p = prob)
+		logm[i] = rng.choice(logm_grid, p=prob)
 
 	mass_sample = 10.** logm
 

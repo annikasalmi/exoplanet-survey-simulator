@@ -161,7 +161,8 @@ if __name__ == "__main__":
     # Run exoplanet plotting
     # run_exoplanet_plotting(name='HWO_exoplanets', star_catalog='Gaia', plot=True)
     
-    run_sim(func=main_hwo, name = 'hwo', parallel=False, nruns=NRUNS, star_catalog='Gaia', run_anew=False)
+    run_sim(func=main_hwo, name = 'hwo', parallel=False, nruns=NRUNS, star_catalog='Gaia', 
+            run_anew=True, plot=False) # CHANGED run_anew to TRUE to re-run HWO with Gaia catalog
     # # print('Completed HWO')
     # run_sim(func=main_lifesim, name='lifesim', parallel=True, nruns=NRUNS, star_catalog='Gaia', run_anew=False)
     # # print('Completed Lifesim Gaia')

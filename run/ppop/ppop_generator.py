@@ -34,17 +34,19 @@ class PPop():
     '''
     This class sets up the parameters for the planet population generator.
     '''
-    def __init__(self, rng):
+    def __init__(self, rng, use_cfk_combined=False, control_fraction=0.15):
         '''
         This function sets up the parameters for the planet population generator.
         '''
         self.rng=rng
+        self.use_cfk_combined = use_cfk_combined
+        self.control_fraction = control_fraction
 
         #StarCatalog = ExoCat_1 # used by NASA
         self.StarCatalog = LTC_3 # LIFE Target Catalog (version 3)
         self.Stypes = ['A', 'F', 'G', 'K', 'M'] # list of str
         self.Dist_min = 0
-        self.Dist_range = [0., 20.] # pc, list of float, [min, max]
+        self.Dist_range = [0., 60.] # pc, list of float, [min, max]
         self.Dec_range = [-90., 90.] # deg, list of float, [min, max]
 
         # Select the planet distributions, the scenario, and the scaling model which should be used here. 
@@ -476,9 +478,86 @@ class PPop():
             (self.catalog['radius_p'].ge(0.5)).to_numpy(),
             (self.catalog['radius_p'].le(1.5)).to_numpy()))
 
+        # Optional C+F+K combined Kepler-bias stress sample.
+        # No new columns are added; this only keeps/rescales existing rows.
+        if self.use_cfk_combined:
+            self._apply_cfk_combined_sample()
+
         # TODO: Definition of stype here is wrong. It should be an int not a string.
         #   Think about this a bit more. It is important to keep the ints in the DataFrame, but that
         #   decreases usability. Maybe an option is to use intermediate masks for the stellar types.
+        
+################################################################## Added for richer Ppop samples!##################################################################
+    def _apply_cfk_combined_sample(self):
+        """
+        Minimal combined experiment:
+        C: emphasize farther stars,
+        F: emphasize larger host stars,
+        K: stretch the existing distance_s values so the brightness proxy spans Kp~4-16.
+
+        Important: this is a stress-test sample, not an occurrence-rate sample.
+        It intentionally does not add columns.
+        """
+        if self.catalog.empty:
+            return
+
+        radius_p = pd.to_numeric(self.catalog['radius_p'], errors='coerce')
+        p_orb = pd.to_numeric(self.catalog['p_orb'], errors='coerce')
+        radius_s = pd.to_numeric(self.catalog['radius_s'], errors='coerce')
+        distance_s = pd.to_numeric(self.catalog['distance_s'], errors='coerce')
+        flux_p = pd.to_numeric(self.catalog['flux_p'], errors='coerce')
+
+        far_star = distance_s >= 30.0
+        large_host = radius_s >= 1.20
+        small_long_period = (radius_p <= 1.50) & (p_orb >= 50.0)
+        small_hz_like = radius_p.between(0.5, 2.0) & flux_p.between(0.25, 2.0)
+
+        keep = far_star | large_host | small_long_period | small_hz_like
+
+        # Keep a small random comparison sample so the plots still contain easier planets.
+        if self.control_fraction > 0:
+            keep = keep | (self.rng.random(len(self.catalog)) < self.control_fraction)
+
+        # If the filter is accidentally too aggressive for a small test run, keep the original sample.
+        if keep.fillna(False).sum() > 0:
+            self.catalog = self.catalog.loc[keep.fillna(False)].copy()
+            self.catalog.index = np.arange(0, self.catalog.shape[0], 1)
+
+        self._stretch_distance_to_kp_range(kp_min=4.0, kp_max=16.0)
+
+    def _stretch_distance_to_kp_range(self, kp_min=4.0, kp_max=16.0):
+        """
+        Make the existing distance_s column produce a wider Kepler-magnitude proxy.
+
+        KeplerData later estimates brightness from l_sun and distance_s when no real kepmag exists.
+        This lets us stress-test Kp~4-16 without adding a new kepmag column.
+        """
+        needed = {'l_sun', 'distance_s'}
+        if not needed.issubset(self.catalog.columns):
+            return
+
+        # Apply one target brightness per star, so all planets around the same star stay consistent.
+        if 'nstar' in self.catalog.columns:
+            star_ids = self.catalog['nstar'].dropna().unique()
+            for sid in star_ids:
+                mask = self.catalog['nstar'] == sid
+                self._set_distance_for_mask(mask, kp_min, kp_max)
+        else:
+            for idx in self.catalog.index:
+                self._set_distance_for_mask(self.catalog.index == idx, kp_min, kp_max)
+
+    def _set_distance_for_mask(self, mask, kp_min, kp_max):
+        l_sun = pd.to_numeric(self.catalog.loc[mask, 'l_sun'], errors='coerce').iloc[0]
+        if not np.isfinite(l_sun) or l_sun <= 0:
+            return
+
+        target_kp = self.rng.uniform(kp_min, kp_max)
+        abs_mag = 4.74 - 2.5 * np.log10(l_sun)
+        new_distance_pc = 10.0 * 10.0 ** ((target_kp - abs_mag) / 5.0)
+
+        if np.isfinite(new_distance_pc) and new_distance_pc > 0:
+            self.catalog.loc[mask, 'distance_s'] = new_distance_pc
+
     def catalog_remove_distance(self,
                                 stype: str,
                                 dist: float,

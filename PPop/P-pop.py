@@ -53,8 +53,8 @@ from ExozodiModels import Ertel2020, Ertel2018
 #StarCatalog = ExoCat_1 # used by NASA
 #StarCatalog = LTC_2 # LIFE Target Catalog (version 2)
 StarCatalog = LTC_3 # LIFE Target Catalog (version 3)
-Stypes = ['A', 'F', 'G', 'K', 'M'] # list of str
-Dist_range = [0., 20.] # pc, list of float, [min, max]
+Stypes = ['A', 'F', 'G', 'K', 'M'] # list of str 
+Dist_range = [0., 20.] # pc, list of float, [min, max] 
 Dec_range = [-90., 90.] # deg, list of float, [min, max]
 
 # Select the planet distributions, the scenario, and the scaling model which

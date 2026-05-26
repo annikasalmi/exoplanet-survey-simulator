@@ -9,7 +9,7 @@ from lifesim.core.hwo_data import HWOData
 
 # Load and process data
 print("Loading exoplanet data...")
-df = load_and_filter_exoplanets('/Users/annikasalmi/lifesim_github/mdwarf-habitability/exoplanets_2025.csv')
+df = load_and_filter_exoplanets('/Users/annikasalmi/lifesim_github/mdwarf-habitability/exoplanets_2026.csv')
 
 print(f"\nBefore HWO processing:")
 print(f"  Total planets: {len(df)}")

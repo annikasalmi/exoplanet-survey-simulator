@@ -9,3 +9,5 @@ LIFESIM_DATA_DIR = os.path.join(LIFESIM_OUTER_DIR, "run","lifesim","data")
 HWO_DATA_DIR = os.path.join(LIFESIM_OUTER_DIR, "run","hwo","data")
 PLOTS_DIR = os.path.join(LIFESIM_OUTER_DIR, "plot")
 LOGGING = os.path.join(LIFESIM_OUTER_DIR, "run", "logging")
+#Hongyi added for kepler data 5/18
+KEPLER_DATA_DIR = os.path.join(LIFESIM_OUTER_DIR, "run", "kepler", "data")

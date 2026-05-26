@@ -33,7 +33,7 @@ def plot_planetary_vs_stellar_flux():
     Stellar flux = Rs^2 * B(Ts)
     """
     # Load exoplanets data
-    exo_path = os.path.join(LIFESIM_OUTER_DIR, 'exoplanets_2025.csv')
+    exo_path = os.path.join(LIFESIM_OUTER_DIR, 'exoplanets_2026.csv')
     df = pd.read_csv(exo_path)
     
     # Filter for valid data
@@ -185,7 +185,7 @@ def plot_flux_ratio_vs_wavelength():
     
     # Add first 100 planets from exoplanet CSV
     print("Loading exoplanet data for wavelength analysis...")
-    exo_path = os.path.join(LIFESIM_OUTER_DIR, 'exoplanets_2025.csv')
+    exo_path = os.path.join(LIFESIM_OUTER_DIR, 'exoplanets_2026.csv')
     df_exo = pd.read_csv(exo_path)
     
     # Filter for valid data (first 100 planets)

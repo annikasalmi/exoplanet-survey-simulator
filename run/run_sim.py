@@ -13,9 +13,12 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from tools.paths import LOGGING, LIFESIM_OUTER_DIR
 from lifesim.core.hwo_data import HWOData
+from lifesim.core.kepler_data import KeplerData #added by Hongyi
+
 from run.lifesim.lifesim_run_multiple import main as main_lifesim
 from run.hwo.hwo_run_multiple import main as main_hwo
-from lifesim.core.hwo_data import HWOData
+from run.kepler.run_Kepler import main as main_kepler #added by Hongyi
+
 from plot.plot import plot_all
 from tools.exoplanet_catalog import load_and_filter_exoplanets
 
@@ -62,7 +65,7 @@ def run_with_progress(func, name, estimated_minutes=12, *args, **kwargs):
         log("Progress thread joined. Wrapper complete.")
     return result
 
-def run_sim(func=main_hwo, name='hwo', parallel=True, nruns=500, star_catalog='Gaia', run_anew=True, plot=True):
+def run_sim(func=main_hwo, name='hwo', parallel=True, nruns=500, star_catalog='Gaia', run_anew=True, plot=True, **kwargs):
     start_time = time.time()
     print(f"Starting simulation: {name} with {len(nruns)} runs...")
     print("Elapsed time: 0:00:00", end='', flush=True)
@@ -84,7 +87,8 @@ def run_sim(func=main_hwo, name='hwo', parallel=True, nruns=500, star_catalog='G
             parallel=parallel,
             nruns=nruns,
             star_catalog=star_catalog,
-            run_anew=run_anew
+            run_anew=run_anew,
+            **kwargs
         )
     finally:
         elapsed = time.time() - start_time
@@ -107,48 +111,112 @@ def run_sim(func=main_hwo, name='hwo', parallel=True, nruns=500, star_catalog='G
         print(f"Time taken to plot: {plot_hours}:{plot_minutes:02d}:{plot_seconds:02d}")
     return df_concat
 
+
 def run_exoplanet_plotting(name='HWO_exoplanets', star_catalog='exoplanet_catalog', plot=True):
-    print(f"Loading exoplanets data for plotting...")
-    exo_path = os.path.join(LIFESIM_OUTER_DIR, 'exoplanets_2025.csv')
-    df = load_and_filter_exoplanets(exo_path, instrument='HWO')
-    
-    # Process through HWO detection simulation
-    print(f"Processing {len(df)} planets through HWO detection simulation...")
-    hwo_data = HWOData(df)
-    hwo_data.determine_detectable()
-    
-    # Get the processed data with detection results
-    df = hwo_data.catalog
-    print(f"After HWO detection processing: {len(df)} planets")
-    print(f"Detected planets (best case): {df['detected_best'].sum() if 'detected_best' in df.columns else 'N/A'}")
-    print(f"Detected planets (worst case): {df['detected_worst'].sum() if 'detected_worst' in df.columns else 'N/A'}")
+    print("Loading exoplanets data for plotting...")
 
-    # DEBUG: Check detected_best value counts right before plotting
-    print('DEBUG: Value counts for detected_best before plotting:')
-    print(df['detected_best'].value_counts())
-    print('Sample detected_best:', df['detected_best'].head(10).tolist())
-    
-    required_columns = [
-        'luminosity_s', 'distance_s', 'radius_p', 'p_orb', 'semimajor_p', 'temp_s', 'temp_p', 'mass_p',
-        'detected', 'detected_best', 'detected_worst', 'flux_ratio_value_best', 'maxangsep', 'z',
-        'stype', 'habitable', 'run', 'radius_bin'
+    exo_path = os.path.join(LIFESIM_OUTER_DIR, 'exoplanets_2026.csv')
+    name_lower = name.lower()
+
+    telescope_map = {
+        "hwo": ("HWO", HWOData),
+        "kepler": ("Kepler", KeplerData),
+        # "tess": ("TESS", TESSData),
+    }
+
+    telescope_name, DataClass = None, None
+    for key, value in telescope_map.items():
+        if key in name_lower:
+            telescope_name, DataClass = value
+            break
+
+    if telescope_name is None:
+        raise ValueError(
+            f"Unknown telescope name: {name}. "
+            "Use 'HWO_exoplanets', 'Kepler_exoplanets', or later 'TESS_exoplanets'."
+        )
+
+    # Load catalog for the chosen telescope
+    df = load_and_filter_exoplanets(exo_path, instrument=telescope_name)
+
+    print(f"Processing {len(df)} planets through {telescope_name} detection simulation...")
+
+    # Run telescope model
+    telescope_data = DataClass(df)
+    telescope_data.determine_detectable()
+    df = telescope_data.catalog
+
+    # Shared plotting columns
+    df["run"] = 0
+    df["radius_bin"] = pd.cut(
+        df["radius_p"],
+        bins=[0, 1.5, 3.0, 6.0],
+        labels=["<1.5", "1.5–3.0", "3.0–6.0"],
+        include_lowest=True
+    )
+
+    # Standardize detection columns
+    if "detected" not in df.columns and "detected_best" in df.columns:
+        df["detected"] = df["detected_best"]
+
+    if "detected_best" not in df.columns and "detected" in df.columns:
+        df["detected_best"] = df["detected"]
+
+    if "detected_worst" not in df.columns and "detected_best" in df.columns:
+        df["detected_worst"] = df["detected_best"]
+
+    # Compact debug summary
+    print(f"After {telescope_name}: {len(df)} planets")
+    for col in ["detected", "detected_best", "detected_worst"]:
+        if col in df.columns:
+            print(f"{col}: {df[col].sum()} detected")
+            print(df[col].value_counts(dropna=False))
+
+    # Required columns
+    common_required = [
+        "luminosity_s", "distance_s", "radius_p", "p_orb", "semimajor_p",
+        "temp_s", "temp_p", "mass_p", "detected", "detected_best",
+        "detected_worst", "stype", "habitable", "run", "radius_bin"
     ]
-    missing = [col for col in required_columns if col not in df.columns]
-    if missing:
-        raise ValueError(f"Missing required columns for plotting: {missing}")
 
-    print(f"Loaded {len(df)} exoplanet records")
+    telescope_required = {
+        "HWO": ["flux_ratio_value_best", "maxangsep", "z"],
+        "Kepler": [
+            "transiting_geometric",
+            "transit_depth_ppm",
+            "kepler_star_bright_enough",
+            "kepler_depth_pass",
+        ],
+        "TESS": [
+            # Add later once TESSData exists
+        ],
+    }
+
+    required_columns = common_required + telescope_required.get(telescope_name, [])
+    missing = [col for col in required_columns if col not in df.columns]
+
+    if missing:
+        raise ValueError(
+            f"Missing required columns for {telescope_name}: {missing}\n"
+            f"Available columns: {df.columns.tolist()}"
+        )
 
     if plot:
         plot_start_time = time.time()
-        print(f"Starting plotting for exoplanets data...")
-        plot_all(df=df, sim_name=name, nruns=1, star_catalog=star_catalog, use_multiprocessing=False)
-        plot_end_time = time.time()
-        plot_elapsed = plot_end_time - plot_start_time
-        plot_hours = int(plot_elapsed // 3600)
-        plot_minutes = int((plot_elapsed % 3600) // 60)
-        plot_seconds = int(plot_elapsed % 60)
-        print(f"Time taken to plot: {plot_hours}:{plot_minutes:02d}:{plot_seconds:02d}")
+        print(f"Starting plotting for {telescope_name}...")
+
+        plot_all(
+            df=df,
+            sim_name=name,
+            nruns=1,
+            star_catalog=star_catalog,
+            use_multiprocessing=False,
+        )
+
+        plot_elapsed = time.time() - plot_start_time
+        h, rem = divmod(int(plot_elapsed), 3600)
+        m, s = divmod(rem, 60)
+        print(f"Time taken to plot: {h}:{m:02d}:{s:02d}")
 
     return df
 
@@ -156,16 +224,20 @@ def run_exoplanet_plotting(name='HWO_exoplanets', star_catalog='exoplanet_catalo
 # Run the whole thing
 if __name__ == "__main__":
 
-    NRUNS = np.arange(1)
+    NRUNS = np.arange(100)
     
     # Run exoplanet plotting
     # run_exoplanet_plotting(name='HWO_exoplanets', star_catalog='Gaia', plot=True)
     
-    run_sim(func=main_hwo, name = 'hwo', parallel=False, nruns=NRUNS, star_catalog='Gaia', 
-            run_anew=True, plot=False) # CHANGED run_anew to TRUE to re-run HWO with Gaia catalog
+    run_sim(func=main_kepler, name = 'kepler_C_F_K_combined', parallel=False, nruns=NRUNS, star_catalog='Gaia', run_anew=True, plot=True, use_cfk_combined=True) # CHANGED run_anew to TRUE to re-run HWO with Gaia catalog
+    # print('Completed Lifesim kepler')
+    
+    # run_sim(func=main_hwo, name = 'hwo', parallel=False, nruns=NRUNS, star_catalog='Gaia', run_anew=True) # CHANGED run_anew to TRUE to re-run HWO with Gaia catalog
     # # print('Completed HWO')
-    # run_sim(func=main_lifesim, name='lifesim', parallel=True, nruns=NRUNS, star_catalog='Gaia', run_anew=False)
-    # # print('Completed Lifesim Gaia')
+    
+    # run_sim(func=main_lifesim, name='lifesim', parallel=False, nruns=NRUNS, star_catalog='Gaia', run_anew=True, plot=True)
+    # print('Completed Lifesim Gaia')
+
     # run_sim(func=main_lifesim, name='lifesim', parallel=True, nruns=NRUNS, star_catalog='LTC_3', run_anew=False)
     # print('Completed Lifesim LTC_3')
     print('done')

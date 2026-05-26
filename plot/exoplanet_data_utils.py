@@ -5,7 +5,7 @@ from tools import physics_constants as const
 
 def load_exoplanet_luminosity_distance(region_lum=(0.001, 10), region_dist=(1, 35), return_names=False):
     """
-    Load exoplanets_2025.csv and return DataFrame with 'Luminosity', 'Distance', 
+    Load exoplanets_2026.csv and return DataFrame with 'Luminosity', 'Distance', 
     and optionally 'Planet Name' in the specified region.
     
     Args:
@@ -16,7 +16,7 @@ def load_exoplanet_luminosity_distance(region_lum=(0.001, 10), region_dist=(1, 3
     Returns:
         DataFrame with filtered exoplanet data or None if no data found
     """
-    exo_path = os.path.join(LIFESIM_OUTER_DIR, 'exoplanets_2025.csv')
+    exo_path = os.path.join(LIFESIM_OUTER_DIR, 'exoplanets_2026.csv')
     
     try:
         exo_df = pd.read_csv(exo_path)

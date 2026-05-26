@@ -64,3 +64,12 @@ __pycache__/*.pyc
 /venv/
 /hwosim/
 .DS_Store
+
+/my_outputs/*/*.csv 
+/my_outputs/*/*.png 
+/my_outputs/*.csv 
+/my_outputs/*.png
+
+/run/kepler/data/*.csv
+/run/kepler/data/*/*.csv
+/run/kepler/__pycache__/*.pyc

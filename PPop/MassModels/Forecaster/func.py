@@ -54,7 +54,10 @@ def ProbRGivenM(radii, M, hyper):
 		ind = indicate(M, trans, i)
 		mu = c[i] + M[ind]*slope[i]
 		sig = sigma[i]
-		prob[ind] = norm.pdf(radii, mu, sig)
+		# Identical to scipy norm.pdf(radii, mu, sig) to machine precision, but
+		# without scipy's per-call broadcast/dispatch overhead. This is the single
+		# hottest line in P-Pop generation (~600k calls per universe).
+		prob[ind] = np.exp(-0.5 * ((radii - mu) / sig)**2) / (sig * np.sqrt(2.0 * np.pi))
 
 	prob = prob/np.sum(prob)
 

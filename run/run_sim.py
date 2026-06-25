@@ -5,8 +5,6 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 import logging
-from tqdm import tqdm
-import threading
 
 # Add the project root to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -14,16 +12,21 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from tools.paths import LOGGING, LIFESIM_OUTER_DIR
 from lifesim.core.hwo_data import HWOData
 from lifesim.core.kepler_data import KeplerData #added by Hongyi
+from lifesim.core.tess_data import TESSData
+
 
 from run.lifesim.lifesim_run_multiple import main as main_lifesim
 from run.hwo.hwo_run_multiple import main as main_hwo
 from run.kepler.run_Kepler import main as main_kepler #added by Hongyi
+from run.tess.run_TESS import main as main_tess
 
 from plot.plot import plot_all
 from tools.exoplanet_catalog import load_and_filter_exoplanets
 
 def run_with_progress(func, name, estimated_minutes=12, *args, **kwargs):
-    estimated_seconds = estimated_minutes * 60
+    # Logs to file and runs func. Real progress comes from the per-star tqdm bar
+    # inside the generator (and the per-universe "Running ... for run i" prints),
+    # not from a fake wall-clock estimate.
     log_path = os.path.join(LOGGING, name, "run_log" + datetime.now().strftime("_%Y%m%d_%H%M%S") + ".txt")
     log_dir = os.path.dirname(log_path)
     if not os.path.isdir(log_dir):
@@ -33,25 +36,6 @@ def run_with_progress(func, name, estimated_minutes=12, *args, **kwargs):
     def log(msg):
         print(msg)
         logging.info(msg)
-    stop_event = threading.Event()
-    def time_based_progress_bar(estimated_seconds, stop_event, log_func=None):
-        with tqdm(total=estimated_seconds, unit='s', ncols=80) as pbar:
-            start_time = time.time()
-            while not stop_event.is_set():
-                elapsed = time.time() - start_time
-                if elapsed >= estimated_seconds:
-                    break
-                pbar.n = int(elapsed)
-                pbar.refresh()
-                if log_func:
-                    log_func(f"Progress: {int(elapsed)} / {estimated_seconds} seconds")
-                time.sleep(1)
-            pbar.n = estimated_seconds
-            pbar.refresh()
-            if log_func:
-                log_func("Progress complete.")
-    progress_thread = threading.Thread(target=time_based_progress_bar, args=(estimated_seconds, stop_event, log))
-    progress_thread.start()
     try:
         log(f"Starting function '{func.__name__}'...")
         result = func(*args, **kwargs)
@@ -59,26 +43,11 @@ def run_with_progress(func, name, estimated_minutes=12, *args, **kwargs):
     except Exception as e:
         log(f"Error during '{func.__name__}': {e}")
         raise
-    finally:
-        stop_event.set()
-        progress_thread.join()
-        log("Progress thread joined. Wrapper complete.")
     return result
 
 def run_sim(func=main_hwo, name='hwo', parallel=True, nruns=500, star_catalog='Gaia', run_anew=True, plot=True, **kwargs):
     start_time = time.time()
-    print(f"Starting simulation: {name} with {len(nruns)} runs...")
-    print("Elapsed time: 0:00:00", end='', flush=True)
-    def update_timer():
-        while True:
-            elapsed = time.time() - start_time
-            hours = int(elapsed // 3600)
-            minutes = int((elapsed % 3600) // 60)
-            seconds = int(elapsed % 60)
-            print(f"\rElapsed time: {hours}:{minutes:02d}:{seconds:02d}", end='', flush=True)
-            time.sleep(1)
-    timer_thread = threading.Thread(target=update_timer, daemon=True)
-    timer_thread.start()
+    print(f"Starting simulation: {name} with {len(nruns)} universe(s)...")
     try:
         df_concat = run_with_progress(
             func,
@@ -95,7 +64,7 @@ def run_sim(func=main_hwo, name='hwo', parallel=True, nruns=500, star_catalog='G
         hours = int(elapsed // 3600)
         minutes = int((elapsed % 3600) // 60)
         seconds = int(elapsed % 60)
-        print(f"\rSimulation completed in: {hours}:{minutes:02d}:{seconds:02d}")
+        print(f"\nSimulation completed in: {hours}:{minutes:02d}:{seconds:02d}")
     bins = [0, 1.5, 3.0, 6.0]
     labels = ['<1.5', '1.5–3.0', '3.0–6.0']
     df_concat['radius_bin'] = pd.cut(df_concat['radius_p'], bins=bins, labels=labels, include_lowest=True)
@@ -121,7 +90,7 @@ def run_exoplanet_plotting(name='HWO_exoplanets', star_catalog='exoplanet_catalo
     telescope_map = {
         "hwo": ("HWO", HWOData),
         "kepler": ("Kepler", KeplerData),
-        # "tess": ("TESS", TESSData),
+        "tess": ("TESS", TESSData),
     }
 
     telescope_name, DataClass = None, None
@@ -188,7 +157,13 @@ def run_exoplanet_plotting(name='HWO_exoplanets', star_catalog='exoplanet_catalo
             "kepler_depth_pass",
         ],
         "TESS": [
-            # Add later once TESSData exists
+            "tess_transiting_geometric",
+            "tess_transit_depth_ppm",
+            "tess_star_bright_enough",
+            "tess_depth_pass",
+            "tess_snr",
+            "tess_n_transits",
+            "tess_reason_category",
         ],
     }
 
@@ -224,13 +199,22 @@ def run_exoplanet_plotting(name='HWO_exoplanets', star_catalog='exoplanet_catalo
 # Run the whole thing
 if __name__ == "__main__":
 
-    NRUNS = np.arange(100)
-    
+    # The Gaia-60pc catalog holds ~54k stars, so ONE universe already yields
+    # ~100k planets. The local volume is ~73% M dwarfs, so F/G/K panels are
+    # sparse from a single universe. Stacking N seeded universes (same fixed
+    # star catalog, different RNG seed = independent Monte-Carlo realizations)
+    # multiplies planets-per-bin by N and smooths the FGK detection background.
+    # 10 universes on 5 workers = 2 batches (~10 h overnight on this box).
+    NRUNS = np.arange(10)
+
     # Run exoplanet plotting
     # run_exoplanet_plotting(name='HWO_exoplanets', star_catalog='Gaia', plot=True)
-    
-    run_sim(func=main_kepler, name = 'kepler_C_F_K_combined', parallel=False, nruns=NRUNS, star_catalog='Gaia', run_anew=True, plot=True, use_cfk_combined=True) # CHANGED run_anew to TRUE to re-run HWO with Gaia catalog
-    # print('Completed Lifesim kepler')
+
+    run_sim(func=main_kepler, name = 'kepler', parallel=True, nruns=NRUNS, star_catalog='Gaia', run_anew=True, plot=True) # Gaia 60pc
+    print('Completed Lifesim kepler')
+
+    run_sim(func=main_tess, name = 'TESS', parallel=True, nruns=NRUNS, star_catalog='Gaia', run_anew=True, plot=True) # Gaia 60pc
+    print('Completed Lifesim tess')
     
     # run_sim(func=main_hwo, name = 'hwo', parallel=False, nruns=NRUNS, star_catalog='Gaia', run_anew=True) # CHANGED run_anew to TRUE to re-run HWO with Gaia catalog
     # # print('Completed HWO')

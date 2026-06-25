@@ -44,7 +44,7 @@ from lifesim.core.kepler_data import KeplerData  # noqa: E402
 
 
 NASA_DATA_DIR = ROOT / "run" / "kepler" / "data" / "NASA"
-NASA_RAW_CSV = NASA_DATA_DIR / "NASA_PSCompPars_transiting_confirmed_RM_insolation.csv"
+NASA_RAW_CSV = NASA_DATA_DIR / "NASA_PSCompPars_transiting_confirmed_RM_insolation_errors_limits.csv"
 NASA_MODEL_CSV = NASA_DATA_DIR / "kepler_catalog_nasa_pscomppars.csv"
 
 OUT_DIR = ROOT / "my_outputs" / "17_w3_nasa_pscomppars_kepler_model"

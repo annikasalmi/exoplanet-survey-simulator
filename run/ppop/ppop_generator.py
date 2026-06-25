@@ -11,6 +11,7 @@ import sys
 import pandas as pd
 from astropy.io import fits
 from astropy.coordinates import SkyCoord, BarycentricMeanEcliptic
+from astropy.table import vstack as astropy_vstack
 
 from lifesim.util.habitable import single_habitable_zone
 from lifesim.util.options import Options
@@ -22,6 +23,7 @@ from PPop.StarCatalogs import CrossfieldBrightSample, ExoCat_1, LTC_2, LTC_3
 from PPop.PlanetDistributions import Fressin2013, Burke2015, Dressing2015, SAG13,\
                                 Weiss2018, Weiss2018KDE, HabitableNominal, \
                                 HabitablePessimistic, Fernandes2019symm
+from PPop.PlanetDistributions import Bergsten2022, SAG13_extrap, SAG13_rv, EarthTwin
 from PPop.ScalingModels import BinarySuppression
 from PPop.MassModels import Chen2017
 from PPop.EccentricityModels import Circular
@@ -30,16 +32,20 @@ from PPop.OrbitModels import Random
 from PPop.AlbedoModels import Uniform
 from PPop.ExozodiModels import Ertel2020
 
+M_STAR_BOOST = 1  # 1 = off. The Gaia-60pc catalog is already M-dwarf-complete
+                  # (~73% M dwarfs), so artificially duplicating M stars would
+                  # over-represent them relative to the real nearby universe.
+
 class PPop():
     '''
     This class sets up the parameters for the planet population generator.
     '''
-    def __init__(self, rng, use_cfk_combined=False, control_fraction=0.15):
+    def __init__(self, rng, use_combined_sample=False, control_fraction=0.15):
         '''
         This function sets up the parameters for the planet population generator.
         '''
         self.rng=rng
-        self.use_cfk_combined = use_cfk_combined
+        self.use_combined_sample = use_combined_sample
         self.control_fraction = control_fraction
 
         #StarCatalog = ExoCat_1 # used by NASA
@@ -53,7 +59,10 @@ class PPop():
         # A different planet distribution can be assigned to each spectral type.
         # dict, StarCatalog.Stype as keys, PlanetDistribution as data
         # SEE MORE options in gp.py
-        self.StypeToModel = {'A': SAG13, 'F': SAG13, 'G': SAG13, 'K': SAG13, 'M': Dressing2015}
+        # Bergsten+2022 (stellar-mass dependent) for FGK; Dressing+2015 (Kepler
+        # M-dwarf occurrence) for M dwarfs. A stars are rare in all catalogs —
+        # keep SAG13 as a stand-in.
+        self.StypeToModel = {'A': SAG13, 'F': Bergsten2022, 'G': Bergsten2022, 'K': Bergsten2022, 'M': Dressing2015}
         self.Scenario = 'baseline' # 'pessimistic', 'optimistic', for +/- 1-sigma lower/higher error bars planet dist.
         self.ScalingModel = BinarySuppression # or None
 
@@ -102,6 +111,22 @@ class PPop():
                                                 self.FigDir,
                                                 self.block,
                                                 rng=self.rng)
+        # Duplicate M-star rows so the simulation sees M_STAR_BOOST× as many M stars.
+        if M_STAR_BOOST > 1:
+            sc = SysGen.StarCatalog.SC
+            stype_str = np.array([
+                s.decode('ascii').strip() if isinstance(s, bytes) else str(s).strip()
+                for s in sc['Stype']
+            ])
+            m_mask = stype_str == 'M'
+            if m_mask.any():
+                m_rows = sc[m_mask]
+                extras = astropy_vstack([m_rows] * (M_STAR_BOOST - 1))
+                SysGen.StarCatalog.SC = astropy_vstack([sc, extras])
+                print(f'--> M-star boost x{M_STAR_BOOST}: '
+                      f'{m_mask.sum()} → {m_mask.sum() * M_STAR_BOOST} M stars '
+                      f'(total stars: {len(SysGen.StarCatalog.SC)})')
+
         df = SysGen.SimulateUniverses(data_path,
                                 nuniverses)
         return df
@@ -478,17 +503,17 @@ class PPop():
             (self.catalog['radius_p'].ge(0.5)).to_numpy(),
             (self.catalog['radius_p'].le(1.5)).to_numpy()))
 
-        # Optional C+F+K combined Kepler-bias stress sample.
+        # Optional combined Kepler-bias stress sample.
         # No new columns are added; this only keeps/rescales existing rows.
-        if self.use_cfk_combined:
-            self._apply_cfk_combined_sample()
+        if self.use_combined_sample:
+            self._apply_combined_sample()
 
         # TODO: Definition of stype here is wrong. It should be an int not a string.
         #   Think about this a bit more. It is important to keep the ints in the DataFrame, but that
         #   decreases usability. Maybe an option is to use intermediate masks for the stellar types.
         
 ################################################################## Added for richer Ppop samples!##################################################################
-    def _apply_cfk_combined_sample(self):
+    def _apply_combined_sample(self):
         """
         Minimal combined experiment:
         C: emphasize farther stars,

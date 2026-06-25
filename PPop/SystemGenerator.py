@@ -369,25 +369,30 @@ class SystemGenerator():
         
         # Go through the star catalog.
         Nstars = len(self.StarCatalog.SC)
-        for i in range(Nstars):
-            
+        from tqdm import tqdm
+        _bar = tqdm(range(Nstars), desc='  generating planets', unit=' star',
+                    ncols=95, leave=False, mininterval=0.5)
+        _nplanets = 0
+        _frames = []  # collect per-system planet tables; concatenated once at the end
+        for i in _bar:
+
             # Get star.
             self.Star = self.getStar(i)
-            
+
             # Apply scaling for the planet occurrence rates.
             if (self.ScalingModel is None):
                 Scale = 1.
             else:
                 Scale = self.ScalingModel.getScale(self.Star)
-            
+
             # Go through the number of universes to be simulated.
             for j in range(Nuniverses):
-                
+
                 # Get system.
                 self.System = self.getSystem(i,
                                              j,
                                              Scale)
-                
+
                 # If there is a planet distribution for the star's spectral
                 # type (i.e. if the system is not None), create a new
                 # planet population table (if it hasn't already been created)
@@ -401,28 +406,32 @@ class SystemGenerator():
                             self.System.append(Name)
                 else:
                     if (self.System is not None):
-                        if (self.TableFlag == False):
-                            df = self.System.write_df()
-                            self.TableFlag = True
-                        else:
-                            df_new = self.System.write_df()
-                            df = pd.concat([df, df_new], ignore_index=True)
-                
-            # sys.stdout.write('\r--> Star %.0f of %.0f, scaling = %.1f' % ((i+1), Nstars, Scale))
-            sys.stdout.flush()
+                        # Collect this system's planets. We append to a list and
+                        # concatenate once after the loop instead of pd.concat'ing
+                        # the growing table every star (which is O(Nstars^2) and
+                        # dominates runtime for big catalogs like Gaia-60pc).
+                        _df = self.System.write_df()
+                        _frames.append(_df)
+                        _nplanets += len(_df)
+
+            # Keep the planet count current; refresh=False lets tqdm throttle the redraw.
+            _bar.set_postfix_str('%d planets' % _nplanets, refresh=False)
+        _bar.close()
         print('')
-        
+
         t1 = time.time()
-        
+
         # Print.
         if (self.StabilityModel is None):
             print('--> Finished after %.0f s' % (t1-t0))
         else:
             print('--> Finished after %.0f s, drawing stable system failed %.0f times' % (t1-t0, self.StabilityModel.Nfails))
-        
+
         if write_to_file == True:
             pass
         else:
+            # Single concat over all systems: O(total planets) instead of O(Nstars^2).
+            df = pd.concat(_frames, ignore_index=True) if len(_frames) > 0 else pd.DataFrame()
             return df
     
     def getStar(self,

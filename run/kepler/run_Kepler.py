@@ -1,10 +1,23 @@
-import time
-import os
-import pandas as pd
-import multiprocessing as mp
-import numpy as np
+from __future__ import annotations
 
+import os
+import sys
+import time
+import multiprocessing as mp
 from functools import partial
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+    
+import numpy as np
+import pandas as pd
+
+from run.ppop.ppop_generator import PPop
+
+from lifesim.core.kepler_data import KeplerData
+from tools.paths import KEPLER_DATA_DIR
 
 from PPop.StarCatalogs import (
     CrossfieldBrightSample,
@@ -14,9 +27,6 @@ from PPop.StarCatalogs import (
     gaia,
 )
 
-from run.ppop.ppop_generator import PPop
-from lifesim.core.kepler_data import KeplerData
-from tools.paths import KEPLER_DATA_DIR
 
 
 def set_star_catalog(PPopObj, star_catalog: str):
@@ -41,7 +51,7 @@ def set_star_catalog(PPopObj, star_catalog: str):
     return PPopObj
 
 
-def run_single(i, star_catalog="Gaia", use_cfk_combined=False):
+def run_single(i, star_catalog="Gaia", use_combined_sample=False):
     """
     One Kepler run.
 
@@ -52,13 +62,13 @@ def run_single(i, star_catalog="Gaia", use_cfk_combined=False):
 
     rng = np.random.default_rng(i)
 
-    PPopObj = PPop(rng=rng, use_cfk_combined=use_cfk_combined)
+    PPopObj = PPop(rng=rng, use_combined_sample=use_combined_sample)
     PPopObj = set_star_catalog(PPopObj, star_catalog)
 
     filename = f"test_runs_kepler_{i}"
     data_path = os.path.join(KEPLER_DATA_DIR, filename)
 
-    save_catalog = star_catalog if not use_cfk_combined else f"{star_catalog}_C_F_K_combined"
+    save_catalog = star_catalog
     save_dir = os.path.join(KEPLER_DATA_DIR, save_catalog)
     os.makedirs(save_dir, exist_ok=True)
 
@@ -69,6 +79,7 @@ def run_single(i, star_catalog="Gaia", use_cfk_combined=False):
     PPopObj.catalog_from_ppop(data_path, df=df)
 
     # 3. Run Kepler detection math
+    print(f"  running Kepler detection on {len(PPopObj.catalog)} planets...")
     kepler_data = KeplerData(PPopObj.catalog)
     kepler_data.determine_detectable()
 
@@ -83,14 +94,14 @@ def run_single(i, star_catalog="Gaia", use_cfk_combined=False):
     return df
 
 
-def run_kepler_import_catalog(i, star_catalog, use_cfk_combined=False):
+def run_kepler_import_catalog(i, star_catalog, use_combined_sample=False):
     """
     Load an existing Kepler CSV instead of rerunning P-Pop.
     """
 
     path = os.path.join(
         KEPLER_DATA_DIR,
-        star_catalog if not use_cfk_combined else f"{star_catalog}_C_F_K_combined",
+        star_catalog,
         f"kepler_catalog_{i}.csv",
     )
 
@@ -99,7 +110,7 @@ def run_kepler_import_catalog(i, star_catalog, use_cfk_combined=False):
     return df
 
 
-def main(parallel=False, nruns=np.arange(1), star_catalog="Gaia", run_anew=True, use_cfk_combined=False):
+def main(parallel=False, nruns=np.arange(1), star_catalog="Gaia", run_anew=True, use_combined_sample=False):
     """
     Multiple Kepler runs.
 
@@ -109,26 +120,29 @@ def main(parallel=False, nruns=np.arange(1), star_catalog="Gaia", run_anew=True,
     start = time.time()
 
     if run_anew:
-        runner = partial(run_single, star_catalog=star_catalog, use_cfk_combined=use_cfk_combined)
+        runner = partial(run_single, star_catalog=star_catalog, use_combined_sample=use_combined_sample)
 
         if parallel:
-            with mp.Pool(processes=mp.cpu_count()) as pool:
+            # Cap workers at 5: this box has 16 GB RAM and each universe peaks
+            # ~2-2.5 GB, so 5 workers (~10-12 GB) leaves headroom. mp.cpu_count()
+            # here is 12 (6 cores x2 SMT) which would over-subscribe and swap.
+            with mp.Pool(processes=min(5, mp.cpu_count())) as pool:
                 results = pool.map(runner, nruns)
         else:
             results = [
-                run_single(i=i, star_catalog=star_catalog, use_cfk_combined=use_cfk_combined)
+                run_single(i=i, star_catalog=star_catalog, use_combined_sample=use_combined_sample)
                 for i in nruns
             ]
 
     else:
-        runner = partial(run_kepler_import_catalog, star_catalog=star_catalog, use_cfk_combined=use_cfk_combined)
+        runner = partial(run_kepler_import_catalog, star_catalog=star_catalog, use_combined_sample=use_combined_sample)
 
         if parallel:
-            with mp.Pool(processes=mp.cpu_count()) as pool:
+            with mp.Pool(processes=min(4, mp.cpu_count())) as pool:  # see note above: cap at 5 for 16 GB RAM
                 results = pool.map(runner, nruns)
         else:
             results = [
-                run_kepler_import_catalog(i=i, star_catalog=star_catalog, use_cfk_combined=use_cfk_combined)
+                run_kepler_import_catalog(i=i, star_catalog=star_catalog, use_combined_sample=use_combined_sample)
                 for i in nruns
             ]
 

@@ -51,6 +51,16 @@ class KeplerData:
     # KeplerPORTs uses this small factor so approximate MES better matches TPS MES.
     MES_CORRECTION = 1.003
 
+    # Empirical detection-efficiency calibration against the OFFICIAL Kepler DR25
+    # pipeline MES (koi_max_mult_ev).  Even with real per-target rrmscdpp* noise,
+    # the idealized boxcar formula (geometric depth x sqrt(N) / CDPP) runs hot:
+    # script 47 measured median toy/official MES ~ 1.19 (optimistic), so the toy
+    # detector crossed MES>=7.1 too readily and over-detected marginal planets.
+    # This factor (~1/1.19) folds in the matched-filter-vs-boxcar shape loss and
+    # limb-darkening reduction of the *effective* depth, bringing the median
+    # toy/official ratio to ~1.0.  Re-derive with scripts/47_kepler_calibration_3in1.py.
+    MES_OFFICIAL_CALIBRATION = 0.84
+
     # Earth-size planet across Sun-size star gives roughly 84 ppm.
     # This is geometry, not a universal Kepler detection threshold.
     EARTH_SUN_TRANSIT_DEPTH_PPM = 84.0
@@ -65,18 +75,40 @@ class KeplerData:
         # Kepler-ish detector settings.
         min_transits: int = 3,
         mes_threshold: float = 7.1,
+        # Multiplicative calibration of toy MES to the official DR25 pipeline MES.
+        # Default = MES_OFFICIAL_CALIBRATION (~1/1.19). Pass 1.0 to recover the
+        # raw, uncalibrated (optimistic) boxcar MES, e.g. for the before/after
+        # comparison in scripts/47_kepler_calibration_3in1.py.
+        mes_calibration: Optional[float] = None,
         kepler_mag_limit: float = 16.0,
         fallback_cdpp_ppm: float = 100.0,
         use_kepmag_cdpp_fallback: bool = True,
         cdpp_kp_ref_mag: float = 12.0,
         cdpp_min_ppm: float = 20.0,
         cdpp_max_ppm: float = 2000.0,
+        # Intrinsic stellar variability + residual-systematics noise floor,
+        # added in QUADRATURE to the magnitude-scaled photon term. Photon noise
+        # keeps shrinking for bright stars, but a real light curve never drops
+        # below the star's own variability. Without this, nearby bright F/G
+        # dwarfs (Kp ~7-9 at 60 pc) get driven toward ~0 ppm noise and every
+        # transit is "detected", saturating the FGK detected-fraction panels.
+        # This is the main knob controlling bright-star detectability.
+        # 28 ppm = "between quiet and typical" FGK dwarf: above Kepler's best-case
+        # ~20 ppm quiet-G2V spec, below the ~40 ppm of a mildly active dwarf.
+        cdpp_variability_ppm: float = 28.0,
 
         # NASA-specific switches. These are the keywords your NASA runner uses.
         use_observed_transit_flag_for_nasa: bool = True,
         use_observed_transit_depth_for_nasa: bool = True,
         assume_bright_if_kepmag_missing_for_nasa: bool = True,
         estimate_missing_semimajor_axis: bool = True,
+
+        # Detection efficiency model (same logic as TESSData).
+        # 'threshold' = hard MES >= mes_threshold step (default; backward-compatible).
+        # 'sigmoid'   = logistic probability weight for expected-detection analysis.
+        #   Usage: expected_count = kepler_p_detect.sum()  (NOT a Bernoulli draw)
+        detection_model: str = "threshold",
+        sigmoid_steepness: float = 1.5,
 
         # Backward-compatibility knobs from older toy versions.
         # They are kept so older scripts do not crash if they still pass them.
@@ -99,6 +131,10 @@ class KeplerData:
         self.mission_duration_days = mission_duration_days
         self.min_transits = min_transits
         self.mes_threshold = mes_threshold
+        self.mes_calibration = (
+            float(self.MES_OFFICIAL_CALIBRATION) if mes_calibration is None
+            else float(mes_calibration)
+        )
         self.kepler_mag_limit = kepler_mag_limit
 
         # If an old caller passes default_noise_ppm, use it as the CDPP fallback.
@@ -109,6 +145,10 @@ class KeplerData:
         self.cdpp_kp_ref_mag = cdpp_kp_ref_mag
         self.cdpp_min_ppm = cdpp_min_ppm
         self.cdpp_max_ppm = cdpp_max_ppm
+        self.cdpp_variability_ppm = float(cdpp_variability_ppm)
+
+        self.detection_model = detection_model.lower().strip()
+        self.sigmoid_steepness = float(sigmoid_steepness)
 
         self.use_observed_transit_flag_for_nasa = use_observed_transit_flag_for_nasa
         self.use_observed_transit_depth_for_nasa = use_observed_transit_depth_for_nasa
@@ -568,8 +608,16 @@ class KeplerData:
         else:
             mag = pd.Series(np.nan, index=self.catalog.index)
 
-        cdpp = self.fallback_cdpp_ppm * 10 ** (0.2 * (mag - self.cdpp_kp_ref_mag))
-        cdpp = cdpp.replace([np.inf, -np.inf], np.nan).fillna(self.fallback_cdpp_ppm)
+        cdpp_photon = self.fallback_cdpp_ppm * 10 ** (0.2 * (mag - self.cdpp_kp_ref_mag))
+        cdpp_photon = cdpp_photon.replace([np.inf, -np.inf], np.nan).fillna(self.fallback_cdpp_ppm)
+
+        # Add the stellar-variability / residual-systematics floor in QUADRATURE.
+        # Photon noise -> 0 for very bright stars, but a real light curve never
+        # drops below the star's own variability. This stops nearby bright F/G
+        # dwarfs (Kp ~7-9 at 60 pc) from becoming effectively noiseless and
+        # making every transit detectable. M dwarfs (Kp ~13, CDPP ~200 ppm) are
+        # essentially unchanged, so the M-dwarf science is unaffected.
+        cdpp = np.sqrt(cdpp_photon ** 2 + self.cdpp_variability_ppm ** 2)
         return cdpp.clip(lower=self.cdpp_min_ppm, upper=self.cdpp_max_ppm)
 
     def get_cdpp_ppm_for_duration(self, duration_hr):
@@ -631,10 +679,11 @@ class KeplerData:
         n_transits = self.calc_number_of_observed_transits_keplerish()
 
         sqrt_n = np.sqrt(n_transits.clip(lower=1))
-        mes = transit_depth_ppm / cdpp_ppm.replace(0, np.nan) * sqrt_n * self.MES_CORRECTION
+        mes = (transit_depth_ppm / cdpp_ppm.replace(0, np.nan) * sqrt_n
+               * self.MES_CORRECTION * self.mes_calibration)
         mes = mes.replace([np.inf, -np.inf], np.nan).fillna(0.0)
 
-        one_sigma_depth_ppm = cdpp_ppm / (sqrt_n * self.MES_CORRECTION)
+        one_sigma_depth_ppm = cdpp_ppm / (sqrt_n * self.MES_CORRECTION * self.mes_calibration)
         min_detectable_depth_ppm = self.mes_threshold * one_sigma_depth_ppm
 
         self.catalog["transit_depth_ppm"] = transit_depth_ppm
@@ -695,6 +744,20 @@ class KeplerData:
 
         detected = transiting & bright_enough_kepler & depth_good
 
+        # Detection probability weight — NOT a Bernoulli draw.
+        # kepler_p_detect is 0/1 for threshold; smooth logistic for sigmoid.
+        # Gated by transiting, bright, and enough-transits so the MES-based
+        # probability only applies to planets that pass all upstream gates.
+        # Usage: expected_detected_in_bin = kepler_p_detect[mask].sum()
+        mes_col = pd.to_numeric(self.catalog["kepler_mes"], errors="coerce").fillna(0.0)
+        enough = self.catalog["kepler_enough_transits"].astype(bool)
+        all_gates = transiting.astype(bool) & bright_enough_kepler.astype(bool) & enough
+        if self.detection_model == "sigmoid":
+            p_mes = 1.0 / (1.0 + np.exp(-self.sigmoid_steepness * (mes_col - self.mes_threshold)))
+        else:
+            p_mes = (mes_col >= self.mes_threshold).astype(float)
+        self.catalog["kepler_p_detect"] = p_mes.where(all_gates, 0.0)
+
         self.catalog["transiting_geometric"] = transiting
         self.catalog["transit_depth_fraction"] = transit_depth_fraction
         self.catalog["transit_depth_ppm"] = transit_depth_ppm
@@ -725,9 +788,9 @@ class KeplerData:
 #     MES = transit_depth_ppm / one_sigma_depth_ppm * 1.003
 # This is better because one-sigma depth includes period-dependent missing data and target-specific noise.
 
-# FUTURE UPGRADE 3:
-# Replace hard MES >= 7.1 with probabilistic detection efficiency.
-# KeplerPORTs idea:
-#     p_pipeline = DEMod.final_detEffs(MES, period)
-#     detected = random_uniform < p_pipeline * window_probability
-# This is better because real pipeline recovery is not a perfect step at MES = 7.1.
+# UPGRADE 2 (implemented):
+# Probabilistic detection efficiency via detection_model='sigmoid'.
+# kepler_p_detect = logistic(sigmoid_steepness * (MES - mes_threshold))
+# Used as a weight (sum(p_i) per bin), not a Bernoulli draw.
+# For a fuller treatment: replace with KeplerPORTs DEMod.final_detEffs(MES, period),
+# which is period-dependent and accounts for window function probability.

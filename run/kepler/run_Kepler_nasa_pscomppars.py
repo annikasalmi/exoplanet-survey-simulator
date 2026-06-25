@@ -1,21 +1,3 @@
-"""
-run_Kepler_nasa_pscomppars.py
-
-Run your Kepler toy model on the official NASA PSCompPars exoplanet CSV.
-
-Input:
-    run/kepler/data/NASA/NASA_PSCompPars_transiting_confirmed_RM_insolation.csv
-
-Output:
-    run/kepler/data/NASA/kepler_catalog_nasa_pscomppars.csv
-
-Caveman:
-    Load NASA planets.
-    Rename NASA columns into our names.
-    Ask KeplerData: would toy Kepler pass each planet?
-    Save the result so scripts/16 can graph it.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path

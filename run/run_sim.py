@@ -159,12 +159,13 @@ if __name__ == "__main__":
     NRUNS = np.arange(1)
     
     # Run exoplanet plotting
-    # run_exoplanet_plotting(name='HWO_exoplanets', star_catalog='Gaia', plot=True)
+    run_exoplanet_plotting(name='myfilename', star_catalog='exoplanet_catalog', plot=True)
     
-    run_sim(func=main_hwo, name = 'hwo', parallel=False, nruns=NRUNS, star_catalog='Gaia', run_anew=False)
+    # run_sim(func=main_hwo, name = 'hwo', parallel=False, nruns=NRUNS, star_catalog='Gaia', run_anew=False)
     # # print('Completed HWO')
     # run_sim(func=main_lifesim, name='lifesim', parallel=True, nruns=NRUNS, star_catalog='Gaia', run_anew=False)
     # # print('Completed Lifesim Gaia')
     # run_sim(func=main_lifesim, name='lifesim', parallel=True, nruns=NRUNS, star_catalog='LTC_3', run_anew=False)
     # print('Completed Lifesim LTC_3')
+    a=1
     print('done')

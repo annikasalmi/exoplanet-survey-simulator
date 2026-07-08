@@ -24,8 +24,8 @@ class HWOConstants():
             self.iwa = 20.6e-3
             self.min_planet_flux_star_ratio = 2.5e-11
             self.min_wavelength_hwo = 200e-9  # Minimum wavelength for HWO (m)
-            self.max_wavelength_hwo = 2500e-9  # Maximum wavelength for HWO (m)
-            self.min_photons = 1 # Minimum photons for detection (photons/hour/micron)
+        self.max_wavelength_hwo = 2500e-9  # Maximum wavelength for HWO (m)
+        self.min_photons = 1 # Minimum photons for detection (photons/hour/micron)
             self.max_z = 10 # Max z value for detection (zodis)
         elif self.scenario == 'worst':
             self.iwa = 124e-3

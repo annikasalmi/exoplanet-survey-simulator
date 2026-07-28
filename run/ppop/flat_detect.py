@@ -4,7 +4,7 @@ flat_detect.py — run Kepler / TESS / RV detectors on a flat catalogue.
 Loads the three detector modules by file path (so the heavy lifesim package
 __init__, which pulls in a Qt GUI dependency, is never triggered — their own
 `from lifesim.core.data import Data` is wrapped in try/except). Mirrors the
-importlib pattern already used in scripts/50_rv_mr_detection.py.
+importlib pattern already used in plot/script plots/57_rv_mr_detection.py.
 """
 
 from __future__ import annotations

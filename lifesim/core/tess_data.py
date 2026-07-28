@@ -80,7 +80,7 @@ class TESSData:
     # (~1/1.52) so the calibrated ratio is ~1.0 exactly where the SNR>=7.1 cut
     # is decided; it folds in the matched-filter-vs-boxcar shape loss and
     # limb-darkening reduction of the *effective* depth.  Re-derive with
-    # scripts/48_tess_calibration_3in1.py (requires the "TESS Mag"->tmag fix so
+    # scripts/Detector_Calibration/05_tess_calibration.py (requires the "TESS Mag"->tmag fix so
     # the smooth-CDPP fallback is not corrupted by a missing magnitude).
     SNR_OFFICIAL_CALIBRATION = 0.66
 
@@ -105,7 +105,7 @@ class TESSData:
         # Multiplicative calibration of toy SNR to the official SPOC pipeline SNR.
         # Default = SNR_OFFICIAL_CALIBRATION (~1/1.52 at threshold). Pass 1.0 to recover the
         # raw, uncalibrated (optimistic) boxcar SNR, e.g. for the before/after
-        # comparison in scripts/48_tess_calibration_3in1.py.
+        # comparison in scripts/Detector_Calibration/05_tess_calibration.py.
         snr_calibration: Optional[float] = None,
         tmag_limit: float = 16.0,
         phase_mode: str = "random",  # random or expected

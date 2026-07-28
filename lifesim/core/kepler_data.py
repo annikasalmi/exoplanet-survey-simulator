@@ -58,7 +58,7 @@ class KeplerData:
     # detector crossed MES>=7.1 too readily and over-detected marginal planets.
     # This factor (~1/1.19) folds in the matched-filter-vs-boxcar shape loss and
     # limb-darkening reduction of the *effective* depth, bringing the median
-    # toy/official ratio to ~1.0.  Re-derive with scripts/47_kepler_calibration_3in1.py.
+    # toy/official ratio to ~1.0.  Re-derive with scripts/Detector_Calibration/03_kepler_calibration.py.
     MES_OFFICIAL_CALIBRATION = 0.84
 
     # Earth-size planet across Sun-size star gives roughly 84 ppm.
@@ -78,7 +78,7 @@ class KeplerData:
         # Multiplicative calibration of toy MES to the official DR25 pipeline MES.
         # Default = MES_OFFICIAL_CALIBRATION (~1/1.19). Pass 1.0 to recover the
         # raw, uncalibrated (optimistic) boxcar MES, e.g. for the before/after
-        # comparison in scripts/47_kepler_calibration_3in1.py.
+        # comparison in scripts/Detector_Calibration/03_kepler_calibration.py.
         mes_calibration: Optional[float] = None,
         kepler_mag_limit: float = 16.0,
         fallback_cdpp_ppm: float = 100.0,

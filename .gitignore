@@ -65,6 +65,9 @@ __pycache__/*.pyc
 /hwosim/
 .DS_Store
 
+# Personal Claude Code overrides (not shared)
+/CLAUDE.local.md
+
 /my_outputs/*/*.csv 
 /my_outputs/*/*.png 
 /my_outputs/*.csv 
@@ -81,7 +84,7 @@ run/tess/*/*/*.csv
 
 
 my_outputs/*.npz
-my_outputs/44_2x4_kepler_tess_rocky-fgkm-detection_gaia60pc/.rerun_marker
+my_outputs/archived/44_2x4_kepler_tess_rocky-fgkm-detection_gaia60pc/.rerun_marker
 my_outputs/archived/28_GOOD_kepler_dr25_detector_check/figure_data_dictionary.txt
 my_outputs/*.txt
 my_outputs/*/*.txt
@@ -95,4 +98,6 @@ Ppop/StarCatalogs/*.csv
 
 
 scripts/__pycache__/*
+scripts/*/__pycache__/*
+plot/script plots/__pycache__/*
 run/__pycache__/*

@@ -93,6 +93,59 @@ def _logU(rng, lo, hi, n):
     return 10.0 ** rng.uniform(np.log10(lo), np.log10(hi), n)
 
 
+# --- mass-radius relations (optional; the default flat universe keeps M independent of R) ---
+# "independent": mass drawn log-uniform, decoupled from radius (the prior-free control).
+# "mean":  mass from radius via the MEAN Chen2017/Forecaster broken power law (average of the
+#          shipped posterior) + tunable log-normal scatter -> a physical R-M relation.
+# "ppop":  mass from radius via P-Pop's full Chen2017/Forecaster (native probabilistic scatter).
+_MEAN_MR_CURVE = None       # cached (R_grid, M_grid) for the mean-relation inverse R->M
+
+
+def _mean_forecaster_curve():
+    """Deterministic mean Forecaster M->R curve, returned as ascending (R_grid, M_grid)."""
+    global _MEAN_MR_CURVE
+    if _MEAN_MR_CURVE is None:
+        import h5py
+        hp = ROOT / "PPop" / "MassModels" / "Forecaster" / "fitting_parameters.h5"
+        with h5py.File(hp, "r") as h5:
+            mu = h5["hyper_posterior"][:].mean(0)          # mean of posterior hyperparameters
+        c0, slope, trans = mu[0], mu[1:5], mu[9:12]        # [c0, slope(4), sigma(4), trans(3)]
+        c = np.zeros(4); c[0] = c0
+        for i in range(1, 4):
+            c[i] = c[i - 1] + trans[i - 1] * (slope[i - 1] - slope[i])
+        ts = np.insert(np.insert(trans, 3, np.inf), 0, -np.inf)
+        logM = np.linspace(-3.0, 3.0, 4000)
+        logR = np.zeros_like(logM)
+        for i in range(4):
+            ind = (logM >= ts[i]) & (logM < ts[i + 1])
+            logR[ind] = c[i] + logM[ind] * slope[i]
+        R, M = 10.0 ** logR, 10.0 ** logM
+        o = np.argsort(R)
+        _MEAN_MR_CURVE = (R[o], M[o])
+    return _MEAN_MR_CURVE
+
+
+def _mass_from_radius(radius, mass_model, rng, mass_lims, scatter_dex, mr_C=1.0, mr_beta=0.28):
+    if mass_model == "mean":
+        Rg, Mg = _mean_forecaster_curve()
+        logm = np.log10(np.interp(radius, Rg, Mg))
+        if scatter_dex > 0:
+            logm = logm + rng.normal(0.0, scatter_dex, len(radius))
+        mass = 10.0 ** logm
+    elif mass_model == "powerlaw":
+        # published rocky/small-planet fit R = mr_C * M^mr_beta, inverted to M = (R/mr_C)^(1/mr_beta)
+        logm = np.log10((np.asarray(radius, float) / mr_C) ** (1.0 / mr_beta))
+        if scatter_dex > 0:
+            logm = logm + rng.normal(0.0, scatter_dex, len(radius))
+        mass = 10.0 ** logm
+    elif mass_model == "ppop":
+        from PPop.MassModels.Chen2017 import MassModel
+        mass = MassModel(rng).RadiusToMass(np.asarray(radius, float))
+    else:
+        raise ValueError(f"unknown mass_model {mass_model!r}")
+    return np.clip(mass, mass_lims[0], mass_lims[1])
+
+
 def generate_flat_catalog(
     n_planets: int = 200000,
     seed: int = 0,
@@ -104,6 +157,10 @@ def generate_flat_catalog(
     teff_lims=DEFAULTS["teff_lims"],
     distance_lims=DEFAULTS["distance_lims"],
     insol_lims=DEFAULTS["insol_lims"],
+    mass_model: str = "independent",
+    mass_scatter_dex: float = 0.05,
+    mr_C: float = 1.0,
+    mr_beta: float = 0.28,
 ) -> pd.DataFrame:
     """
     Build a fully-flat synthetic planet catalogue (see module docstring).
@@ -170,6 +227,13 @@ def generate_flat_catalog(
     df["stype"] = _stype_from_teff(teff)
     df["nstar"] = np.arange(len(df))   # one synthetic star per planet (independent draws)
     df["id"] = np.arange(len(df))
+    # Optionally replace the independent (log-uniform) mass by a mass-radius relation.
+    # Insolation/orbit/star do not depend on mass_p, so radius/flux/star are IDENTICAL across
+    # mass models (a controlled comparison), and mass_model="independent" is byte-for-byte the
+    # original catalogue (shared cache stays valid).
+    if mass_model != "independent":
+        df["mass_p"] = _mass_from_radius(df["radius_p"].to_numpy(), mass_model, rng,
+                                         mass_lims, mass_scatter_dex, mr_C, mr_beta)
     return df
 
 

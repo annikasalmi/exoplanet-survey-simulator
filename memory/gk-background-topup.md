@@ -37,5 +37,18 @@ CSV load is slow (~30-40 min for the 86+86 stacked files).
 **Consumers must stack 8001+**: script
 `44_2x4_kepler_tess_rocky-fgkm-detection_gaia60pc.py` was updated so `_ppop_files`
 additively stacks any index >= `EXTRA_START_INDEX (8001)` on top of 0..9 (single-
-type files only add to their own panel). Other consumers (e.g. script 53) still
-read only 0..9 — widen them the same way if they need the denser G/K background.
+type files only add to their own panel).
+
+Other consumers (verified 2026-06-25):
+- **Script 53** (`53_rv_2x4_rocky_fgkm_rvtest.py`): globs `tess_catalog_*.csv`,
+  `--n-catalogs` defaults to None -> loads ALL 86 files, so 8001+ are auto-included.
+  Just run it normally. PITFALL: filenames string-sort, so `8001.csv` < `9.csv`;
+  passing a SMALL `--n-catalogs N` (e.g. 10) grabs [0..8, 8001] and drops universe 9
+  + the top-ups. Default (all) is correct.
+- **Script 25** (`Statistical_Analysis/25_metric_robustness.py`, ex-69) Part A: globbed
+  `kepler_catalog_*.csv` from the same Gaia dir and treated each file as ONE FULL universe
+  for cosmic-variance stats, so the single-type top-ups (8001+) corrupted its per-universe
+  puffy-fraction mean/SD/N (the Jul-16 figure showed SD=0.120 over ~55 "universes").
+  FIXED 2026-07-28: Part A now builds an explicit index list 0..`N_FULL_UNIVERSES`-1 and
+  errors if any is missing. Clean re-run: puffy mean 0.487, SD 0.014, NASA 0.404,
+  gap 0.083 = 5.8x SD. (Part B uses only kepler_catalog_0.csv -> was unaffected.)

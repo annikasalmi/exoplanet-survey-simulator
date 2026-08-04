@@ -63,10 +63,18 @@ class RVData:
     M_EARTH_IN_M_JUP = 1.0 / 317.828  # Earth masses -> Jupiter masses
     K_CONST_MS = 28.4329              # m/s, canonical RV semi-amplitude prefactor
 
-    # Stellar jitter (m/s) by spectral type — survey-averaged activity floor.
-    # Optical RV is limited by stellar activity, not just photons; M dwarfs and
-    # active stars are noisier.  Rough literature medians; tune per sample.
-    JITTER_BY_STYPE_MS = {"A": 5.0, "F": 3.0, "G": 1.8, "K": 1.5, "M": 2.5, "Unknown": 2.0}
+    # Stellar (spot-induced) RV jitter (m/s RMS) by spectral type, VISIBLE domain.
+    # Grounded to Bellotti & Korhonen (2021), Astron. Nachr. 342, 926, Table 3
+    # (DOI 10.1002/asna.20210003): median mean peak-to-peak jitter per type over
+    # their 15-star F-M sample, converted p2p -> RMS by /2.8 (phase-sampled
+    # rotational modulation, RMS ~ p2p / 2*sqrt(2)).  Their sample deliberately
+    # spans activity levels, so per-type values partly reflect the sample's
+    # activity mix (active K stars, inactive M stars), NOT a universal type law;
+    # jitter tracks logR'HK / filling factor / vsini, per the paper.  A is not in
+    # their F-M sample -> extrapolated.  NOTE: this OVERRIDES the earlier values
+    # (F=2.5,G=1.2,K=1.3,M=2.5) that were tuned to match published pl_rvamperr on
+    # 342 real small planets; expect M-dwarf jitter to drop ~10x here.
+    JITTER_BY_STYPE_MS = {"A": 5.0, "F": 1.6, "G": 2.4, "K": 3.5, "M": 0.25, "Unknown": 2.0}
 
     # Teff -> bolometric correction (M_bol = M_band + BC_band, so M_band = M_bol - BC_band).
     # BC_V is large and NEGATIVE for cool stars -> M dwarfs faint in V (optical RV struggles).
@@ -87,9 +95,13 @@ class RVData:
     # beyond it the photon noise degrades.  This replaces the old fixed-exposure photon model that
     # made every target fainter than the reference far too noisy.
     INSTRUMENT_PRESETS = {
+        # HARPS jitter grounded to Bellotti & Korhonen (2021) Table 3 (visible domain);
+        # see JITTER_BY_STYPE_MS above for the p2p->RMS conversion and caveats.
         "HARPS": dict(band="V", sigma_instr_ms=0.8, sigma_phot_ref_ms=1.0, phot_full_mag=12.0,
-                      jitter_by_stype={"A": 5.0, "F": 2.5, "G": 1.2, "K": 1.3, "M": 2.5, "Unknown": 1.8}),
-        # NIRPS: NIR band J; M dwarfs bright + lower activity jitter in the IR.
+                      jitter_by_stype={"A": 5.0, "F": 1.6, "G": 2.4, "K": 3.5, "M": 0.25, "Unknown": 2.0}),
+        # NIRPS: NIR band J; M dwarfs bright + lower activity jitter in the IR.  Bellotti &
+        # Korhonen (2021) is VISIBLE-domain (bluer = larger jitter), so their values do not
+        # transfer to the NIR; NIRPS jitter kept lower here by design.  Not grounded to their table.
         "NIRPS": dict(band="J", sigma_instr_ms=1.0, sigma_phot_ref_ms=1.0, phot_full_mag=11.0,
                       jitter_by_stype={"A": 6.0, "F": 4.0, "G": 2.5, "K": 1.6, "M": 1.2, "Unknown": 2.0}),
     }

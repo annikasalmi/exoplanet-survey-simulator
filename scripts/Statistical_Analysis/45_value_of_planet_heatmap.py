@@ -262,45 +262,35 @@ def main():
     print("    (per-cell MC noise ~0.01-0.02 sigma: ordering among these cells is NOT "
           "significant; quote the high-value region, not the ranking)")
 
-    # ---- figure ----
+    # ---- figure (paper: all four relations, decluttered 2x2) ----
     vmax = np.nanmax(np.abs(stack)) if np.isfinite(stack).any() else 1.0
-    fig, axes = plt.subplots(2, 2, figsize=(15, 12.5), constrained_layout=True)
+    fig, axes = plt.subplots(2, 2, figsize=(13, 11.5), constrained_layout=True,
+                             sharex=True, sharey=True)
     X, Y = np.meshgrid(insol_edges, radius_edges)
     pcs = []
     for ax, d in zip(axes.flat, rel_data):
         pc = ax.pcolormesh(X, Y, d["grid"], cmap="RdBu_r", vmin=-vmax, vmax=vmax, shading="flat")
         pcs.append(pc)
-        for ri_ in range(N_CELLS):
-            for ci in range(N_CELLS):
-                if not np.isfinite(d["grid"][ri_, ci]):
-                    ax.add_patch(plt.Rectangle((insol_edges[ci], radius_edges[ri_]),
-                                               insol_edges[ci + 1] - insol_edges[ci],
-                                               radius_edges[ri_ + 1] - radius_edges[ri_],
-                                               hatch="xx", fill=False, ec="0.75", lw=0))
-        sel_m = is_m & has_teff
-        sel_fgk = ~is_m & has_teff
-        ax.scatter(nasa_teff["ins"][sel_m], nasa_teff["r"][sel_m], s=22, marker="o",
-                   facecolor="tab:orange", edgecolor="k", linewidth=0.4, zorder=5, label="NASA (M dwarf host)")
-        ax.scatter(nasa_teff["ins"][sel_fgk], nasa_teff["r"][sel_fgk], s=22, marker="^",
-                   facecolor="tab:cyan", edgecolor="k", linewidth=0.4, zorder=5, label="NASA (FGK host)")
         ax.axvline(COLD_CUT["insol_max"], color="k", ls="--", lw=1.3, zorder=6)
         ax.axvspan(insol_edges[0], COLD_CUT["insol_max"], color="0.9", alpha=0.35, zorder=0)
-        ax.text(COLD_CUT["insol_max"] * 0.85, radius_edges[-1] * 0.97, "Cold Rocky Desert\n(insol<50)",
+        ax.text(COLD_CUT["insol_max"] * 0.85, radius_edges[-1] * 0.97, "cold region\n(insol<50)",
                color="0.25", fontsize=8, ha="right", va="top")
         ax.set_xscale("log"); ax.set_yscale("log")
         ax.set_xlim(insol_edges[0], insol_edges[-1]); ax.set_ylim(radius_edges[0], radius_edges[-1])
         ax.set_title(d["name"], fontsize=12)
-        ax.set_xlabel(r"insolation [$I_\oplus$]"); ax.set_ylabel(r"planet radius [$R_\oplus$]")
-        ax.legend(fontsize=7.5, loc="lower right", framealpha=0.9)
+    for ax in axes[-1, :]:
+        ax.set_xlabel(r"insolation [$I_\oplus$]")
+    for ax in axes[:, 0]:
+        ax.set_ylabel(r"planet radius [$R_\oplus$]")
 
     fig.colorbar(pcs[0], ax=axes, shrink=0.85, pad=0.02,
-                label=r"$\Delta\sigma$ = change in overlap tension from confirming one planet in this cell")
-    fig.suptitle("Value of a planet: change in the flat-A-vs-flat-B overlap tension per confirmed NASA planet\n"
-                 "cold-corner tension, true mass drawn from the flat-A truth pool per cell; "
-                 "hatched = flat A predicts no planets there\n"
-                 "negative = the planet dilutes NASA's puffy fraction toward flat B (estimator effect, not negative evidence)\n"
-                 f"cold corner: {n_corner_m} of {n_corner} precision-passing planets orbit M dwarfs "
-                 f"(Teff<{MDWARF_TEFF_MAX:g} K); G/FGK-host cold super-Earths: currently N={n_corner_fgk}",
+                label=r"change in the $\sigma$ gap from confirming one planet in this cell")
+    fig.suptitle("Value of a planet: how much one new confirmed planet moves the "
+                 r"$\sigma$ gap between the observed sample and Primordial-rocky" "\n"
+                 "red = sharpens the test, blue = dilutes it (an estimator effect, not evidence against), "
+                 "blank = Escape-only predicts no planets\n"
+                 f"cold cut: insol < 50 I⊕; of {n_corner} cold planets, {n_corner_m} orbit M dwarfs "
+                 f"and {n_corner_fgk} orbit FGK stars",
                  fontsize=12)
     out_png = os.path.join(OUT_DIR, "value_heatmap.png")
     fig.savefig(out_png, dpi=170, bbox_inches="tight")

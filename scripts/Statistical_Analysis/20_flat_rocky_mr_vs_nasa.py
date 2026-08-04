@@ -147,7 +147,7 @@ def _draw_scatter(ax, arr, cut, nasa, m_sil, r_sil, rng, title):
     mo, ro, dropped = noised_scatter_AB(arr, cut, rng)
     nmc, nrc, nme1, nme2, nre1, nre2 = nasa_cut(nasa, cut)
     ax.fill_between(m_sil, r_sil, 2.6, color="0.965", zorder=0)
-    ax.plot(m_sil, r_sil, "k-", lw=1.2, zorder=6, label="silicate rock limit")
+    ax.plot(m_sil, r_sil, "k-", lw=1.2, zorder=6, label="silicate line")
     ax.scatter(mo[~dropped], ro[~dropped], s=15, color="tab:blue", alpha=0.45, lw=0,
                zorder=3, label="Escape-only (kept)")
     ax.scatter(mo[dropped], ro[dropped], s=15, color="tab:orange", alpha=0.5, lw=0,
@@ -255,6 +255,28 @@ def make_otegi_2x1(arr, nasa, m_sil, r_sil, rng):
     print(f"--> Saved paper copy: {PAPER_FIG_DIR / 'flat_otegi_2x1_cold_cut.png'}")
 
 
+def make_paper_2col(pools, nasa, m_sil, r_sil, rng):
+    """Paper figure (fig:mrrel): cold super-Earth cut, two representative rocky
+    mass-radius relations (Chen & Kipping, Otegi) side by side, mass-radius draw
+    on top and volatile-fraction histograms below."""
+    print("\n--> Paper 2-col (Chen & Kipping + Otegi, cold super-Earth cut):")
+    cut = dict(mass_min=2.0, insol_max=50.0)
+    wanted = ["Chen & Kipping 2017", "Otegi et al. 2020"]
+    sel = [p for p in pools if p[0] in wanted]
+    fig, axes = plt.subplots(2, 2, figsize=(12.5, 11))
+    for ci, (name, eq, applies, arr) in enumerate(sel):
+        _draw_scatter(axes[0, ci], arr, cut, nasa, m_sil, r_sil, rng, f"{name}\n{eq}")
+        _draw_bells(axes[1, ci], arr, cut, nasa, m_sil, r_sil, rng, tag=f"[2col] {name}")
+    fig.tight_layout()
+    out_png = os.path.join(OUT_DIR, "flat_rocky_mr_2col_chen_otegi_cold.png")
+    fig.savefig(out_png, dpi=170, bbox_inches="tight")
+    PAPER_FIG_DIR.mkdir(parents=True, exist_ok=True)
+    fig.savefig(PAPER_FIG_DIR / "flat_rocky_mr_2col_chen_otegi_cold.png", dpi=170, bbox_inches="tight")
+    plt.close(fig)
+    print(f"--> Saved: {out_png}")
+    print(f"--> Saved paper copy: {PAPER_FIG_DIR / 'flat_rocky_mr_2col_chen_otegi_cold.png'}")
+
+
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     m_sil, r_sil = S72.load_silicate()
@@ -271,6 +293,7 @@ def main():
     otegi_arr = next(arr for name, eq, applies, arr in pools if "Otegi" in name)
     make_otegi_2x2(otegi_arr, nasa, m_sil, r_sil, rng)
     make_otegi_2x1(otegi_arr, nasa, m_sil, r_sil, rng)
+    make_paper_2col(pools, nasa, m_sil, r_sil, rng)
 
 
 if __name__ == "__main__":

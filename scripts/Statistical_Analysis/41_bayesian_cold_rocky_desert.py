@@ -3,11 +3,11 @@
 cold rocky desert, resolved over three insolation panels (paper Figure 1 format).
 
 Object (per-cell Bayes, single detected planet at location theta=(M,R) in insolation bin b):
-    P(theta | detected, U_k) = d_b(theta) * pi_k(theta) / Z_{k,b}
-      likelihood  d_b(theta)  = joint transit+RV detection fraction AMONG TRANSITING on the
+    P(theta | detected, U_k) = l_b(theta) * pi_k(theta) / Z_{k,b}
+      likelihood  l_b(theta)  = joint transit+RV detection fraction AMONG TRANSITING on the
                                 MR plane, measured on the uniform-parameter universe.
       prior       pi_k(theta) = the universe's TRUE planet density (one of three).
-      evidence    Z_{k,b}     = sum_theta pi_k d_b  (from the model, NOT from NASA).
+      evidence    Z_{k,b}     = sum_theta pi_k l_b  (from the model, NOT from NASA).
     NASA is the DATA, not the marginal. All figures consider TRANSITING planets only
     (the detector's geometric transit flag); NASA's sample is transiting-confirmed.
 
@@ -19,7 +19,7 @@ Three universes (priors), all built on the uniform-parameter universe:
 Model comparison (normalization-free; "mixture, not count"):
     per insolation bin, among DETECTED planets the volatile fraction conditions out absolute
     occurrence and survey effort. NASA gives k_b volatile of n_b detected; universe k predicts
-    p_{k,b}. L_k = prod_b Binomial(k_b; n_b, p_{k,b}); posterior P(U_k|NASA), equal 1/3 prior;
+    p_{k,b}. L_k = prol_b Binomial(k_b; n_b, p_{k,b}); posterior P(U_k|NASA), equal 1/2 prior;
     pairwise Bayes factors. Headline = the I<50 cold rocky desert (mass>2).
 
 Run:
@@ -43,7 +43,6 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.patches import Ellipse
 from matplotlib.colors import Normalize
 from scipy.stats import binom
 from scipy.ndimage import gaussian_filter
@@ -92,7 +91,9 @@ MASS_FRAC_ERR = 0.20           # log-normal measurement noise (script 72 convent
 RAD_FRAC_ERR = 0.046
 NASA_MASS_PREC = 0.25
 NASA_RAD_PREC = 0.08
-N_FRAC_REP = 400               # noise realizations for the predicted volatile fraction
+N_FRAC_REP = 4000               # noise realizations for the predicted volatile fraction
+                                # (matches the 4,000-draw convention of script 52's density figure
+                                # and the main paper's own Section-4.2 MC procedure)
 
 # Nested insolation panels, matching paper Figure 1 (rocky_mr_insolation_3panel): the cold
 # rocky desert is the I<50 panel, I<10 its extreme, I>50 the hot control.
@@ -101,9 +102,8 @@ INSOL_BINS = [("I < 10", BOX["f_lo"], 10.0),
               ("I > 50", 50.0, BOX["f_hi"])]
 
 UNIVERSES = [
-    ("rocky_formation", "Rocky-formation", "tab:blue"),
+    ("rocky_formation", "Primordial-rocky", "tab:blue"),
     ("escape_only", "Escape-only", "tab:orange"),
-    ("uniform", "Uniform", "tab:green"),
 ]
 
 # LINEAR mass grid (paper Fig.1 axis). With the 10M pool every cell in every panel clears
@@ -124,6 +124,34 @@ def load_silicate():
 
 def is_volatile(mass, radius, m_sil, r_sil):
     return radius > np.interp(mass, m_sil, r_sil)
+
+
+def nasa_frac_sigma(nasa, lo, hi, mass_min, m_sil, r_sil, rng, n_rep=N_FRAC_REP):
+    """Standard deviation of the observed volatile fraction v/n from NASA's own measurement
+    error alone: redraw each planet's mass/radius within its own published asymmetric error
+    bars (no resampling of which planets are in the set), reapply the mass cut on the redrawn
+    mass so boundary planets can flip in/out, and take the spread over n_rep redraws (same
+    per-planet-error method as the main paper's NASA Monte Carlo bells)."""
+    sel = (nasa["ins"] >= lo) & (nasa["ins"] < hi)
+    m, r = nasa["m"][sel], nasa["r"][sel]
+    me1, me2, re1, re2 = nasa["me1"][sel], nasa["me2"][sel], nasa["re1"][sel], nasa["re2"][sel]
+    n = m.size
+    if n == 0:
+        return np.nan, np.nan
+    fr = []
+    for _ in range(n_rep):
+        zm, zr = rng.normal(size=n), rng.normal(size=n)
+        mb = np.clip(m + np.where(zm >= 0, zm * me1, zm * me2), 1e-3, None)
+        rb = np.clip(r + np.where(zr >= 0, zr * re1, zr * re2), 1e-3, None)
+        if mass_min:
+            k = mb > mass_min
+            mb, rb = mb[k], rb[k]
+        if mb.size < 1:
+            continue
+        fr.append(float(is_volatile(mb, rb, m_sil, r_sil).mean()))
+    if not fr:
+        return np.nan, np.nan
+    return float(np.mean(fr)), float(np.std(fr))
 
 
 def load_nasa(precision: bool):
@@ -223,7 +251,7 @@ def build_universes(m_sil, r_sil):
 
 
 def detection_map(pool, lo, hi):
-    """d_b(M,R) = joint detected fraction AMONG TRANSITING on the linear-mass MR grid, in
+    """l_b(M,R) = joint detected fraction AMONG TRANSITING on the linear-mass MR grid, in
     insolation bin [lo,hi). Denominator = transiting count (paper fig:flat convention)."""
     tsel = (pool["flux"] >= lo) & (pool["flux"] < hi) & pool["transit"]
     m, r, det = pool["mass"][tsel], pool["radius"][tsel], pool["det"][tsel]
@@ -277,26 +305,54 @@ def model_posterior(p_by_univ, k, n):
 # ----------------------------------------------------------------------- reporting
 def desert_table(univ, nasa, m_sil, r_sil, rng, tag):
     print(f"\n  ================ Bayesian model comparison — {tag} ================")
-    print("  predicted detected volatile fraction p_k, NASA k/n, and likelihood odds O=L/sum L\n")
+    print("  volatile fraction f_k, NASA v/n, binomial likelihood L_k, and likelihood odds O=L/sum L\n")
     segments = [(lbl, lo, hi, MASS_MIN) for lbl, lo, hi in INSOL_BINS]
-    segments += [("all bins (no mass cut)", BOX["f_lo"], BOX["f_hi"], None)]
+    segments += [("all insolation", BOX["f_lo"], BOX["f_hi"], None)]
     rows = []
     for lbl, lo, hi, mcut in segments:
-        p_by = {key: predicted_frac(univ[key], lo, hi, mcut, m_sil, r_sil, rng)[0]
-                for key, _, _ in UNIVERSES}
+        p_raw = {key: predicted_frac(univ[key], lo, hi, mcut, m_sil, r_sil, rng)
+                 for key, _, _ in UNIVERSES}
+        p_by = {key: v[0] for key, v in p_raw.items()}
+        p_sigma = {key: v[1] for key, v in p_raw.items()}
         k, n = nasa_bin(nasa, lo, hi, mcut, m_sil, r_sil)
         if n == 0:
             print(f"  {lbl:<24} NASA n=0 — skipped")
             continue
+        _, nasa_sigma = nasa_frac_sigma(nasa, lo, hi, mcut, m_sil, r_sil, rng)
         logl, post = model_posterior(p_by, k, n)
-        ptxt = "  ".join(f"{lbl2[:5]}={p_by[key]:.2f}" for key, lbl2, _ in UNIVERSES)
+        L = {key: float(np.exp(logl[key])) for key in logl}
+        ftxt = "  ".join(f"{lbl2[:5]}={p_by[key]:.3f}+-{p_sigma[key]:.3f}" for key, lbl2, _ in UNIVERSES)
+        Ltxt = "  ".join(f"{lbl2[:5]}={L[key]:.2e}" for key, lbl2, _ in UNIVERSES)
         postxt = "  ".join(f"{lbl2[:5]}={post[key]:.2f}" for key, lbl2, _ in UNIVERSES)
         cut = " (M>2)" if mcut else ""
-        print(f"  {lbl + cut:<24} NASA vol {k}/{n} (f={k/n:.2f})")
-        print(f"      p_k : {ptxt}")
+        print(f"  {lbl + cut:<24} NASA vol {k}/{n} (v/n={k/n:.3f}+-{nasa_sigma:.3f})")
+        print(f"      f_k : {ftxt}")
+        print(f"      L_k : {Ltxt}")
         print(f"      odds O   : {postxt}")
-        rows.append(dict(label=lbl + cut, k=k, n=n, p=p_by, post=post, logl=logl))
+        rows.append(dict(label=lbl + cut, k=k, n=n, p=p_by, p_sigma=p_sigma,
+                          nasa_sigma=nasa_sigma, post=post, logl=logl, L=L))
     return rows
+
+
+def save_stats_table(rows, tag):
+    """Per-panel f_k, L_k, O_esc, and Bayes factor to CSV, so the paper table traces to code.
+    rocky_formation is the paper's Primordial-rocky (f_prim); escape_only is Escape-only (f_esc)."""
+    recs = []
+    for r in rows:
+        Le, Lp = r["L"]["escape_only"], r["L"]["rocky_formation"]
+        recs.append(dict(
+            panel=r["label"], v=r["k"], n=r["n"], v_over_n=round(r["k"] / r["n"], 3),
+            v_over_n_sigma=round(r["nasa_sigma"], 3),
+            f_esc=round(r["p"]["escape_only"], 3), f_esc_sigma=round(r["p_sigma"]["escape_only"], 3),
+            f_prim=round(r["p"]["rocky_formation"], 3), f_prim_sigma=round(r["p_sigma"]["rocky_formation"], 3),
+            L_esc=Le, L_prim=Lp,
+            O_esc=round(r["post"]["escape_only"], 3),
+            BF_esc_over_prim=Le / max(Lp, 1e-300)))
+    df = pd.DataFrame(recs)
+    out = os.path.join(_out_dir(), "model_stats.csv")
+    df.to_csv(out, index=False)
+    print(f"--> Saved: {out}")
+    return df
 
 
 def print_bayes_factors(rows):
@@ -313,14 +369,12 @@ def print_bayes_factors(rows):
 
 
 # -------------------------------------------------------------------------- figures
-def _desert_ellipse(ax):
-    ax.add_patch(Ellipse((7.0, 1.72), width=8.4, height=0.5, angle=4.0,
-                         fill=False, edgecolor="red", lw=1.6, zorder=6))
-
-
-def _nasa_overlay(ax, nasa, lo, hi, norm):
-    """NASA planets in insolation bin: grey error bars + points colored by log insolation."""
+def _nasa_overlay(ax, nasa, lo, hi, norm, mass_min=None):
+    """NASA planets in insolation bin: grey error bars + points colored by log insolation.
+    mass_min, if given, applies the same super-Earth cut used by the panel it is drawn on."""
     nsel = (nasa["ins"] >= lo) & (nasa["ins"] < hi)
+    if mass_min:
+        nsel = nsel & (nasa["m"] > mass_min)
     if nsel.sum() == 0:
         return None
     ax.errorbar(nasa["m"][nsel], nasa["r"][nsel],
@@ -343,9 +397,9 @@ def _field_image(ax, field, vmax, levels):
 
 
 def fig_likelihood_maps(univ, nasa):
-    """1x3 by insolation: the detectability field d_b(M,R) (detected fraction among transiting,
-    uniform-parameter universe) in Figure-3 format — filled viridis + white contours, NASA
-    planets colored by log insolation with error bars, red super-Earth cut + cold rocky desert."""
+    """1x3 by insolation: the detectability field l_b(M,R) (detected fraction among transiting,
+    uniform-parameter universe, ALL masses) in Figure-3 format — filled viridis + white contours,
+    NASA planets (mass > MASS_MIN only) colored by log insolation with error bars."""
     Ds = [detection_map(univ["uniform"], lo, hi)[0] for _, lo, hi in INSOL_BINS]
     vmax = max((np.nanmax(D) for D in Ds if np.isfinite(D).any()), default=1.0)
     levels = np.round(np.linspace(0.2, vmax, 4), 2)
@@ -354,10 +408,7 @@ def fig_likelihood_maps(univ, nasa):
     sc = None
     for ax, (lbl, lo, hi), D in zip(axes, INSOL_BINS, Ds):
         _field_image(ax, D, vmax, levels)
-        ax.axvline(MASS_MIN, color="red", ls="--", lw=1.2, zorder=3)
-        if hi <= COLD_MAX:
-            _desert_ellipse(ax)
-        s = _nasa_overlay(ax, nasa, lo, hi, norm)
+        s = _nasa_overlay(ax, nasa, lo, hi, norm, mass_min=MASS_MIN)
         if s is not None:
             sc = s
         ax.set_xlim(BOX["m_lo"], BOX["m_hi"]); ax.set_ylim(BOX["r_lo"], BOX["r_hi"])
@@ -365,14 +416,14 @@ def fig_likelihood_maps(univ, nasa):
         ax.set_title(f"{lbl} $I_\\oplus$", fontsize=12)
     axes[0].set_ylabel(r"planet radius [$R_\oplus$]")
     cb = fig.colorbar(axes[0].images[0], ax=axes, location="right", shrink=0.9)
-    cb.set_label(f"detected fraction among transiting  $d_b(M,R)$  ({_mlabel()} transit + RV)")
+    cb.set_label(f"detected fraction among transiting  $\\ell_b(M,R)$  ({_mlabel()} transit + RV)")
     if sc is not None:
         cb2 = fig.colorbar(sc, ax=axes, location="bottom", shrink=0.45, pad=0.02, aspect=45)
         cb2.set_label(r"NASA planets: log(Insolation Flux [$I_\oplus$])")
     fig.suptitle(f"Detectability (likelihood) on the MR plane — {_mlabel()} transit + RV, "
                  "transiting only\n"
                  "viridis = detected fraction among transiting (uniform-parameter universe); "
-                 "white contours; red dashed = M=2 super-Earth cut, red ellipse = cold rocky desert",
+                 "white contours",
                  fontsize=13)
     out = os.path.join(_out_dir(), "likelihood_detection_maps.png")
     fig.savefig(out, dpi=160, bbox_inches="tight")
@@ -382,21 +433,22 @@ def fig_likelihood_maps(univ, nasa):
 
 def fig_posterior_predictive(univ, nasa, m_sil, r_sil):
     """3x3 (universe x insolation) in Figure-3 format: filled viridis predicted-detected
-    (transiting) density per panel (self-normalized, so every cell carries a color), white
-    contours, NASA planets colored by log insolation with error bars, silicate line. Linear
-    mass axis; no red highlight (per request)."""
+    (transiting, mass > MASS_MIN) density per panel (self-normalized, so every cell carries a
+    color), white contours, NASA planets colored by log insolation with error bars, silicate
+    line. Linear mass axis; no red highlight (per request)."""
     ms = np.linspace(BOX["m_lo"], BOX["m_hi"], 250)
     r_sil_line = np.interp(ms, m_sil, r_sil)
     norm = Normalize(vmin=np.log10(BOX["f_lo"]), vmax=np.log10(BOX["f_hi"]))
     X, Y = np.meshgrid(M_CENT, R_CENT)
-    fig, axes = plt.subplots(3, 3, figsize=(17, 14), sharex=True, sharey=True,
+    fig, axes = plt.subplots(len(UNIVERSES), 3, figsize=(17, 9.5), sharex=True, sharey=True,
                              constrained_layout=True)
     sc = None
     for i, (key, plabel, _) in enumerate(UNIVERSES):
         u = univ[key]
         for j, (blabel, lo, hi) in enumerate(INSOL_BINS):
             ax = axes[i, j]
-            sel = u["det"] & (u["flux"] >= lo) & (u["flux"] < hi)      # detected ⊂ transiting
+            sel = (u["det"] & (u["flux"] >= lo) & (u["flux"] < hi)     # detected ⊂ transiting
+                   & (u["mass"] > MASS_MIN))
             H, _, _ = np.histogram2d(u["mass"][sel], u["radius"][sel], bins=[M_EDGES, R_EDGES])
             # log stretch: the uniform-in-R track dams a density spike at the M=12 box wall that a
             # linear+clip scale saturates into a flat slab; log1p renders it as a smooth gradient.
@@ -418,7 +470,7 @@ def fig_posterior_predictive(univ, nasa, m_sil, r_sil):
                 ax.set_title(f"{blabel} $I_\\oplus$", fontsize=12)
             if j == 0:
                 ax.set_ylabel(f"{plabel}\n" + r"radius [$R_\oplus$]", fontsize=11)
-            if i == 2:
+            if i == len(UNIVERSES) - 1:
                 ax.set_xlabel(r"planet mass [$M_\oplus$]")
     cb = fig.colorbar(axes[0, 0].images[0], ax=axes, location="right", shrink=0.85)
     cb.set_label("predicted-detected density (per-panel normalized)")
@@ -426,9 +478,9 @@ def fig_posterior_predictive(univ, nasa, m_sil, r_sil):
         cb2 = fig.colorbar(sc, ax=axes, location="bottom", shrink=0.4, pad=0.02, aspect=50)
         cb2.set_label(r"NASA planets: log(Insolation Flux [$I_\oplus$])")
     fig.suptitle(f"Posterior-predictive detected density ({_mlabel()} transit + RV, viridis, "
-                 "transiting only) vs confirmed NASA planets (points colored by log insolation, "
-                 "with error bars)\n"
-                 "rows = universes (priors); columns = insolation panels (Figure-3 format); "
+                 f"transiting only, $M>{MASS_MIN:.0f}\\,M_\\oplus$) vs confirmed NASA planets "
+                 "(points colored by log insolation, with error bars)\n"
+                 "rows = universes (priors); columns = insolation panels; "
                  "black dashed = silicate line", fontsize=13)
     out = os.path.join(_out_dir(), "posterior_predictive_maps.png")
     fig.savefig(out, dpi=150, bbox_inches="tight")
@@ -442,18 +494,75 @@ def fig_model_odds(rows):
     w = 0.26
     fig, ax = plt.subplots(figsize=(13, 5.6))
     for i, (key, plabel, color) in enumerate(UNIVERSES):
-        ax.bar(x + (i - 1) * w, [r["post"][key] for r in rows], w, color=color, label=plabel)
+        ax.bar(x + (i - (len(UNIVERSES) - 1) / 2) * w, [r["post"][key] for r in rows], w,
+               color=color, label=plabel)
     ax.set_xticks(x)
     ax.set_xticklabels([l.replace(" ", "\n", 1) for l in labels], fontsize=8.5)
     ax.set_ylabel(r"likelihood odds  $O = L / \sum_j L_j$")
     ax.set_ylim(0, 1.05)
-    ax.axhline(1 / 3, color="0.6", ls=":", lw=1, label="even split (1/3)")
+    ax.axhline(1 / len(UNIVERSES), color="0.6", ls=":", lw=1,
+               label=f"even split (1/{len(UNIVERSES)})")
     ax.set_title(f"Which universe does NASA prefer? ({_mlabel()} transit + RV; normalized "
                  "binomial composition likelihood)\n"
                  "headline = I<50 cold rocky desert (M>2); transiting planets only", fontsize=11)
     ax.grid(alpha=0.2, axis="y"); ax.legend(fontsize=9)
     fig.tight_layout()
     out = os.path.join(_out_dir(), "model_odds.png")
+    fig.savefig(out, dpi=160, bbox_inches="tight")
+    plt.close(fig)
+    print(f"--> Saved: {out}")
+
+
+def fig_model_stats(rows):
+    """Companion to the odds bars, and the direct answer to 'why does O saturate when the maps
+    look alike': (top) the two universes' predicted volatile fractions f_k with the observed
+    NASA v/n marked, showing how close the fractions sit; (bottom) the binomial likelihoods L_k
+    on a log axis, showing the same small f gap turn into orders of magnitude in L. Every plotted
+    quantity is labelled on its bar/marker; the derived odds (O_esc, BF) live in the note's table."""
+    esc, prim = "escape_only", "rocky_formation"
+    labels = [r["label"] for r in rows]
+    x = np.arange(len(labels))
+    w = 0.26
+    fig, (ax1, ax2) = plt.subplots(
+        2, 1, figsize=(13, 8.0), sharex=True, gridspec_kw=dict(height_ratios=[1.0, 1.0]))
+    for i, (key, plabel, color) in enumerate(UNIVERSES):
+        xb = x + (i - (len(UNIVERSES) - 1) / 2) * w
+        vals = [r["p"][key] for r in rows]
+        ax1.bar(xb, vals, w, color=color, label=f"$f$  {plabel}")
+        for xi, v in zip(xb, vals):
+            ax1.annotate(f"{v:.2f}", (xi, v), textcoords="offset points", xytext=(0, 2),
+                         ha="center", fontsize=8, color=color)
+    ax1.plot(x, [r["k"] / r["n"] for r in rows], "kD", ms=8, zorder=5, label=r"observed $v/n$")
+    for xi, r in zip(x, rows):
+        vn = r["k"] / r["n"]
+        ytop = max([vn] + [r["p"][key] for key, _, _ in UNIVERSES]) + 0.09
+        ax1.annotate(f"{r['k']}/{r['n']} = {vn:.2f}", (xi, ytop),
+                     ha="center", fontsize=8,
+                     bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none", alpha=0.85))
+    ax1.set_ylabel("volatile fraction")
+    ax1.set_ylim(0, 1.12)
+    ax1.set_xticks(x)
+    ax1.grid(alpha=0.2, axis="y"); ax1.legend(fontsize=9, ncol=3)
+    ax1.set_title(r"Predicted volatile fractions $f_k$ vs observed $v/n$ "
+                  "(the two universes sit close)", fontsize=11)
+    for i, (key, plabel, color) in enumerate(UNIVERSES):
+        xb = x + (i - (len(UNIVERSES) - 1) / 2) * w
+        vals = [max(r["L"][key], 1e-300) for r in rows]
+        ax2.bar(xb, vals, w, color=color, label=f"$L$  {plabel}")
+        for xi, v in zip(xb, vals):
+            ax2.annotate(f"{v:.1e}", (xi, v), textcoords="offset points", xytext=(0, 2),
+                         ha="center", fontsize=8, color=color)
+    ax2.set_yscale("log")
+    ax2.set_ylabel(r"binomial likelihood $L_k$")
+    ax2.set_xticks(x)
+    ax2.set_xticklabels([l.replace(" (M>2)", "\n(M>2)") for l in labels])
+    ax2.grid(alpha=0.2, axis="y"); ax2.legend(fontsize=9)
+    ax2.set_title(r"Binomial likelihoods $L_k$ (log axis): the small $f$ gap becomes orders "
+                  "of magnitude", fontsize=11)
+    fig.suptitle(f"Why the odds saturate — {_mlabel()} transit + RV, precision-cut sample",
+                 fontsize=12)
+    fig.tight_layout()
+    out = os.path.join(_out_dir(), "model_stats.png")
     fig.savefig(out, dpi=160, bbox_inches="tight")
     plt.close(fig)
     print(f"--> Saved: {out}")
@@ -494,6 +603,8 @@ def main(mission="kepler"):
     fig_likelihood_maps(univ, nasa_prec)
     fig_posterior_predictive(univ, nasa_prec, m_sil, r_sil)
     fig_model_odds(rows_prec)
+    fig_model_stats(rows_prec)
+    save_stats_table(rows_prec, "precision-cut (primary)")
 
     print("\n  CAVEATS:")
     print("  - Figures consider TRANSITING planets only (detector geometric transit flag); the")

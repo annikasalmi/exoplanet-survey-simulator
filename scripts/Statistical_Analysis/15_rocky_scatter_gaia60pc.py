@@ -45,7 +45,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-from matplotlib.patches import Patch, Ellipse, Rectangle
+from matplotlib.patches import Patch, Rectangle
 from matplotlib.ticker import FuncFormatter, NullFormatter
 
 
@@ -746,8 +746,18 @@ def false_negative_prob(ppop_panel: pd.DataFrame, slope: float, intercept: float
 
 FACILITY_PALETTE = list(plt.get_cmap("tab10").colors) + list(plt.get_cmap("Set2").colors)
 
+# Fixed colors for facilities whose default palette color blends into the
+# viridis pass-fraction background (TESS blue, K2 green). Magenta and brown
+# have no counterpart anywhere in viridis and stay distinct from the other
+# facility colors (Kepler orange, Multiple red, La Silla purple, gray Other).
+# Applied only when a figure opts in (viridis-background figures, e.g. script 21).
+FACILITY_COLOR_OVERRIDES = {
+    "TESS": "#ff00ff",
+    "K2": "#8b4513",
+}
 
-def build_facility_styles(rocky_win: pd.DataFrame):
+
+def build_facility_styles(rocky_win: pd.DataFrame, contrast_overrides: bool = False):
     """
     Assign a distinct color to every discovery facility that contributed more
     than FACILITY_MIN_COUNT rocky planets inside the plotted window.  Returns
@@ -756,13 +766,27 @@ def build_facility_styles(rocky_win: pd.DataFrame):
     counts = rocky_win["discovery_facility"].fillna("Unknown").value_counts()
     major = [f for f, c in counts.items() if c > FACILITY_MIN_COUNT]
     color_map = {f: FACILITY_PALETTE[i % len(FACILITY_PALETTE)] for i, f in enumerate(major)}
+    if contrast_overrides:
+        for f in major:
+            override = FACILITY_COLOR_OVERRIDES.get(short_facility(f))
+            if override:
+                color_map[f] = override
     return color_map, major, counts
 
 
 OTHER_COLOR = "0.55"
 
+# The cold rocky desert candidates (relaxed cuts; paper_v2 Table 1), all starred
+# equally in overlay panels — LHS 1140 b is not singled out.
+DESERT_CANDIDATE_PATTERNS = [
+    r"LHS\s*1140\s*b", r"TOI-?1452\s*b", r"LHS\s*1903\s*e",
+    r"TOI-?198\s*b", r"TOI-?771\s*b", r"TOI-?1468\s*b",
+]
+DESERT_CANDIDATE_REGEX = "|".join(f"(?:{p})" for p in DESERT_CANDIDATE_PATTERNS)
 
-def _overlay_rocky_by_facility(ax, sub: pd.DataFrame, color_map: dict, major: list[str]):
+
+def _overlay_rocky_by_facility(ax, sub: pd.DataFrame, color_map: dict, major: list[str],
+                               star_candidates: bool = True):
     """Overlay rocky planets in one panel, colored & error-barred by facility."""
     if len(sub) == 0:
         return
@@ -794,19 +818,16 @@ def _overlay_rocky_by_facility(ax, sub: pd.DataFrame, color_map: dict, major: li
             zorder=3,
         )
 
-    # Highlight LHS 1140 b if it landed in this panel.
-    lhs_mask = sub["planet_label"].str.contains(r"LHS\s*1140\s*b", case=False, na=False, regex=True)
-    for _, row in sub[lhs_mask].iterrows():
+    # Star every desert candidate that landed in this panel, all styled alike.
+    if not star_candidates:
+        return
+    cand_mask = sub["planet_label"].str.contains(
+        DESERT_CANDIDATE_REGEX, case=False, na=False, regex=True)
+    for _, row in sub[cand_mask].iterrows():
         ax.scatter(
             [row["flux_p"]], [row["radius_p"]],
             s=70, marker="*", color="gold", edgecolors="darkred",
             linewidths=0.9, zorder=6,
-        )
-        ax.annotate(
-            "LHS 1140 b",
-            xy=(row["flux_p"], row["radius_p"]),
-            xytext=(5, 4), textcoords="offset points",
-            fontsize=7, color="darkred", fontweight="bold", zorder=7,
         )
 
 
@@ -909,7 +930,7 @@ def plot_combined(kepler: pd.DataFrame, tess: pd.DataFrame,
         )
     handles.append(
         Line2D([0], [0], marker="*", linestyle="", color="gold",
-               markeredgecolor="darkred", markersize=12, label="LHS 1140 b (anchor)")
+               markeredgecolor="darkred", markersize=12, label="Cold rocky desert candidates")
     )
     handles.append(
         Line2D([0], [0], color="black", lw=2.0, ls="--",
@@ -1105,9 +1126,10 @@ def plot_threshold_curve_comparison(m_ref, r_ref, nasa_win: pd.DataFrame) -> Pat
 # (radius > COLD_CORNER_RADIUS) planets receiving little insolation (I < 50).
 COLD_CORNER_INSOL  = 50.0   # I_earth  — "cold" boundary shown to Hongyi by the professor
 COLD_CORNER_RADIUS = 1.4    # R_earth  — "large rocky" lower bound of the corner
+COLD_CORNER_COLOR  = "#ff9ec4"  # light pink band under the silicate curve
 
 # Insolation slices for the 1x3 mass-radius figure (title, mask, draw-corner).
-# Cold panels (I<10, I<50) get the red Cold-Corner ellipse; the hot panel does not.
+# Cold panels (I<10, I<50) get the pink Cold-Corner band; the hot panel does not.
 MR_INSOL_PANELS = [
     (r"$I < 10\,I_\oplus$",  lambda f: f < 10.0, True),
     (r"$I < 50\,I_\oplus$",  lambda f: f < 50.0, True),
@@ -1115,16 +1137,10 @@ MR_INSOL_PANELS = [
 ]
 
 
-def _cold_corner_ellipse(**kw) -> Ellipse:
-    """Red ellipse hugging the large-rocky region of the silicate curve
-    (radius > 1.4 R_earth, mass ~3-11 M_earth) used to mark the Cold Corner.
-
-    Geometry is set so the major-axis endpoints land on the silicate curve near
-    (3.3 M_earth, 1.4 R_earth) and (11 M_earth, 2.05 R_earth); the small angle is
-    in data units (mass vs radius), so it visually follows the curve despite the
-    non-equal axis aspect."""
-    return Ellipse((7.15, 1.72), width=7.9, height=0.36, angle=4.8,
-                   fill=False, edgecolor="red", lw=2.0, zorder=6, **kw)
+def draw_cold_corner_band(ax, m_line, r_curve):
+    ax.fill_between(m_line, COLD_CORNER_RADIUS, r_curve,
+                    where=np.isfinite(r_curve) & (r_curve >= COLD_CORNER_RADIUS),
+                    color=COLD_CORNER_COLOR, alpha=0.35, lw=0, zorder=1)
 
 
 def plot_mr_insolation_panels(m_ref, r_ref, nasa_win: pd.DataFrame,
@@ -1134,7 +1150,8 @@ def plot_mr_insolation_panels(m_ref, r_ref, nasa_win: pd.DataFrame,
     Recreates the professor's figure with our PSCompPars sample: points colored
     by discovery facility (not insolation), two-sided mass/radius error bars, the
     silicate rocky curve as the black dashed line, and the Cold Corner
-    (radius > 1.4 R_earth, I < 50) marked as a red ellipse on the cold panels.
+    (radius > 1.4 R_earth, I < 50) marked as a light pink band under the
+    silicate curve on the cold panels.
     """
     XLIM = (0.0, 12.0)
     YLIM = (RADIUS_LIMITS[0], RADIUS_LIMITS[1])
@@ -1179,7 +1196,7 @@ def plot_mr_insolation_panels(m_ref, r_ref, nasa_win: pd.DataFrame,
             )
 
         if draw_corner:
-            ax.add_patch(_cold_corner_ellipse())
+            draw_cold_corner_band(ax, m_line, r_curve)
 
         ax.set_xlim(*XLIM)
         ax.set_ylim(*YLIM)
@@ -1201,7 +1218,8 @@ def plot_mr_insolation_panels(m_ref, r_ref, nasa_win: pd.DataFrame,
                               markersize=7, label=f"Other facilities  (N={n_other})"))
     handles.append(Line2D([0], [0], color="black", lw=1.6, ls="--",
                           label=f"Silicate rocky curve ({ROCKY_CURVE_PATH.name})"))
-    handles.append(_cold_corner_ellipse(label=r"Cold Rocky Desert ($R>1.4\,R_\oplus$, $I<50$)"))
+    handles.append(Patch(facecolor=COLD_CORNER_COLOR, alpha=0.35,
+                         label=r"Cold Rocky Desert ($R>1.4\,R_\oplus$, $I<50$)"))
 
     fig.legend(handles=handles, loc="outside lower center",
                ncol=min(len(handles), 5), fontsize=10, framealpha=0.9,

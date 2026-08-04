@@ -8,7 +8,7 @@ composition-ratio Bayes comparison. This script answers the map-level version di
 UNDOING the detection selection with an inverse-completeness correction.
 
 Method (conditional completeness, per the methodology decision):
-    completeness  C_b(M,R) = detected / TRANSITING  per cell  (= script 88's likelihood d_b)
+    completeness  C_b(M,R) = detected / TRANSITING  per cell  (= script 88's likelihood l_b)
     corrected     N_true(M,R) ~ N_detected(M,R) / C_b(M,R)
     -> this recovers the INTRINSIC TRANSITING density on the MR plane, WITHIN each insolation
        panel. It removes detection incompleteness (SNR, baseline, #transits) but NOT the
@@ -52,7 +52,7 @@ from matplotlib.colors import Normalize
 from scipy.ndimage import gaussian_filter
 
 _HERE = Path(__file__).resolve().parent
-ROOT = _HERE.parents[2]
+ROOT = _HERE.parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -94,7 +94,7 @@ def _smooth_nan(field, sigma=1.0):
 
 def corrected_maps(u, lo, hi):
     """Return (H_det, C, C_smooth, corrected, H_transit) on the 88 MR grid for one universe/bin.
-        C          = detected / transiting  (conditional completeness = 88's d_b)
+        C          = detected / transiting  (conditional completeness = 88's l_b)
         corrected  = detected / C_smooth, blanked where C_smooth < C_FLOOR (unconstrained)
     corrected recovers the intrinsic TRANSITING density (H_transit) within this insolation panel.
     """
@@ -129,7 +129,7 @@ def fig_corrected_maps(univ, nasa, m_sil, r_sil):
     r_sil_line = np.interp(ms, m_sil, r_sil)
     norm = Normalize(vmin=np.log10(_bayes.BOX["f_lo"]), vmax=np.log10(_bayes.BOX["f_hi"]))
     X, Y = np.meshgrid(_bayes.M_CENT, _bayes.R_CENT)
-    fig, axes = plt.subplots(3, 3, figsize=(17, 14), sharex=True, sharey=True,
+    fig, axes = plt.subplots(len(_bayes.UNIVERSES), 3, figsize=(17, 9.5), sharex=True, sharey=True,
                              constrained_layout=True)
     sc = None
     for i, (key, plabel, _) in enumerate(_bayes.UNIVERSES):
@@ -158,7 +158,7 @@ def fig_corrected_maps(univ, nasa, m_sil, r_sil):
                 ax.set_title(f"{blabel} $I_\\oplus$", fontsize=12)
             if j == 0:
                 ax.set_ylabel(f"{plabel}\n" + r"radius [$R_\oplus$]", fontsize=11)
-            if i == 2:
+            if i == len(_bayes.UNIVERSES) - 1:
                 ax.set_xlabel(r"planet mass [$M_\oplus$]")
     cb = fig.colorbar(axes[0, 0].images[0], ax=axes, location="right", shrink=0.85)
     cb.set_label("occurrence-corrected transiting density (per-panel normalized)")
@@ -182,7 +182,7 @@ def fig_completeness_maps(univ):
     that was divided out. Dark = large correction (cold, near/above the curve) = where the
     'occurrence-corrected' claim leans hardest on the model."""
     X, Y = np.meshgrid(_bayes.M_CENT, _bayes.R_CENT)
-    fig, axes = plt.subplots(3, 3, figsize=(17, 14), sharex=True, sharey=True,
+    fig, axes = plt.subplots(len(_bayes.UNIVERSES), 3, figsize=(17, 9.5), sharex=True, sharey=True,
                              constrained_layout=True)
     vmax = 0.0
     Cs = {}
@@ -214,15 +214,14 @@ def fig_completeness_maps(univ):
                 ax.set_title(f"{blabel} $I_\\oplus$", fontsize=12)
             if j == 0:
                 ax.set_ylabel(f"{plabel}\n" + r"radius [$R_\oplus$]", fontsize=11)
-            if i == 2:
+            if i == len(_bayes.UNIVERSES) - 1:
                 ax.set_xlabel(r"planet mass [$M_\oplus$]")
     cb = fig.colorbar(axes[0, 0].images[0], ax=axes, location="right", shrink=0.85)
     cb.set_label("conditional completeness  C(M,R) = detected / transiting")
     fig.suptitle(
         f"Completeness field divided out ({_bayes._mlabel()} transit + RV) -- detected fraction "
         "among transiting\ndark below the curve for the two track universes = physically EMPTY "
-        "(no transiting planets to measure), not low completeness;\nread the Uniform row for true "
-        "detectability everywhere. red = M=2 cut + cold rocky desert",
+        "(no transiting planets to measure), not low completeness.\nred = M=2 cut + cold rocky desert",
         fontsize=12)
     out = os.path.join(_out_dir(), "completeness_field_maps.png")
     fig.savefig(out, dpi=150, bbox_inches="tight")

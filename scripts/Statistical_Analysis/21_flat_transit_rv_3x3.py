@@ -49,7 +49,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from run.ppop.uniform_generator import generate_flat_catalog
-from run.ppop.flat_detect import run_tess, run_rv, TESSData
+from run.ppop.flat_detect import run_kepler, run_tess, run_rv, TESSData
 
 
 def _load(name, path):
@@ -70,6 +70,10 @@ plt.rcParams.update({
     "font.size": 13, "axes.titlesize": 14, "axes.labelsize": 13,
     "legend.fontsize": 10, "xtick.labelsize": 11, "ytick.labelsize": 11,
 })
+
+# Which transit pipeline fills the transit row: "TESS" (paper Fig. 2) or
+# "Kepler" (appendix comparison). Patched by script 48's mapskep part.
+TRANSIT_MISSION = "TESS"
 
 OTEGI = dict(mr_C=1.03, mr_beta=0.29)      # R = 1.03 M^0.29, script 77's default relation
 MR_SCATTER_DEX = 0.15
@@ -117,10 +121,15 @@ def build_column(stype: str, m_ref, r_ref) -> pd.DataFrame:
     b = cat["semimajor_p"].to_numpy() * np.abs(np.cos(cat["inc_p"].to_numpy())) / rs_au
     cat = cat[b <= 1.0 + rp_au / rs_au].copy().reset_index(drop=True)
 
-    tess = run_tess(cat)
-    denom = (tess["tess_observed"].astype(bool)
-             & tess["tess_transiting_geometric"].astype(bool)).to_numpy()
-    det_transit = tess["detected"].astype(bool).to_numpy() & denom
+    if TRANSIT_MISSION == "Kepler":
+        kep = run_kepler(cat)
+        denom = kep["transiting_geometric"].astype(bool).to_numpy()
+        det_transit = kep["detected"].astype(bool).to_numpy() & denom
+    else:
+        tess = run_tess(cat)
+        denom = (tess["tess_observed"].astype(bool)
+                 & tess["tess_transiting_geometric"].astype(bool)).to_numpy()
+        det_transit = tess["detected"].astype(bool).to_numpy() & denom
     # Paper operator: mass measured if EITHER channel reaches K/sigma_K >= 5 on a
     # host with band-mag <= 12 in that channel's band (scripts 50/53 lineage).
     det_rv = np.zeros(len(cat), bool)
@@ -180,12 +189,17 @@ def window_stats(panel: pd.DataFrame, test: str):
 def main():
     print("=" * 70)
     print("21_flat_transit_rv_3x3.py — flat-Otegi selection maps (paper Fig. 2)")
+    print(f"Transit pipeline: {TRANSIT_MISSION}")
     print("=" * 70)
+    rows = list(ROWS)
+    if TRANSIT_MISSION != "TESS":
+        rows[0] = (f"Transit test ({TRANSIT_MISSION})", "transit")
+        rows[2] = (f"Transit ({TRANSIT_MISSION}) + RV", "joint")
     m_ref, r_ref = S44.load_rocky_reference_curve()
     shift = S44.compute_rocky_threshold_shift(m_ref, r_ref)
     _, rocky = S44.load_and_filter_nasa(m_ref, r_ref, shift)
     rocky_win = S44.restrict_to_window(rocky)
-    color_map, major, counts = S44.build_facility_styles(rocky_win)
+    color_map, major, counts = S44.build_facility_styles(rocky_win, contrast_overrides=True)
     for st in COLUMNS:
         f_max = rocky_win.loc[rocky_win["stype_clean"] == st, "flux_p"].max()
         if np.isfinite(f_max) and f_max > COLUMNS[st]["insol"][1]:
@@ -204,13 +218,13 @@ def main():
         r = rocky_win[rocky_win["stype_clean"] == stype]
         xbins = XBINS[stype]
         fit = S44.fit_90pct_line(r["flux_p"].values, r["radius_p"].values)
-        for i, (row_name, test) in enumerate(ROWS):
+        for i, (row_name, test) in enumerate(rows):
             ax = axes[i, j]
             grid, _ = fraction_grid(panel, test, xbins)
             mesh = ax.pcolormesh(xbins, YBINS, grid, shading="auto",
                                  vmin=0, vmax=1, cmap=S44.CMAP_DETECTED)
             add_contours(ax, grid, xbins)
-            S44._overlay_rocky_by_facility(ax, r, color_map, major)
+            S44._overlay_rocky_by_facility(ax, r, color_map, major, star_candidates=False)
 
             xlo = xbins[0]
             ax.fill_between([xlo, S44.COLD_CORNER_INSOL], S44.COLD_CORNER_RADIUS,
@@ -251,10 +265,9 @@ def main():
         handles.append(Line2D([0], [0], marker="o", linestyle="", color=S44.OTHER_COLOR,
                               markersize=7, label=f"Other facilities  (N={n_other})"))
     handles += [
-        Line2D([0], [0], marker="*", linestyle="", color="gold",
-               markeredgecolor="darkred", markersize=12, label="LHS 1140 b"),
         Patch(facecolor="red", alpha=0.15, edgecolor="red", lw=2.0,
-              label=r"Cold Rocky Desert ($S<50\,S_\oplus$, $R>1.4\,R_\oplus$)"),
+              label=(r"Cold Rocky Desert ($S<50\,S_\oplus$, $R>%.2f\,R_\oplus$)"
+                     % S44.COLD_CORNER_RADIUS)),
     ]
     ncol = (len(handles) + 1) // 2  # widen the legend so it fits in exactly 2 rows
     fig.legend(handles=handles, loc="outside lower center", ncol=ncol, fontsize=12,
@@ -264,7 +277,8 @@ def main():
     fig.colorbar(mesh, ax=axes.ravel().tolist(), shrink=0.55, pad=0.01,
                  label="Pass fraction (transiting rocky planets)")
 
-    out = OUT_DIR / "flat_transit_rv_3x3_otegi.png"
+    suffix = "" if TRANSIT_MISSION == "TESS" else f"_{TRANSIT_MISSION.lower()}"
+    out = OUT_DIR / f"flat_transit_rv_3x3_otegi{suffix}.png"
     fig.savefig(out, dpi=170, bbox_inches="tight")
     fig.savefig(PAPER_FIG_DIR / out.name, dpi=170, bbox_inches="tight")
     plt.close(fig)

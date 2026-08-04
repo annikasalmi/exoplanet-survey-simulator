@@ -140,10 +140,10 @@ def main():
         ax.set_title(cut_label, fontsize=10)
         ax.grid(alpha=0.2); ax.legend(fontsize=8, loc="upper left")
         if ci == 0:
-            ax.set_ylabel("median significance rejecting flat B (truth = flat A)")
+            ax.set_ylabel("median significance ruling out Primordial-rocky (truth = Escape-only)")
 
-    fig.suptitle("How many NASA planets to reject flat B (rocky super-Earths exist)?\n"
-                 "two-proportion power, κ-calibrated against the script-72 MC (bootstrap + noise included)",
+    fig.suptitle("How many NASA planets to rule out Primordial-rocky (rocky super-Earths exist)?\n"
+                 "two-proportion power, κ-calibrated against the detect+noise Monte Carlo (bootstrap + noise included)",
                  fontsize=12)
     fig.tight_layout(rect=[0, 0, 1, 0.92])
     out_png = os.path.join(OUT_DIR, "significance_vs_n.png")

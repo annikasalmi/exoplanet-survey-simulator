@@ -131,11 +131,11 @@ def main():
         ax.set_xscale("log")
         ax.set_xlim(N_GRID[0], N_GRID[-1]); ax.set_ylim(0, 12)
         ax.set_xlabel("NASA precision-passing planets N")
-        ax.set_title(f"{cut_label}\nsolid = z_floor(N) (with systematic), dashed = z(N) (no floor)",
+        ax.set_title(f"{cut_label}\nsolid = with relation-spread floor, dashed = counting noise only",
                      fontsize=9.5)
         ax.grid(alpha=0.2); ax.legend(fontsize=7.5, loc="upper left")
         if ci == 0:
-            ax.set_ylabel("significance rejecting flat B (truth = flat A)")
+            ax.set_ylabel("significance ruling out Primordial-rocky (truth = Escape-only)")
 
         min_zmax = min(zmax_list)
         sigma_stat_now = np.sqrt(kB_mean * pB_mean * (1 - pB_mean) / n_now)
@@ -161,8 +161,8 @@ def main():
                   f"sigma_stat(N_now)={sigma_stat_now:.4f} -> still statistics-limited at N_now; more "
                   f"detections help before calibration does.")
 
-    fig.suptitle("Systematic floor: rocky M-R relation choice vs counting noise on the puffy fraction\n"
-                 "z_floor(N) saturates at z_max = delta/sigma_syst as N -> infinity",
+    fig.suptitle("Systematic floor: rocky mass-radius relation choice vs counting noise on the detected volatile fraction\n"
+                 "significance flattens once the relation spread beats the counting noise",
                  fontsize=12)
     fig.tight_layout(rect=[0, 0, 1, 0.90])
     out_png = os.path.join(OUT_DIR, "systematic_floor.png")

@@ -56,6 +56,7 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 RHO_EARTH = 5.513
 RV_MAG_TARGET = 12.0
+N_FULL_UNIVERSES = 10
 BOX = dict(r_lo=0.5, r_hi=2.2, m_lo=0.1, m_hi=12.0, f_lo=1e-2, f_hi=1e4)
 PPOP_COLS = ["radius_p", "mass_p", "p_orb", "inc_p", "ecc_p", "semimajor_p", "radius_s",
              "mass_s", "temp_s", "teff_s", "distance_s", "l_sun", "flux_p", "stype", "detected"]
@@ -96,7 +97,13 @@ def load_nasa_puffy(m_sil, r_sil):
 # ── PART A: cosmic variance across the 10 universes ─────────────────────────────
 
 def part_a(m_sil, r_sil, nasa_puffy):
-    files = sorted(KEPLER_DIR.glob("kepler_catalog_*.csv"))
+    # Only the full F/G/K/M universes 0..9 are valid here. The 8001+ top-ups in the same
+    # directory are single-spectral-type (G-only / K-only) partial draws, so treating them
+    # as universes corrupts the across-universe mean and SD.
+    files = [KEPLER_DIR / f"kepler_catalog_{i}.csv" for i in range(N_FULL_UNIVERSES)]
+    missing = [f.name for f in files if not f.exists()]
+    if missing:
+        raise FileNotFoundError(f"missing full P-Pop universes: {missing}")
     print(f"\nPART A — cosmic variance across {len(files)} P-Pop universes")
     puffies, denss, ndet = [], [], []
     for f in files:

@@ -101,3 +101,20 @@ scripts/__pycache__/*
 scripts/*/__pycache__/*
 plot/script plots/__pycache__/*
 run/__pycache__/*
+
+*.md
+memory/*.md
+my_outputs/*.npz
+my_outputs/*/*.npz
+my_outputs/*/*.txt
+my_outputs/*/*/*.txt
+my_outputs/*/*.npy
+/*/*.png
+overleaf_packages/*
+overleaf_packages/*/*
+overleaf_packages/*/*/*
+overleaf_packages/*/*/*/*
+paper/*
+tests/*/*.pyc
+paper.zip
+texput.log

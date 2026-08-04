@@ -118,3 +118,5 @@ paper/*
 tests/*/*.pyc
 paper.zip
 texput.log
+
+memory/*.md

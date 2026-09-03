@@ -16,7 +16,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.8'  
+          python-version: '3.11'
 
       - name: Install dependencies
         run: pip install -r requirements.txt
@@ -24,8 +24,7 @@ jobs:
       - name: Check working directory
         run: pwd && ls -al
 
-      - name: Set PYTHONPATH and run integration
-        working-directory: /home/runner/work/mdwarf-habitability/mdwarf-habitability
+      - name: Run integration
         run: |
-          export PYTHONPATH=$(pwd)
+          pip install -e .
           python tests/integration.py

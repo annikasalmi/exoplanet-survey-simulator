@@ -1,17 +1,28 @@
-mdwarf-habitability
-===================
+exoplanet-survey-simulator
+==========================
 
-This repository contains tools to simulate and analyze detectability of potentially habitable exoplanets around M dwarfs for LIFE and HWO.
+Tools to simulate and analyze the detectability of potentially habitable exoplanets
+around M dwarfs, for the LIFE and HWO mission concepts.
 
-For the most up-to-date usage instructions, please see the Markdown README at the project root (``README.md``).
+For usage instructions, see ``README.md`` at the project root.
 
-Quick links
------------
+Provenance
+----------
 
-* LIFEsim: https://github.com/fdannert/LIFEsim
-* P-pop: https://github.com/kammerje/P-pop
+This repository builds on two existing codebases, each documented in its own
+``UPSTREAM.md``:
+
+* ``lifesim/`` — fork of LIFEsim (Felix Dannert, Maurice Ottiger, Sascha Quanz,
+  ETH Zürich) at ``a2b8eeb``, GPLv3: https://github.com/fdannert/LIFEsim
+* ``PPop/`` — modified copy of P-pop (Jens Kammerer), MIT:
+  https://github.com/kammerje/P-pop
+* ``PPop/MassModels/Forecaster/`` — Forecaster (Jingjing Chen), MIT:
+  https://github.com/chenjj2/forecaster
+
+Everything under ``hwo/``, ``run/``, ``plot/``, ``tools/`` and ``tests/`` was written
+for this project.
 
 License
 -------
 
-GPL-3.0 (see ``LICENSE``).
+GPL-3.0 (see ``LICENSE``). Vendored MIT components retain their own licence files.

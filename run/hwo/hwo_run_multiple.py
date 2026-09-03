@@ -6,7 +6,7 @@ import numpy as np
 from functools import partial
 
 from PPop.StarCatalogs import CrossfieldBrightSample, ExoCat_1, LTC_2, LTC_3, gaia
-from lifesim.core.hwo_data import HWOData
+from hwo.hwo_data import HWOData
 from run.ppop.ppop_generator import PPop
 from tools.paths import HWO_DATA_DIR
 

@@ -12,7 +12,7 @@ NRUNS = 100
 STAR_CATALOG = 'Gaia'  # or 'ExoCat_1'
 SIM_NAME = 'hwo'       # or 'lifesim'
 
-print("\nWelcome to the mdwarf-habitability demo!\n")
+print("\nWelcome to the exoplanet-survey-simulator demo!\n")
 print(f"Running {SIM_NAME} simulation with {NRUNS} runs and catalog '{STAR_CATALOG}'...\n")
 
 # Select simulation function

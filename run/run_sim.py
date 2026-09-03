@@ -10,7 +10,7 @@ import logging
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from tools.paths import LOGGING, LIFESIM_OUTER_DIR
-from lifesim.core.hwo_data import HWOData
+from hwo.hwo_data import HWOData
 from lifesim.core.kepler_data import KeplerData #added by Hongyi
 from lifesim.core.tess_data import TESSData
 

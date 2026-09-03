@@ -1,55 +1,61 @@
 import os
-from setuptools import setup
+from setuptools import setup, find_packages
+
+# `lifesim/__init__.py` keeps LIFEsim's own version. See lifesim/UPSTREAM.md.
+__version__ = '0.1.0'
 
 def read(rel_path: str) -> str:
     here = os.path.abspath(os.path.dirname(__file__))
-    # intentionally *not* adding an encoding option to open, See:
-    #   https://github.com/pypa/virtualenv/issues/201#issuecomment-3145690
-    with open(os.path.join(here, rel_path)) as fp:
+    with open(os.path.join(here, rel_path), encoding='utf-8') as fp:
         return fp.read()
 
-def get_version(rel_path: str) -> str:
-    for line in read(rel_path).splitlines():
-        if line.startswith("__version__"):
-            delim = '"' if '"' in line else "'"
-            return line.split(delim)[1]
-    raise RuntimeError("Unable to find version string.")
-
 setup(
-    name='LIFEsim',
-    version=get_version("lifesim/__init__.py"),
-    description='Simulator software for the Large Interferometer For Exoplanets (LIFE)',
-    long_description=open('README.rst').read(),
-    long_description_content_type='text/x-rst',
-    author='Felix Dannert, Maurice Ottiger & Sascha Quanz',
-    author_email='fdannert@ethz.ch',
-    url='https://github.com/fdannert/LIFEsim',
-    project_urls={'Documentation': 'https://lifesim.readthedocs.io'},
-    packages=['lifesim',
-              'lifesim.core',
-              'lifesim.gui',
-              'lifesim.instrument',
-              'lifesim.optimize',
-              'lifesim.util'],
+    name='exoplanet-survey-simulator',
+    version=__version__,
+    description='Detectability of potentially habitable exoplanets around M dwarfs '
+                'for the LIFE and HWO mission concepts',
+    long_description=read('README.md'),
+    long_description_content_type='text/markdown',
+    author='Annika Salmi',
+    author_email='annikaksalmi@gmail.com',
+    url='https://github.com/annikasalmi/exoplanet-survey-simulator',
+    # `lifesim/` is listed by hand so the inherited tree needs no added
+    # __init__.py files. It is frozen at a2b8eeb, so the list will not drift.
+    packages=find_packages(exclude=['tests', 'tests.*', 'docs', 'docs.*',
+                                    'lifesim', 'lifesim.*',
+                                    '*.data', '*.data.*'])
+             + ['lifesim',
+                'lifesim.core',
+                'lifesim.gui',
+                'lifesim.instrument',
+                'lifesim.optimize',
+                'lifesim.util'],
     include_package_data=True,
-    install_requires=['astropy>=5.2.1',
+    install_requires=['alphashape',
+                      'astropy>=5.2.1',
+                      'GitPython>=3.1.32',
+                      'h5py',
                       'matplotlib>=3.7.0',
                       'numpy>=1.24.2',
                       'pandas>=1.5.3',
-                      'PyQt5==5.15.4',
-                      'tqdm>=4.64.1',
+                      'PyQt5>=5.15.4,<6',
+                      'pyyaml',
+                      'requests',
+                      'scipy>=1.7.0',
+                      'spectres',
                       'tables>=3.8.0',
-                      'GitPython>=3.1.32'],
+                      'tqdm>=4.64.1'],
+    extras_require={'test': ['pytest>=6.0.0', 'pytest-cov>=2.10.0']},
     license='GPLv3',
     zip_safe=False,
-    keywords='lifesim',
-    python_requires='~=3.8',
+    keywords='exoplanets astronomy LIFE HWO habitability',
+    python_requires='>=3.9',
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Science/Research',
         'Topic :: Scientific/Engineering :: Astronomy',
         'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
         'Natural Language :: English',
-        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3',
     ]
 )

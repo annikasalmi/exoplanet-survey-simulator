@@ -1,0 +1,24 @@
+include LICENSE
+include README.md
+include README.rst
+include requirements.txt
+
+# Vendored licences and provenance
+include PPop/LICENSE
+include PPop/UPSTREAM.md
+include PPop/MassModels/Forecaster/LICENSE
+include lifesim/UPSTREAM.md
+
+# Runtime data files
+recursive-include PPop/StarCatalogs *.csv *.tbl
+recursive-include PPop/ExozodiModels *.npy
+recursive-include PPop/MassModels/Forecaster *.h5
+
+global-exclude *.py[cod] .DS_Store
+prune *.egg-info
+prune docs
+prune tests
+prune logs
+prune results
+prune .vscode
+prune .github

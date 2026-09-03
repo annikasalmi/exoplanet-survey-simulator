@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 
-import sys
 import os
-sys.path.insert(0, '.')
 
 from tools.exoplanet_catalog import load_and_filter_exoplanets
-from lifesim.core.hwo_data import HWOData
+from hwo.hwo_data import HWOData
 
 # Load and process data
 print("Loading exoplanet data...")
-df = load_and_filter_exoplanets('/Users/annikasalmi/lifesim_github/mdwarf-habitability/exoplanets_2026.csv')
+REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
+df = load_and_filter_exoplanets(
+    os.path.join(REPO_ROOT, 'exoplanet_csv', 'exoplanets_2026.csv'))
 
 print(f"\nBefore HWO processing:")
 print(f"  Total planets: {len(df)}")

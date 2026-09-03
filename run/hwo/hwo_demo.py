@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
-from lifesim.core.hwo_data import HWOData
+from hwo.hwo_data import HWOData
 
 # ---------- Set-Up ----------
 

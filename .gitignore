@@ -1,64 +1,44 @@
-/life_sim.py
-/__init__.py
-/lifesim/archive/
-/archive/
-/lifesim/data/*.yaml
-/lifesim/data/*.hdf5
-/lifesim/gui/Earth_Clear_R1000_10pc_Björn_Konrad.txt
-/lifesim/gui/data_creation/ppop_catalog.txt
-/lifesim/gui/data_creation/*.yaml
-/lifesim/gui/data_creation/*.hdf5
-/lifesim/instrument/__pycache__/*.pyc
-TestPlanetPopulation.txt
-/Figures/*
-/plot/*/*.png
-/PPop/__pycache__/*
-/PPop/AlbedoModels/__pycache__/*.pyc
-/PPop/EccentricityModels/__pycache__/*
-/PPop/ExozodiModels/__pycache__/*.pyc
-/PPop/MassModels/__pycache__/*
-/PPop/MassModels/Forecaster/__pycache__/*
-/PPop/OrbitModels/__pycache__/*
-/PPop/PlanetDistributions/__pycache__/*
-/PPop/StabilityModels/__pycache__/*
-/PPop/ScalingModels/__pycache__/*
-/PPop/StarCatalogs/__pycache__/*
-/PPop/Figures/
-/PPop/data/*
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+
+# Run outputs and logs
+/logs/
 /run/logging/*/*.txt
+/Figures/
+/archive/
+/mdwarfs/
+
+# Generated plots
+/plot/*/*.png
+/plot/old/*/*.png
+
+# Simulation data products
+/run/hwo/data/*.csv
+/run/hwo/data/*/*.csv
 /run/lifesim/data/*.hdf5
 /run/lifesim/data/*.yaml
 /run/lifesim/data/*/*.hdf5
 /run/lifesim/data/*/*.yaml
-/run/hwo/data/*.csv
-/run/hwo/data/*/*.csv
-/run/hwo/__pycache__/*.pyc
-/run/lifesim/__pycache__/*.pyc
-/plot/__pycache__/*.pyc
-/plot/*/.DS_Store
-/tools/__pycache__/*.pyc
-__pycache__/*.pyc
-/lifesim/core/__pycache__/*.pyc
-/lifesim/util/__pycache__/*.pyc
-/lifesim/optimize/__pycache__/*.pyc
-/lifesim/gui/__pycache__/*.pyc
-/lifesim/__pycache__/*.pyc
-/run/ppop/__pycache__/*.pyc
-/PPop/__pycache__/*.pyc
-/plot/old/*/*.png
 
-/mdwarfs/*
-/mdwarfs/*/*
-/mdwarfs/*/*/*
-/mdwarfs/*/*/*/*
-/mdwarfs/*/*/*/*/*
-/mdwarfs/*/*/*/*/*/*
-/mdwarfs/*/*/*/*/*/*/*
-/mdwarfs/*/*/*/*/*/*/*/*
-/mdwarfs/*/*/*/*/*/*/*/*/*
-/mdwarfs/*/*/*/*/*/*/*/*/*/*
-/plot/old/*/*.png
-/plot/combined_edited/*
+# PPop generated
+/PPop/data/
+/PPop/Figures/
+/PPop/TestPlanetPopulation.out
+TestPlanetPopulation.txt
 
 # Local Python virtual environments
 /venv/
@@ -120,3 +100,22 @@ paper.zip
 texput.log
 
 memory/*.md
+
+# --- added with the vendored-fork relabelling ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.coverage
+.vscode/
+/logs/
+/PPop/TestPlanetPopulation.out
+
+# `*.md` above is deliberate, but these record who wrote what and must ship
+!README.md
+!MANIFEST.in
+!PPop/UPSTREAM.md
+!lifesim/UPSTREAM.md
+!results/README.md

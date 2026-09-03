@@ -1,7 +1,7 @@
 import pytest  # type: ignore
 import numpy as np
 import pandas as pd
-from hwo.hwo_data import HWOData
+from detectors.hwo_data import HWOData
 
 class DummyConst:
     h = 6.62607015e-34
@@ -98,7 +98,7 @@ def test_calc_planet_flux(monkeypatch):
     monkeypatch.setattr(const, 'h', DummyConst.h)
     monkeypatch.setattr(const, 'c', DummyConst.c)
     monkeypatch.setattr(const, 'k', DummyConst.k)
-    import hwo.hwo_data as hwo_data_mod
+    import detectors.hwo_data as hwo_data_mod
     monkeypatch.setattr(hwo_data_mod, 'HWO', DummyHWO)
     result = hwo.calc_planet_flux('best')
     assert isinstance(result, np.ndarray)
@@ -110,7 +110,7 @@ def test_calc_flux_ratio(monkeypatch):
     monkeypatch.setattr(const, 'h', DummyConst.h)
     monkeypatch.setattr(const, 'c', DummyConst.c)
     monkeypatch.setattr(const, 'k', DummyConst.k)
-    import hwo.hwo_data as hwo_data_mod
+    import detectors.hwo_data as hwo_data_mod
     monkeypatch.setattr(hwo_data_mod, 'HWO', DummyHWO)
     result = hwo.calc_flux_ratio('best')
     assert isinstance(result, np.ndarray)
@@ -123,7 +123,7 @@ def test_calc_photons(monkeypatch):
     monkeypatch.setattr(const, 'c', DummyConst.c)
     monkeypatch.setattr(const, 'k', DummyConst.k)
     monkeypatch.setattr(const, 'pc_to_m', DummyConst.pc_to_m)
-    import hwo.hwo_data as hwo_data_mod
+    import detectors.hwo_data as hwo_data_mod
     monkeypatch.setattr(hwo_data_mod, 'HWO', DummyHWO)
     result = hwo.calc_photons('best')
     assert isinstance(result, np.ndarray)
@@ -136,7 +136,7 @@ def test_determine_detectable(monkeypatch):
     monkeypatch.setattr(const, 'c', DummyConst.c)
     monkeypatch.setattr(const, 'k', DummyConst.k)
     monkeypatch.setattr(const, 'pc_to_m', DummyConst.pc_to_m)
-    import hwo.hwo_data as hwo_data_mod
+    import detectors.hwo_data as hwo_data_mod
     monkeypatch.setattr(hwo_data_mod, 'HWO', DummyHWO)
     result = hwo.determine_detectable()
     assert 'detected_best' in result.columns

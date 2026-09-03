@@ -58,8 +58,8 @@ def _load_attr(modfile: Path, clsname: str, attr: str) -> float:
     return float(getattr(getattr(mod, clsname), attr))
 
 
-CAL_K = _load_attr(ROOT / "lifesim" / "core" / "kepler_data.py", "KeplerData", "MES_OFFICIAL_CALIBRATION")
-CAL_T = _load_attr(ROOT / "lifesim" / "core" / "tess_data.py", "TESSData", "SNR_OFFICIAL_CALIBRATION")
+CAL_K = _load_attr(ROOT / "detectors" / "kepler_data.py", "KeplerData", "MES_OFFICIAL_CALIBRATION")
+CAL_T = _load_attr(ROOT / "detectors" / "tess_data.py", "TESSData", "SNR_OFFICIAL_CALIBRATION")
 
 # (label, directory, glob) for every catalog set that stores a detection statistic.
 KEPLER_DIRS = [

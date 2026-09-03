@@ -42,7 +42,7 @@ import pandas as pd
 
 def find_root(start: Path) -> Path:
     for p in [start, *start.parents]:
-        if (p / "lifesim" / "core" / "tess_data.py").exists():
+        if (p / "detectors" / "tess_data.py").exists():
             return p
     return start.parents[2]
 
@@ -58,7 +58,7 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 def _load_tess_data():
     spec = importlib.util.spec_from_file_location(
-        "tess_data", ROOT / "lifesim" / "core" / "tess_data.py",
+        "tess_data", ROOT / "detectors" / "tess_data.py",
     )
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)

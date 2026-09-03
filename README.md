@@ -4,7 +4,7 @@ Simulates whether planned missions can detect different types of simulated exopl
 These simulations include LIFE, forked from [LIFEsim](https://github.com/fdannert/LIFEsim).
 Additional simulations written for this repo are HWO, TESS, Kepler, HARPS, and NIRPS.
 
-Simulated planets are generated from a modified copy of [P-Pop](https://github.com/fdannert/P-pop) and [chenjj2/forecaster](https://github.com/chenjj2/forecaster).
+Simulated planets are generated from a modified copy of [P-Pop](https://github.com/kammerje/P-pop) and [chenjj2/forecaster](https://github.com/chenjj2/forecaster).
 
 ## Install
 

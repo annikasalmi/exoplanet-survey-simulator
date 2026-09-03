@@ -23,9 +23,9 @@ def _load(name: str, rel: str):
     spec.loader.exec_module(mod)
     return mod
 
-_kep = _load("kepler_data", "lifesim/core/kepler_data.py")
-_tess = _load("tess_data", "lifesim/core/tess_data.py")
-_rv = _load("rv_data", "lifesim/core/rv_data.py")
+_kep = _load("kepler_data", "detectors/kepler_data.py")
+_tess = _load("tess_data", "detectors/tess_data.py")
+_rv = _load("rv_data", "detectors/rv_data.py")
 
 KeplerData = _kep.KeplerData
 TESSData = _tess.TESSData

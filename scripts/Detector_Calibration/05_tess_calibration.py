@@ -54,7 +54,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 try:
-    from lifesim.core.tess_data import TESSData
+    from detectors.tess_data import TESSData
 except Exception as exc:
     raise ImportError(f"Cannot import TESSData. Run from repo root.\n{exc}") from exc
 

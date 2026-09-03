@@ -49,7 +49,7 @@ silicate curve, Hongyi-silicon.ddat, as the overlay), because at fixed radius th
 RV signal depends on mass: the question is specifically whether ROCKY planets of
 that radius are confirmable.
 
-RV model: lifesim/core/rv_data.py (HARPS V-band / NIRPS J-band presets,
+RV model: detectors/rv_data.py (HARPS V-band / NIRPS J-band presets,
 N=100 epochs, K/sigma_K >= 5 with sigma_K = sqrt(2/N)*sigma_RV).
 --instrument best (default) takes the per-planet better of HARPS and NIRPS.
 
@@ -96,7 +96,7 @@ def _load_module(name: str, path: Path):
 # rocky cutoff (UNSHIFTED silicate curve, Hongyi-silicon.ddat). The P-Pop
 # catalogue below is intentionally the non-60pc combined sample.
 S44 = _load_module("s44", ROOT / "plot" / "script plots" / "56_kepler_tess_rocky_fgkm_gaia60pc.py")
-RVData = _load_module("rv_data", ROOT / "lifesim" / "core" / "rv_data.py").RVData
+RVData = _load_module("rv_data", ROOT / "detectors" / "rv_data.py").RVData
 
 TESS_PPOP_DIR = ROOT / "run" / "tess" / "data" / "Gaia_cdpp_v1"
 OUT_DIR = ROOT / "my_outputs" / "58_rv_rocky_fgkm_test"

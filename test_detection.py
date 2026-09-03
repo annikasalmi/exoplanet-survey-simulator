@@ -3,7 +3,7 @@
 import os
 
 from tools.exoplanet_catalog import load_and_filter_exoplanets
-from hwo.hwo_data import HWOData
+from detectors.hwo_data import HWOData
 
 # Load and process data
 print("Loading exoplanet data...")

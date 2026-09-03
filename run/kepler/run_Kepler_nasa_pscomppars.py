@@ -19,7 +19,7 @@ ROOT = find_project_root(Path(__file__).resolve())
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from lifesim.core.kepler_data import KeplerData  # noqa: E402
+from detectors.kepler_data import KeplerData  # noqa: E402
 
 
 NASA_DATA_DIR = ROOT / "run" / "kepler" / "data" / "NASA"

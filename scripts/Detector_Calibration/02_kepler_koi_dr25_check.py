@@ -5,7 +5,7 @@ Report-ready KOI/DR25 validation plots for KeplerData.
 
 Purpose
 -------
-Check whether lifesim.core.kepler_data.KeplerData behaves like a physically
+Check whether detectors.kepler_data.KeplerData behaves like a physically
 reasonable Kepler selection-function model using NASA's KOI cumulative table.
 
 This is NOT a false-positive classifier.
@@ -81,10 +81,10 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 try:
-    from lifesim.core.kepler_data import KeplerData
+    from detectors.kepler_data import KeplerData
 except Exception as exc:
     raise ImportError(
-        "Could not import lifesim.core.kepler_data.KeplerData.\n"
+        "Could not import detectors.kepler_data.KeplerData.\n"
         "Run this script from your mdwarf-habitability repo root, or place it in scripts/.\n"
         f"Detected ROOT = {ROOT}\n"
         f"Original error: {type(exc).__name__}: {exc}"

@@ -35,13 +35,12 @@ if str(ROOT) not in sys.path:
 import numpy as np
 import pandas as pd
 
-# Load KeplerData directly from its file instead of `from lifesim.core.kepler_data
-# import KeplerData`. The lifesim package __init__ eagerly imports the GUI
-# Instrument (PyQt5/spectres), which is irrelevant to this headless recompute and
-# may be absent. kepler_data.py itself only needs numpy/pandas (its lifesim.core
-# imports are wrapped in try/except), so this loads cleanly on its own.
+# This file-path loader dates from when kepler_data.py lived in lifesim/core/, so
+# importing it dragged in the lifesim package __init__ and with it the GUI
+# Instrument (PyQt5/spectres). It now lives in detectors/, whose __init__ imports
+# nothing, so `from detectors.kepler_data import KeplerData` would do just as well.
 def _load_kepler_data_class():
-    path = ROOT / "lifesim" / "core" / "kepler_data.py"
+    path = ROOT / "detectors" / "kepler_data.py"
     spec = importlib.util.spec_from_file_location("kepler_data_standalone", path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)

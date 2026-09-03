@@ -59,7 +59,7 @@ NASA_FILE = (ROOT / "run" / "kepler" / "data" / "NASA"
 OUT_DIR = ROOT / "my_outputs" / "57_rv_mr_detection"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-_spec = importlib.util.spec_from_file_location("rv_data", ROOT / "lifesim" / "core" / "rv_data.py")
+_spec = importlib.util.spec_from_file_location("rv_data", ROOT / "detectors" / "rv_data.py")
 _rv = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_rv)
 RVData = _rv.RVData

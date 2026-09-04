@@ -19,8 +19,10 @@ from run.lifesim.lifesim_run_multiple import main as main_lifesim
 from run.hwo.hwo_run_multiple import main as main_hwo
 from run.kepler.run_kepler import main as main_kepler
 from run.tess.run_tess import main as main_tess
+from run.flat_universe.run_flat_universe import main as main_flat_universe
 
-from plot.plot import plot_all
+from output.plots.plot import plot_all
+from output.plots.plot_flat_universe import plot_flat_universe
 from tools.exoplanet_catalog import load_and_filter_exoplanets
 
 def run_with_progress(func, name, estimated_minutes=12, *args, **kwargs):
@@ -65,13 +67,21 @@ def run_sim(func=main_hwo, name='hwo', parallel=True, nruns=500, star_catalog='G
         minutes = int((elapsed % 3600) // 60)
         seconds = int(elapsed % 60)
         print(f"\nSimulation completed in: {hours}:{minutes:02d}:{seconds:02d}")
-    bins = [0, 1.5, 3.0, 6.0]
-    labels = ['<1.5', '1.5–3.0', '3.0–6.0']
-    df_concat['radius_bin'] = pd.cut(df_concat['radius_p'], bins=bins, labels=labels, include_lowest=True)
+    if 'radius_bin' not in df_concat.columns:
+        bins = [0, 1.5, 3.0, 6.0]
+        labels = ['<1.5', '1.5–3.0', '3.0–6.0']
+        df_concat['radius_bin'] = pd.cut(df_concat['radius_p'], bins=bins, labels=labels, include_lowest=True)
+
     if plot:
         plot_start_time = time.time()
         print(f"Starting plotting...")
-        plot_all(df=df_concat, sim_name=name, nruns=len(nruns), star_catalog=star_catalog, use_multiprocessing=False)
+
+        # Use dedicated plotter for flat_universe
+        if name.lower() == 'flat_universe':
+            plot_flat_universe(df=df_concat, nruns=len(nruns), use_multiprocessing=False)
+        else:
+            plot_all(df=df_concat, sim_name=name, nruns=len(nruns), star_catalog=star_catalog, use_multiprocessing=False)
+
         plot_end_time = time.time()
         plot_elapsed = plot_end_time - plot_start_time
         plot_hours = int(plot_elapsed // 3600)

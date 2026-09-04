@@ -41,6 +41,8 @@ import sys
 
 import numpy as np
 import pandas as pd
+
+from tools.paths import SILICON_CURVE
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -137,7 +139,7 @@ REF_CURVE_PATH = ROOT / "run" / "kepler" / "reference_curves" / "ref.ddat"
 # filter out puffy (non-rocky) planets everywhere in this script. The loader
 # reads cols 0,1 and the threshold is anchored to LHS 1140 b via an automatic
 # (here ~0) vertical shift.
-ROCKY_CURVE_PATH  = ROOT / "silicon_curve.ddat"
+ROCKY_CURVE_PATH  = Path(SILICON_CURVE)
 ROCKY_CURVE_LABEL = "silicate rocky curve"
 
 NASA_DATA_DIR = ROOT / "run" / "kepler" / "data" / "NASA"

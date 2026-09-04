@@ -91,7 +91,7 @@ def _occupant_table(sub):
 
 
 def census():
-    s15 = _load("s15_census", ROOT / "important_plots" / "rocky_scatter_gaia60pc.py")
+    s15 = _load("s15_census", ROOT / "output" / "plots" / "scripts" / "analysis" / "multi" / "rocky_scatter_gaia60pc.py")
     m_ref, r_ref = s15.load_rocky_reference_curve()
     shift = s15.compute_rocky_threshold_shift(m_ref, r_ref)
 
@@ -190,7 +190,7 @@ def fvol():
     print("\n--> script 17 table (flat + P-Pop, four cuts), relaxed cuts:")
     S72.main()
 
-    s20 = _load("s20_v2", ROOT / "important_plots" / "flat_rocky_mr_vs_nasa.py")
+    s20 = _load("s20_v2", ROOT / "output" / "plots" / "scripts" / "analysis" / "multi" / "flat_rocky_mr_vs_nasa.py")
     s20.S72.NASA_MASS_PREC = NEW_MASS_PREC
     s20.S72.NASA_RAD_PREC = NEW_RAD_PREC
     s20.S72.N_REPEATS = N_REPEATS
@@ -395,7 +395,7 @@ def specs():
     mass_mins = [1.5, 2.0, 2.5]
     spec_draws = 1000
 
-    s15 = _load("s15_specs", ROOT / "important_plots" / "rocky_scatter_gaia60pc.py")
+    s15 = _load("s15_specs", ROOT / "output" / "plots" / "scripts" / "analysis" / "multi" / "rocky_scatter_gaia60pc.py")
     m_ref, r_ref = s15.load_rocky_reference_curve()
     shift = s15.compute_rocky_threshold_shift(m_ref, r_ref)
 
@@ -487,7 +487,7 @@ def specs():
 
 
 def xcold(s_max=10.0):
-    s15 = _load("s15_xcold", ROOT / "important_plots" / "rocky_scatter_gaia60pc.py")
+    s15 = _load("s15_xcold", ROOT / "output" / "plots" / "scripts" / "analysis" / "multi" / "rocky_scatter_gaia60pc.py")
     m_ref, r_ref = s15.load_rocky_reference_curve()
     shift = s15.compute_rocky_threshold_shift(m_ref, r_ref)
 
@@ -551,7 +551,7 @@ def xcold(s_max=10.0):
     print("  building P-Pop pool...")
     pools = {"P-Pop": S72.build_pool("ppop", m_sil, r_sil)}
     print("  building flat-Otegi pool...")
-    s20 = _load("s20_xc", ROOT / "important_plots" / "flat_rocky_mr_vs_nasa.py")
+    s20 = _load("s20_xc", ROOT / "output" / "plots" / "scripts" / "analysis" / "multi" / "flat_rocky_mr_vs_nasa.py")
     pools["Flat-Otegi"] = s20.build_arrays(dict(mr_C=1.03, mr_beta=0.29), m_sil, r_sil)
     for label, cut in cuts:
         n_mu, n_sd = bells[label]
@@ -573,7 +573,7 @@ def design(n_draw=2_000_000):
     from run.ppop.uniform_generator import generate_flat_catalog
     from run.ppop.flat_detect import run_kepler, run_tess, run_rv_best, TESSData
 
-    s15 = _load("s15_design", ROOT / "important_plots" / "rocky_scatter_gaia60pc.py")
+    s15 = _load("s15_design", ROOT / "output" / "plots" / "scripts" / "analysis" / "multi" / "rocky_scatter_gaia60pc.py")
     m_ref, r_ref = s15.load_rocky_reference_curve()
 
     print(f"\nFlat-Otegi universe, N={n_draw:,} draws, GKM hosts only (teff 2300-6000 K).")

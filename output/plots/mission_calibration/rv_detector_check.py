@@ -48,7 +48,8 @@ try:
 except Exception:
     pass
 
-ROOT = Path(__file__).resolve().parents[2]
+from tools.paths import LIFESIM_OUTER_DIR
+ROOT = Path(LIFESIM_OUTER_DIR)
 PPOP_DIR = ROOT / "run" / "tess" / "data" / "Gaia_C_F_K_combined_cdpp_v1"
 RVAMP_CACHE = ROOT / "run" / "kepler" / "data" / "NASA" / "NASA_PSCompPars_rvamp_calibration.csv"
 OUT_DIR = ROOT / "output" / "plots" / "mission_calibration" / "rv_detector_check"

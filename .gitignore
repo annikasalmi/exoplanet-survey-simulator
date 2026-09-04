@@ -21,12 +21,12 @@ htmlcov/
 /run/logging/*/*.txt
 
 # Simulation data products
-/telescopes/kepler/data/*.csv
-/telescopes/kepler/data/*/*.csv
-/telescopes/tess/data/*.csv
-/telescopes/tess/data/*/*.csv
-/telescopes/hwo/data/*.csv
-/telescopes/hwo/data/*/*.csv
+/run/kepler/data/*.csv
+/run/kepler/data/*/*.csv
+/run/tess/data/*.csv
+/run/tess/data/*/*.csv
+/run/hwo/data/*.csv
+/run/hwo/data/*/*.csv
 /run/lifesim/data/*.hdf5
 /run/lifesim/data/*.yaml
 /run/lifesim/data/*/*.hdf5
@@ -90,3 +90,8 @@ dist/
 !PPop/UPSTREAM.md
 !lifesim/UPSTREAM.md
 !results/README.md
+
+# Generated plot output
+/output/figures/
+my_outputs/*/*.png
+my_outputs/*/*.csv

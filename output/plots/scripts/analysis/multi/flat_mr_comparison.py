@@ -57,7 +57,7 @@ def _load(name, path):
 
 
 # reuse script 72's puffy machinery + updated NASA method (precision cut + per-planet perturbation)
-S72 = _load("s72", str(ROOT / "scripts" / "statistical_analysis" / "puffy_cuts_flat.py"))
+S72 = _load("s72", str(ROOT / "output" / "plots" / "scripts" / "analysis" / "multi" / "puffy_cuts_flat.py"))
 S72.N_REPEATS = 4000            # bells smooth at 4k; keeps the 12-panel run quick
 
 OUT_DIR = os.path.join(ROOT, "output/plots", "19_flat_mr_comparison")

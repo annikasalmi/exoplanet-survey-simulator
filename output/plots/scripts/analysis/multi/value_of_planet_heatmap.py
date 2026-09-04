@@ -48,7 +48,7 @@ Outputs (output/plots/45_value_of_planet_heatmap/):
     value_heatmap.png (2x2 panels, one per relation, delta_sigma heatmap) + value_table.csv
 
 Run:
-    python "scripts/statistical_analysis/45_value_of_planet_heatmap.py"
+    python "output/plots/scripts/analysis/multi/45_value_of_planet_heatmap.py"
 """
 
 from __future__ import annotations
@@ -85,7 +85,7 @@ def _load(name, path):
     return mod
 
 
-S77 = _load("s77", str(ROOT / "important_plots" / "flat_rocky_mr_vs_nasa.py"))
+S77 = _load("s77", str(ROOT / "output" / "plots" / "scripts" / "analysis" / "multi" / "flat_rocky_mr_vs_nasa.py"))
 S72 = S77.S72                    # already loaded by S77, N_REPEATS = 4000
 
 OUT_DIR = os.path.join(ROOT, "output/plots", "45_value_of_planet_heatmap")

@@ -34,7 +34,7 @@ Outputs (output/plots/38_hierarchical_poisson_occurrence/):
     hier_poisson_occurrence.png, posterior_summary.csv, cell_table.csv
 
 Run:
-    python "scripts/statistical_analysis/38_hierarchical_poisson_occurrence.py"
+    python "output/plots/scripts/analysis/multi/38_hierarchical_poisson_occurrence.py"
 """
 
 from __future__ import annotations
@@ -72,7 +72,7 @@ def _load(name, path):
     return mod
 
 
-S79 = _load("s79", str(ROOT / "scripts" / "statistical_analysis" / "35_corner_occupancy_poisson.py"))
+S79 = _load("s79", str(ROOT / "output" / "plots" / "scripts" / "analysis" / "multi" / "35_corner_occupancy_poisson.py"))
 
 OUT_DIR = os.path.join(ROOT, "output/plots", "38_hierarchical_poisson_occurrence")
 POOL_CACHE = os.path.join(OUT_DIR, f"flat_pool_seed{S79.RNG_SEED}_n{S79.FLAT_N_POOL}.npz")

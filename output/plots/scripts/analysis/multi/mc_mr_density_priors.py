@@ -34,7 +34,8 @@ import sys
 import importlib.util
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+from tools.paths import LIFESIM_OUTER_DIR
+ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -60,7 +61,7 @@ def _load(name, path):
     return mod
 
 
-S41 = _load("s41", str(ROOT / "scripts" / "statistical_analysis" / "bayesian_cold_rocky_desert.py"))
+S41 = _load("s41", str(ROOT / "output" / "plots" / "scripts" / "analysis" / "multi" / "bayesian_cold_rocky_desert.py"))
 
 OUT_DIR = os.path.join(ROOT, "my_outputs", "mc_mr_density_priors")
 N_MC = 4000        # Monte Carlo noise realizations per prior per panel

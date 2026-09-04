@@ -29,7 +29,7 @@ Outputs (output/plots/46_systematic_floor/):
     floor_table.csv + printed table, systematic_floor.png
 
 Run:
-    python "scripts/statistical_analysis/46_systematic_floor.py"
+    python "output/plots/scripts/analysis/multi/46_systematic_floor.py"
 """
 
 from __future__ import annotations

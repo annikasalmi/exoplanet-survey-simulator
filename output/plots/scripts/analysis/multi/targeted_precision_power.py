@@ -31,7 +31,7 @@ Outputs (output/plots/49_targeted_precision_power/ + paper/figures_v2/):
     precision_power.png, remeasurement_value.png, precision_table.csv, candidate_value.csv
 
 Run (from repo root, PYTHONPATH set):
-    python "scripts/statistical_analysis/49_targeted_precision_power.py"
+    python "output/plots/scripts/analysis/multi/49_targeted_precision_power.py"
 """
 
 from __future__ import annotations
@@ -68,7 +68,7 @@ def _load(name, path):
     return mod
 
 
-S77 = _load("s77", str(ROOT / "important_plots" / "flat_rocky_mr_vs_nasa.py"))
+S77 = _load("s77", str(ROOT / "output" / "plots" / "scripts" / "analysis" / "multi" / "flat_rocky_mr_vs_nasa.py"))
 S72 = S77.S72
 
 # relaxed thresholds, identical to script 48

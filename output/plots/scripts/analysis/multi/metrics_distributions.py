@@ -31,6 +31,8 @@ if str(ROOT) not in sys.path:
 
 import numpy as np
 import pandas as pd
+
+from tools.paths import SILICON_CURVE
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -45,7 +47,7 @@ from run.ppop.uniform_generator import generate_flat_catalog
 from run.ppop.flat_detect import run_kepler, run_rv_best
 from run.ppop import universe_metrics as UM
 
-SILICATE_CURVE = ROOT / "silicon_curve.ddat"
+SILICATE_CURVE = Path(SILICON_CURVE)
 PPOP_CATALOG = ROOT / "run" / "kepler" / "data" / "Gaia" / "kepler_catalog_0.csv"
 NASA_FILE = (ROOT / "run" / "kepler" / "data" / "NASA"
              / "NASA_PSCompPars_transiting_confirmed_RM_insolation_errors_limits.csv")

@@ -39,7 +39,8 @@ import os
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+from tools.paths import LIFESIM_OUTER_DIR, SILICON_CURVE
+ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -53,7 +54,7 @@ from run.flat_universe.uniform_generator import get_or_build_catalog, UNIFORM_OU
 from run.ppop.flat_detect import run_kepler, run_rv_best
 
 # ---------------- settings ----------------
-SILICATE_CURVE = ROOT / "silicon_curve.ddat"
+SILICATE_CURVE = Path(SILICON_CURVE)
 PPOP_CATALOG = ROOT / "run" / "kepler" / "data" / "Gaia" / "kepler_catalog_0.csv"
 OUT_DIR = os.path.join(ROOT, "my_outputs", "two_universe_puffy_overlap")
 

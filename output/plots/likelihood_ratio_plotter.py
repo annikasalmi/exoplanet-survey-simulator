@@ -53,7 +53,8 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+from tools.paths import LIFESIM_OUTER_DIR, SILICON_CURVE, EXOPLANET_CSV_DIR
+ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -77,9 +78,8 @@ except Exception:
 from run.flat_universe.uniform_generator import generate_flat_catalog
 from run.ppop.flat_detect import run_kepler, run_rv_best
 
-SILICATE_CURVE = ROOT / "silicon_curve.ddat"
-NASA_FILE = (ROOT / "run" / "kepler" / "data" / "NASA"
-             / "NASA_PSCompPars_transiting_confirmed_RM_insolation_errors_limits.csv")
+SILICATE_CURVE = Path(SILICON_CURVE)
+NASA_FILE = Path(EXOPLANET_CSV_DIR) / "exoplanets_2026.csv"
 OUT_DIR = os.path.join(ROOT, "my_outputs", "likelihood_ratio_catalog")
 
 FLAT_N_POOL = 1_000_000
@@ -127,7 +127,7 @@ def _sigma_log(err_hi, err_lo, value, floor, missing):
 
 
 def load_nasa(precision: bool):
-    df = pd.read_csv(NASA_FILE)
+    df = pd.read_csv(NASA_FILE, comment="#", low_memory=False)
     m = pd.to_numeric(df["pl_bmasse"], errors="coerce")
     r = pd.to_numeric(df["pl_rade"], errors="coerce")
     ins = pd.to_numeric(df["pl_insol"], errors="coerce")
@@ -168,33 +168,24 @@ def load_nasa(precision: bool):
 
 
 # ---------------------------------------------------------------- STEP 1: forward sim
-def get_detected_pool():
-    """Flat pool -> joint Kepler+RV detection, cached. Returns TRUE parameters of the
-    joint-detected planets + their TRUE-corner membership (universe B; A = ~corner)."""
-    cache = os.path.join(OUT_DIR, f"flat_joint_detected_N{FLAT_N_POOL}_seed{RNG_SEED}.csv")
-    if os.path.exists(cache):
-        det = pd.read_csv(cache)
-        print(f"    loaded cached joint-detected pool: {len(det)} planets ({cache})")
-    else:
-        print(f"    building flat pool (N={FLAT_N_POOL}, seed={RNG_SEED}) + detectors ...")
-        pool = generate_flat_catalog(n_planets=FLAT_N_POOL, seed=RNG_SEED)
-        td = run_kepler(pool)["detected"].to_numpy(bool)
-        rd = run_rv_best(pool, mag_target=RV_MAG_TARGET)["detected"].to_numpy(bool)
-        joint = td & rd
-        m_sil, r_sil = load_silicate()
-        det = pd.DataFrame({
-            "mass": pool["mass_p"].to_numpy(float)[joint],
-            "radius": pool["radius_p"].to_numpy(float)[joint],
-            "flux": pool["flux_p"].to_numpy(float)[joint],
-            "teff": pool["teff_s"].to_numpy(float)[joint],
-        })
-        rocky = det["radius"].to_numpy() < np.interp(det["mass"].to_numpy(), m_sil, r_sil)
-        det["corner"] = rocky & (det["mass"].to_numpy() > MASS_MIN) & \
-            (det["flux"].to_numpy() < COLD_MAX)
-        os.makedirs(OUT_DIR, exist_ok=True)
-        det.to_csv(cache, index=False)
-        print(f"    joint-detected {len(det)}/{FLAT_N_POOL} "
-              f"({100 * len(det) / FLAT_N_POOL:.2f}%); cached -> {cache}")
+def get_detected_pool(df):
+    """TRUE parameters of joint (Kepler AND RV) detected planets, from the
+    flat universe produced by run_flat_universe. Universe B is the keep-all
+    population; universe A drops rocky M>2 and is not the pool used here."""
+    pool = df[df["universe_type"] == "B"]
+    joint = (pool["kepler_detected"].to_numpy(bool)
+             & pool["rv_detected"].to_numpy(bool))
+    m_sil, r_sil = load_silicate()
+    det = pd.DataFrame({
+        "mass": pool["mass_p"].to_numpy(float)[joint],
+        "radius": pool["radius_p"].to_numpy(float)[joint],
+        "flux": pool["flux_p"].to_numpy(float)[joint],
+        "teff": pool["teff_s"].to_numpy(float)[joint],
+    })
+    rocky = det["radius"].to_numpy() < np.interp(det["mass"].to_numpy(), m_sil, r_sil)
+    det["corner"] = rocky & (det["mass"].to_numpy() > MASS_MIN) & \
+        (det["flux"].to_numpy() < COLD_MAX)
+    print(f"    joint-detected {len(det)}/{len(pool)} ({100*len(det)/len(pool):.2f}%)")
     pi = det["corner"].mean()
     print(f"    TRUE-corner share of detected planets (pi, universe B): {100 * pi:.2f}%  "
           f"({int(det['corner'].sum())} corner planets)")
@@ -688,12 +679,12 @@ def explainer_verdict(cfg, m_sil, r_sil):
     print(f"--> Saved: {out}")
 
 
-def main():
+def main(df):
     os.makedirs(OUT_DIR, exist_ok=True)
     m_sil, r_sil = load_silicate()
 
     print("STEP 1 — FORWARD SIM (shared): flat pool -> joint Kepler+RV detection")
-    det = get_detected_pool()
+    det = get_detected_pool(df)
 
     print("\n--> loading NASA samples")
     nasa_prec = load_nasa(True)
@@ -741,5 +732,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    from run.flat_universe.run_flat_universe import main as run_flat
+    main(run_flat(seed=RNG_SEED, n_planets=FLAT_N_POOL))
 DOWNLOAD_NASA_DATA = False  # Set to True to download fresh data, False to use local CSV

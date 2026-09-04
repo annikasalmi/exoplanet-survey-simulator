@@ -20,7 +20,7 @@ ROOT = HERE.parents[1]
 sys.path.insert(0, str(ROOT))
 
 _spec = importlib.util.spec_from_file_location(
-    "rocky_scatter_gaia60pc", ROOT / "important_plots" / "rocky_scatter_gaia60pc.py")
+    "rocky_scatter_gaia60pc", ROOT / "output" / "plots" / "scripts" / "analysis" / "multi" / "rocky_scatter_gaia60pc.py")
 s15 = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(s15)
 

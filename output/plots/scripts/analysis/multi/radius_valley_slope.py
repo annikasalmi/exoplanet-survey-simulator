@@ -37,6 +37,8 @@ if str(ROOT) not in sys.path:
 
 import numpy as np
 import pandas as pd
+
+from tools.paths import SILICON_CURVE
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -65,7 +67,7 @@ PHOTOEVAP_BETA_I = +0.07       # thermal mass loss (Van Eylen 2018: dlogR/dlogP=
 GASPOOR_BETA_I = -0.08         # gas-poor / primordial (dlogR/dlogP=+0.11)
 
 # silicate (pure-rock) curve from the rest of the project -> the rocky/puffy boundary
-SILICATE_CURVE = ROOT / "silicon_curve.ddat"
+SILICATE_CURVE = Path(SILICON_CURVE)
 SIL_MASS_LO, SIL_MASS_HI = 3.0, 10.0   # super-Earth mass range for the rock-radius band
 
 

@@ -17,8 +17,8 @@ from telescopes.tess.detection_model import TESSData
 
 from run.lifesim.lifesim_run_multiple import main as main_lifesim
 from run.hwo.hwo_run_multiple import main as main_hwo
-from run.kepler.run_Kepler import main as main_kepler #added by Hongyi
-from run.tess.run_TESS import main as main_tess
+from run.kepler.run_kepler import main as main_kepler
+from run.tess.run_tess import main as main_tess
 
 from plot.plot import plot_all
 from tools.exoplanet_catalog import load_and_filter_exoplanets

@@ -2,11 +2,11 @@ import multiprocessing as mp
 from functools import partial
 import matplotlib
 import os
-from plot.plot_by_type import PlotPlanetType
-from plot.plot_by_type_LTC3 import PlotPlanetTypeLTC3, PlanetDetectionPlotterLTC3 
-from plot.plot_detections import PlanetDetectionPlotter
-from plot.plot_rejections import PlanetRejectionPlotter
-from plot.plot_hz_limits import PlotHZLimits
+from output.plots.plot_by_type import PlotPlanetType
+from output.plots.plot_by_type_LTC3 import PlotPlanetTypeLTC3, PlanetDetectionPlotterLTC3
+from output.plots.plot_detections import PlanetDetectionPlotter
+from output.plots.plot_rejections import PlanetRejectionPlotter
+from output.plots.plot_hz_limits import PlotHZLimits
 import matplotlib.pyplot as plt
 
 plt.rcParams.update({'font.size': 16})

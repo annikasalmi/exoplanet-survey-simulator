@@ -31,6 +31,7 @@ htmlcov/
 /run/lifesim/data/*.yaml
 /run/lifesim/data/*/*.hdf5
 /run/lifesim/data/*/*.yaml
+/run/flat_universe/data/*.csv
 
 # PPop generated
 /PPop/data/

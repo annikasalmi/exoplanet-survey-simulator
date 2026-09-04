@@ -53,7 +53,7 @@ import pandas as pd
 
 
 # Default output location for cached flat catalogues.
-UNIFORM_OUT_DIR = os.path.join(ROOT, "my_outputs", "uniform_box")
+UNIFORM_OUT_DIR = os.path.join(ROOT, "output/plots", "uniform_box")
 
 # Default parameter box (matches P-Pop bounds; small-planet focus per request).
 DEFAULTS = dict(

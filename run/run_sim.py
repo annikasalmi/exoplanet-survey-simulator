@@ -10,9 +10,9 @@ import logging
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from tools.paths import LOGGING, LIFESIM_OUTER_DIR
-from detectors.hwo_data import HWOData
-from detectors.kepler_data import KeplerData #added by Hongyi
-from detectors.tess_data import TESSData
+from telescopes.hwo.detection_model import HWOData
+from telescopes.kepler.detection_model import KeplerData #added by Hongyi
+from telescopes.tess.detection_model import TESSData
 
 
 from run.lifesim.lifesim_run_multiple import main as main_lifesim

@@ -23,7 +23,7 @@ import pandas as pd
 
 from PPop.StarCatalogs import CrossfieldBrightSample, ExoCat_1, LTC_2, LTC_3, gaia
 from run.ppop.ppop_generator import PPop
-from detectors.tess_data import TESSData
+from telescopes.tess.detection_model import TESSData
 
 try:
     from tools.paths import TESS_DATA_DIR

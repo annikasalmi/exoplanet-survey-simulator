@@ -1,5 +1,0 @@
-2025-07-17 15:37:38,756 - Starting function 'main'...
-2025-07-17 15:37:38,764 - Progress: 0 / 720 seconds
-2025-07-17 15:37:38,795 - Error during 'main': 'int' object is not iterable
-2025-07-17 15:37:39,769 - Progress complete.
-2025-07-17 15:37:39,770 - Progress thread joined. Wrapper complete.

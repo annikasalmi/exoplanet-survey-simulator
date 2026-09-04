@@ -67,6 +67,7 @@ PAPER_FIG_DIR.mkdir(parents=True, exist_ok=True)
 
 SNR_THRESHOLD = 7.1
 MIN_CELL_N = 20
+DOWNLOAD_NASA_DATA = False  # Set to True to download fresh data, False to use local CSV
 
 plt.rcParams.update({
     "figure.dpi": 120, "savefig.dpi": 260,
@@ -110,6 +111,19 @@ def load_or_download(redownload: bool = False) -> pd.DataFrame:
     if CACHE.exists() and not redownload:
         print(f"Loading cached TOI table: {CACHE}")
         return pd.read_csv(CACHE, low_memory=False)
+
+    # Try local data first if DOWNLOAD_NASA_DATA is False
+    if not DOWNLOAD_NASA_DATA:
+        local_tess = ROOT / "data" / "exoplanet_csv" / "tess_exoplanets_2026.csv"
+        if local_tess.exists():
+            print(f"Loading local TESS data: {local_tess}")
+            df = pd.read_csv(local_tess, low_memory=False)
+            df.to_csv(CACHE, index=False)
+            print(f"Cached to: {CACHE}")
+            return df
+        else:
+            print(f"Local data not found at {local_tess}, will attempt download")
+
     print(f"Downloading ExoFOP TESS TOI catalog...")
     try:
         df = pd.read_csv(EXOFOP_TOI_URL, low_memory=False)

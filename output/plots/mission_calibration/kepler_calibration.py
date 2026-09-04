@@ -56,6 +56,7 @@ PAPER_FIG_DIR.mkdir(parents=True, exist_ok=True)
 
 MES_THRESHOLD = 7.1
 MIN_CELL_N = 20
+DOWNLOAD_NASA_DATA = False  # Set to True to download fresh data, False to use local CSV
 
 plt.rcParams.update({
     "figure.dpi": 120, "savefig.dpi": 260,
@@ -94,6 +95,18 @@ def load_or_download(redownload: bool = False) -> pd.DataFrame:
     if CACHE.exists() and not redownload:
         print(f"Loading cached KOI+stellar: {CACHE}")
         return pd.read_csv(CACHE, low_memory=False)
+
+    # Try local data first if DOWNLOAD_NASA_DATA is False
+    if not DOWNLOAD_NASA_DATA:
+        local_kepler = ROOT / "data" / "exoplanet_csv" / "kepler_exoplanets_2026.csv"
+        if local_kepler.exists():
+            print(f"Loading local Kepler data: {local_kepler}")
+            df = pd.read_csv(local_kepler, low_memory=False)
+            df.to_csv(CACHE, index=False)
+            print(f"Cached to: {CACHE}")
+            return df
+        else:
+            print(f"Local data not found at {local_kepler}, will attempt download")
 
     cdpp_select = ", ".join(f"s.{c}" for c in CDPP_COLS)
     query = f"""

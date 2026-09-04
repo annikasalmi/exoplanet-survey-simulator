@@ -93,10 +93,16 @@ TESS_PPOP_DIR   = ROOT / "run" / "tess"   / "data" / "Gaia_cdpp_v1"
 
 def _ppop_files(directory: Path, stem: str) -> list[Path]:
     """Return <stem>_<i>.csv for i in 0..N_UNIVERSES-1 PLUS any top-up universes
-    with index >= EXTRA_START_INDEX, in order."""
+    with index >= EXTRA_START_INDEX, in order. Falls back to local CSV if DOWNLOAD_NASA_DATA=False."""
     wanted = [directory / f"{stem}_{i}.csv" for i in range(N_UNIVERSES)]
     present = [f for f in wanted if f.exists()]
     if not present:
+        # Fallback to local CSV when run/ catalogs don't exist
+        if not DOWNLOAD_NASA_DATA:
+            local_csv = ROOT / "data" / "exoplanet_csv" / "exoplanets_2026.csv"
+            if local_csv.exists():
+                print(f"No P-Pop catalogs in {directory}, using local CSV: {local_csv}")
+                return [local_csv]
         raise FileNotFoundError(
             f"No P-Pop catalogs found in {directory} for stem '{stem}' "
             f"(expected {stem}_0.csv .. {stem}_{N_UNIVERSES - 1}.csv)"
@@ -1364,3 +1370,4 @@ if __name__ == "__main__":
         import traceback
         traceback.print_exc()
         sys.exit(1)
+DOWNLOAD_NASA_DATA = False  # Set to True to download fresh data, False to use local CSV

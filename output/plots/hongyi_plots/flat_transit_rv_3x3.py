@@ -293,3 +293,4 @@ if __name__ == "__main__":
         import traceback
         traceback.print_exc()
         sys.exit(1)
+DOWNLOAD_NASA_DATA = False  # Set to True to download fresh data, False to use local CSV

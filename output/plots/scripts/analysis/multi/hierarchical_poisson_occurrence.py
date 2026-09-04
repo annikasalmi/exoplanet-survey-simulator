@@ -47,7 +47,8 @@ import time
 import importlib.util
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+from tools.paths import LIFESIM_OUTER_DIR
+ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -72,7 +73,7 @@ def _load(name, path):
     return mod
 
 
-S79 = _load("s79", str(ROOT / "output" / "plots" / "scripts" / "analysis" / "multi" / "35_corner_occupancy_poisson.py"))
+S79 = _load("s79", str(ROOT / "output" / "plots" / "scripts" / "analysis" / "multi" / "corner_occupancy_poisson.py"))
 
 OUT_DIR = os.path.join(ROOT, "output/plots", "38_hierarchical_poisson_occurrence")
 POOL_CACHE = os.path.join(OUT_DIR, f"flat_pool_seed{S79.RNG_SEED}_n{S79.FLAT_N_POOL}.npz")

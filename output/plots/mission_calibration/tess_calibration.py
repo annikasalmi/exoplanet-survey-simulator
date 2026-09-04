@@ -49,7 +49,7 @@ try:
 except Exception:
     pass
 
-from tools.paths import LIFESIM_OUTER_DIR
+from tools.paths import LIFESIM_OUTER_DIR, EXOFOP_TOI_CSV
 ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -109,29 +109,26 @@ EXOFOP_TOI_URL = "https://exofop.ipac.caltech.edu/tess/download_toi.php?sort=toi
 
 
 def load_or_download(redownload: bool = False) -> pd.DataFrame:
-    if CACHE.exists() and not redownload:
-        print(f"Loading cached TOI table: {CACHE}")
-        return pd.read_csv(CACHE, comment="#", low_memory=False)
+    """ExoFOP TOI table.
 
-    # Try local data first if DOWNLOAD_NASA_DATA is False
-    if not DOWNLOAD_NASA_DATA:
-        local_tess = ROOT / "data" / "exoplanet_csv" / "tess_exoplanets_2026.csv"
-        if local_tess.exists():
-            print(f"Loading local TESS data: {local_tess}")
-            df = pd.read_csv(local_tess, comment="#", low_memory=False)
-            # Validated against SPOC SNR from the ExoFOP TOI table, whose columns
-            # ("Period (days)", "TESS Mag", ...) differ from a planetary-systems
-            # export. Filtering exoplanets_2026.csv cannot supply them.
-            if "Period (days)" not in df.columns:
-                raise RuntimeError(
-                    f"{local_tess.name} is not an ExoFOP TOI table (no 'Period "
-                    "(days)' column). Set DOWNLOAD_NASA_DATA = True to fetch the "
-                    "TOI table from ExoFOP.")
-            df.to_csv(CACHE, index=False)
-            print(f"Cached to: {CACHE}")
-            return df
-        else:
-            print(f"Local data not found at {local_tess}, will attempt download")
+    Reads the copy in data/ by default. Only downloads when DOWNLOAD_NASA_DATA is
+    True (or redownload is passed), and writes what it fetches back to data/ so
+    the next run is offline.
+    """
+    local = Path(EXOFOP_TOI_CSV)
+    if local.exists() and not (DOWNLOAD_NASA_DATA or redownload):
+        print(f"Loading local TOI table: {local}")
+        df = pd.read_csv(local, comment="#", low_memory=False)
+        if "Period (days)" not in df.columns:
+            raise RuntimeError(
+                f"{local.name} is not an ExoFOP TOI table (no 'Period (days)' "
+                "column). Set DOWNLOAD_NASA_DATA = True to refresh it.")
+        return df
+
+    if not (DOWNLOAD_NASA_DATA or redownload):
+        raise RuntimeError(
+            f"{local} not found. Set DOWNLOAD_NASA_DATA = True to fetch the TOI "
+            "table from ExoFOP.")
 
     print(f"Downloading ExoFOP TESS TOI catalog...")
     try:

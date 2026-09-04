@@ -27,7 +27,8 @@ from pathlib import Path
 
 import numpy as np
 
-ROOT = Path(__file__).resolve().parents[2]
+from tools.paths import LIFESIM_OUTER_DIR
+ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 warnings.filterwarnings("ignore")

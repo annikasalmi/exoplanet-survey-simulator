@@ -22,14 +22,14 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import numpy as np
 import pandas as pd
 
-from tools.paths import SILICON_CURVE
+from tools.paths import LIFESIM_OUTER_DIR, SILICON_CURVE
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt

@@ -9,7 +9,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parents[1]
+from tools.paths import LIFESIM_OUTER_DIR
+ROOT = Path(LIFESIM_OUTER_DIR)
 KEP = ROOT / "run" / "kepler" / "data" / "Gaia"
 TES = ROOT / "run" / "tess" / "data" / "Gaia_cdpp_v1"
 FLUX = (0.1, 1e4)

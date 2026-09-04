@@ -38,7 +38,7 @@ try:
 except Exception:
     pass
 
-from tools.paths import LIFESIM_OUTER_DIR
+from tools.paths import LIFESIM_OUTER_DIR, KOI_CUMULATIVE_CSV
 ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -93,31 +93,28 @@ def nasa_tap_url(query: str) -> str:
 
 
 def load_or_download(redownload: bool = False) -> pd.DataFrame:
-    if CACHE.exists() and not redownload:
-        print(f"Loading cached KOI+stellar: {CACHE}")
-        return pd.read_csv(CACHE, comment="#", low_memory=False)
+    """KOI cumulative + stellar CDPP.
 
-    # Try local data first if DOWNLOAD_NASA_DATA is False
-    if not DOWNLOAD_NASA_DATA:
-        local_kepler = ROOT / "data" / "exoplanet_csv" / "kepler_exoplanets_2026.csv"
-        if local_kepler.exists():
-            print(f"Loading local Kepler data: {local_kepler}")
-            df = pd.read_csv(local_kepler, comment="#", low_memory=False)
-            # This script compares our toy MES against the official KOI MES, which
-            # lives in the KOI cumulative table. A planetary-systems export does not
-            # carry it, and no filtering of exoplanets_2026.csv will produce it.
-            missing = [c for c in ("koi_max_mult_ev", "koi_num_transits")
-                       if c not in df.columns]
-            if missing:
-                raise RuntimeError(
-                    f"{local_kepler.name} lacks {missing}, which only the KOI "
-                    "cumulative table provides. Set DOWNLOAD_NASA_DATA = True to "
-                    "fetch it from the NASA Exoplanet Archive.")
-            df.to_csv(CACHE, index=False)
-            print(f"Cached to: {CACHE}")
-            return df
-        else:
-            print(f"Local data not found at {local_kepler}, will attempt download")
+    Reads the copy in data/ by default. Only downloads when DOWNLOAD_NASA_DATA is
+    True (or redownload is passed), and writes what it fetches back to data/ so
+    the next run is offline.
+    """
+    local = Path(KOI_CUMULATIVE_CSV)
+    if local.exists() and not (DOWNLOAD_NASA_DATA or redownload):
+        print(f"Loading local KOI table: {local}")
+        df = pd.read_csv(local, comment="#", low_memory=False)
+        missing = [c for c in ("koi_max_mult_ev", "koi_num_transits")
+                   if c not in df.columns]
+        if missing:
+            raise RuntimeError(
+                f"{local.name} lacks {missing}. Set DOWNLOAD_NASA_DATA = True to "
+                "refresh it from the NASA Exoplanet Archive.")
+        return df
+
+    if not (DOWNLOAD_NASA_DATA or redownload):
+        raise RuntimeError(
+            f"{local} not found. Set DOWNLOAD_NASA_DATA = True to fetch the KOI "
+            "cumulative table from the NASA Exoplanet Archive.")
 
     cdpp_select = ", ".join(f"s.{c}" for c in CDPP_COLS)
     query = f"""
@@ -153,7 +150,8 @@ def load_or_download(redownload: bool = False) -> pd.DataFrame:
           .drop_duplicates(subset=key, keep="first")
           .reset_index(drop=True))
     print(f"  Deduped keplerstellar rows: {n_raw:,} -> {len(df):,} (one per {key})")
-    df.to_csv(CACHE, index=False)
+    df.to_csv(KOI_CUMULATIVE_CSV, index=False)
+    print(f'Saved to: {KOI_CUMULATIVE_CSV}')
     print(f"  Saved: {CACHE}  ({len(df):,} rows)")
     return df
 

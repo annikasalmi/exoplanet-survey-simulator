@@ -217,7 +217,7 @@ def nasabells():
 
 
 def maps(mission="TESS"):
-    s21 = _load("s21_v2", ROOT / "important_plots" / "flat_transit_rv_3x3.py")
+    s21 = _load("s21_v2", ROOT / "output" / "plots" / "scripts" / "analysis" / "multi" / "flat_transit_rv_3x3.py")
     s21.S44.MAX_MASS_REL_UNCERTAINTY = NEW_MASS_PREC
     s21.S44.MAX_RADIUS_REL_UNCERTAINTY = NEW_RAD_PREC
     s21.S44.COLD_CORNER_RADIUS = NEW_CORNER_RADIUS

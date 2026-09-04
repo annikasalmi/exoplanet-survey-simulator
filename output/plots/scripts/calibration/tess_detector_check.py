@@ -29,7 +29,8 @@ try:
 except Exception:
     pass
 
-ROOT = Path(__file__).resolve().parents[2]
+from tools.paths import LIFESIM_OUTER_DIR
+ROOT = Path(LIFESIM_OUTER_DIR)
 CATALOG = ROOT / "run" / "tess" / "data" / "Gaia_cdpp_v1" / "tess_catalog_0.csv"
 OUT_DIR = ROOT / "output/plots" / "04_tess_detector_check"
 OUT_DIR.mkdir(parents=True, exist_ok=True)

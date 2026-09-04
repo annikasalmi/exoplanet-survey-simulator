@@ -51,7 +51,8 @@ try:
 except Exception:
     pass
 
-ROOT = Path(__file__).resolve().parents[2]
+from tools.paths import LIFESIM_OUTER_DIR
+ROOT = Path(LIFESIM_OUTER_DIR)
 PPOP_DIR = ROOT / "run" / "tess" / "data" / "Gaia_C_F_K_combined_cdpp_v1"
 PPOP_PATTERN = "tess_catalog_*.csv"
 NASA_FILE = (ROOT / "run" / "kepler" / "data" / "NASA"

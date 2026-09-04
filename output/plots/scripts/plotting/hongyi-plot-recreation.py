@@ -17,7 +17,8 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-ROOT = Path(__file__).resolve().parents[2]
+from tools.paths import LIFESIM_OUTER_DIR
+ROOT = Path(LIFESIM_OUTER_DIR)
 SILICATE_CURVE = Path(SILICON_CURVE)
 LUO_CURVES = ROOT / "luo_dorn_2024_mr.csv"   # M-R model curves from Luo, Dorn & Deng 2024
 OUT = ROOT / "output/plots" / "hongyi_silicon_mr.png"

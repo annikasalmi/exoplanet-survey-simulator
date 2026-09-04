@@ -14,6 +14,7 @@ from functools import partial
 
 from tools.paths import PPOP_DATA_DIR, LIFESIM_DATA_DIR
 from PPop.StarCatalogs import ExoCat_1,LTC_3, gaia
+from plot.plot import plot_all
 
 RUN_PPOP = False
 
@@ -108,12 +109,10 @@ def main(parallel=True, nruns=np.arange(1), star_catalog='Gaia', run_anew=True):
             results = [run_lifesim_import_catalog(i=i, star_catalog=star_catalog) for i in nruns]
             
     print(f"Finished {len(nruns)} runs in {time.time() - start:.2f} seconds")
-    print('Starting plotting...')
 
-    # Step 2: Combine all runs into one DataFrame
+    # Combine all runs into one DataFrame
     df_concat = pd.concat(results, keys=nruns).reset_index(level=0).rename(columns={'level_0': 'run'})
 
-    plot_all(df=df_concat, sim_name='LIFEsim_exoplanets', nruns=len(nruns), star_catalog=star_catalog, use_multiprocessing=False)
     print(f"Total time: {time.time() - start:.2f} seconds")
 
     return df_concat

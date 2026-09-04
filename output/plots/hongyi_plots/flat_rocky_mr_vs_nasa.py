@@ -47,7 +47,7 @@ try:
 except Exception:
     pass
 
-from run.ppop.uniform_generator import generate_flat_catalog
+from run.flat_universe.uniform_generator import generate_flat_catalog
 from run.ppop.flat_detect import run_kepler, run_rv_best
 
 

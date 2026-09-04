@@ -49,7 +49,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from run.ppop.uniform_generator import get_or_build_catalog, UNIFORM_OUT_DIR, generate_flat_catalog
+from run.flat_universe.uniform_generator import get_or_build_catalog, UNIFORM_OUT_DIR, generate_flat_catalog
 from run.ppop.flat_detect import run_kepler, run_rv_best
 
 # ---------------- settings ----------------

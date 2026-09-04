@@ -19,7 +19,8 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+from tools.paths import LIFESIM_OUTER_DIR, EXOPLANET_CSV_DIR
+ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -42,8 +43,7 @@ from run.ppop.flat_detect import run_kepler, run_rv_best
 
 SILICATE_CURVE = Path(SILICON_CURVE)
 PPOP_CATALOG = ROOT / "run" / "kepler" / "data" / "Gaia" / "kepler_catalog_0.csv"
-NASA_FILE = (ROOT / "run" / "kepler" / "data" / "NASA"
-             / "NASA_PSCompPars_transiting_confirmed_RM_insolation_errors_limits.csv")
+NASA_FILE = Path(EXOPLANET_CSV_DIR) / "exoplanets_2026.csv"
 OUT_DIR = os.path.join(ROOT, "output/plots", "puffy_cuts_flat")
 
 N_SAMPLE = 20000
@@ -130,7 +130,7 @@ def mc_universe(arrays, drop, cut, m_sil, r_sil, rng):
 
 
 def load_nasa():
-    df = pd.read_csv(NASA_FILE)
+    df = pd.read_csv(NASA_FILE, comment="#", low_memory=False)
     m = pd.to_numeric(df["pl_bmasse"], errors="coerce")
     r = pd.to_numeric(df["pl_rade"], errors="coerce")
     ins = pd.to_numeric(df["pl_insol"], errors="coerce")

@@ -95,14 +95,24 @@ def nasa_tap_url(query: str) -> str:
 def load_or_download(redownload: bool = False) -> pd.DataFrame:
     if CACHE.exists() and not redownload:
         print(f"Loading cached KOI+stellar: {CACHE}")
-        return pd.read_csv(CACHE, low_memory=False)
+        return pd.read_csv(CACHE, comment="#", low_memory=False)
 
     # Try local data first if DOWNLOAD_NASA_DATA is False
     if not DOWNLOAD_NASA_DATA:
         local_kepler = ROOT / "data" / "exoplanet_csv" / "kepler_exoplanets_2026.csv"
         if local_kepler.exists():
             print(f"Loading local Kepler data: {local_kepler}")
-            df = pd.read_csv(local_kepler, low_memory=False)
+            df = pd.read_csv(local_kepler, comment="#", low_memory=False)
+            # This script compares our toy MES against the official KOI MES, which
+            # lives in the KOI cumulative table. A planetary-systems export does not
+            # carry it, and no filtering of exoplanets_2026.csv will produce it.
+            missing = [c for c in ("koi_max_mult_ev", "koi_num_transits")
+                       if c not in df.columns]
+            if missing:
+                raise RuntimeError(
+                    f"{local_kepler.name} lacks {missing}, which only the KOI "
+                    "cumulative table provides. Set DOWNLOAD_NASA_DATA = True to "
+                    "fetch it from the NASA Exoplanet Archive.")
             df.to_csv(CACHE, index=False)
             print(f"Cached to: {CACHE}")
             return df

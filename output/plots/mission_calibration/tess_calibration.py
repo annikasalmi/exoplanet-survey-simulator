@@ -111,14 +111,22 @@ EXOFOP_TOI_URL = "https://exofop.ipac.caltech.edu/tess/download_toi.php?sort=toi
 def load_or_download(redownload: bool = False) -> pd.DataFrame:
     if CACHE.exists() and not redownload:
         print(f"Loading cached TOI table: {CACHE}")
-        return pd.read_csv(CACHE, low_memory=False)
+        return pd.read_csv(CACHE, comment="#", low_memory=False)
 
     # Try local data first if DOWNLOAD_NASA_DATA is False
     if not DOWNLOAD_NASA_DATA:
         local_tess = ROOT / "data" / "exoplanet_csv" / "tess_exoplanets_2026.csv"
         if local_tess.exists():
             print(f"Loading local TESS data: {local_tess}")
-            df = pd.read_csv(local_tess, low_memory=False)
+            df = pd.read_csv(local_tess, comment="#", low_memory=False)
+            # Validated against SPOC SNR from the ExoFOP TOI table, whose columns
+            # ("Period (days)", "TESS Mag", ...) differ from a planetary-systems
+            # export. Filtering exoplanets_2026.csv cannot supply them.
+            if "Period (days)" not in df.columns:
+                raise RuntimeError(
+                    f"{local_tess.name} is not an ExoFOP TOI table (no 'Period "
+                    "(days)' column). Set DOWNLOAD_NASA_DATA = True to fetch the "
+                    "TOI table from ExoFOP.")
             df.to_csv(CACHE, index=False)
             print(f"Cached to: {CACHE}")
             return df

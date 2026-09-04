@@ -34,7 +34,8 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+from tools.paths import LIFESIM_OUTER_DIR, EXOPLANET_CSV_DIR
+ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -77,8 +78,7 @@ def _out_dir():
 
 
 SILICATE_CURVE = Path(SILICON_CURVE)
-NASA_FILE = (ROOT / "run" / "kepler" / "data" / "NASA"
-             / "NASA_PSCompPars_transiting_confirmed_RM_insolation_errors_limits.csv")
+NASA_FILE = Path(EXOPLANET_CSV_DIR) / "exoplanets_2026.csv"
 
 BOX = dict(r_lo=0.5, r_hi=2.2, m_lo=0.1, m_hi=12.0, f_lo=1e-2, f_hi=1e4)
 FLAT_N_POOL = 10_000_000       # 10x: the cold among-transiting denominator is thin (~2% transit);
@@ -157,7 +157,7 @@ def nasa_frac_sigma(nasa, lo, hi, mass_min, m_sil, r_sil, rng, n_rep=N_FRAC_REP)
 
 
 def load_nasa(precision: bool):
-    df = pd.read_csv(NASA_FILE)
+    df = pd.read_csv(NASA_FILE, comment="#", low_memory=False)
     m = pd.to_numeric(df["pl_bmasse"], errors="coerce")
     r = pd.to_numeric(df["pl_rade"], errors="coerce")
     ins = pd.to_numeric(df["pl_insol"], errors="coerce")

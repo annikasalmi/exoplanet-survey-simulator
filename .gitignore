@@ -95,3 +95,7 @@ dist/
 /output/figures/
 my_outputs/*/*.png
 my_outputs/*/*.csv
+
+# Per-script generated output under output/plots/
+/output/plots/bayesian_cold_rocky_desert/
+/output/plots/mission_calibration/*/

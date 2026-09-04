@@ -231,7 +231,13 @@ class RVData:
             "luminosity_s": "l_sun", "temp_s": "teff_s", "insolation": "flux_p",
             "Vmag": "vmag", "gaia_g_mag": "gaiamag",
         }
-        df = df.rename(columns={k: v for k, v in rename.items() if k in df.columns and v not in df.columns})
+        # Apply one at a time: several source names can map to the same target
+        # (st_teff and temp_s both mean teff_s), and a single comprehension
+        # evaluates its guard against the original columns, so both would pass
+        # and produce two columns with one name.
+        for src_col, dst_col in rename.items():
+            if src_col in df.columns and dst_col not in df.columns:
+                df = df.rename(columns={src_col: dst_col})
 
         if "st_lum_log10" in df.columns and "l_sun" not in df.columns:
             df["l_sun"] = 10 ** self._num(df["st_lum_log10"])

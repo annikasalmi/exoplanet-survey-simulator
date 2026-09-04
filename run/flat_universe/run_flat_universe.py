@@ -75,6 +75,7 @@ def main(
     n_planets=150000,
     parallel=False,
     nruns=np.arange(1),
+    star_catalog=None,
     run_anew=True,
 ):
     """
@@ -84,8 +85,9 @@ def main(
         seed: Random seed for catalog generation
         n_planets: Number of planets per universe
         run_anew: If True, always regenerate (ignore cache)
-        parallel: Unused (for compatibility with other simulators)
-        nruns: Unused (for compatibility with other simulators)
+        parallel, nruns, star_catalog: unused. The flat universe draws its own
+            stars, so there is no catalog to pick; accepted so run_sim can call
+            this the same way it calls the telescope pipelines.
 
     Returns:
         DataFrame with A and B concatenated, columns: all planet properties +

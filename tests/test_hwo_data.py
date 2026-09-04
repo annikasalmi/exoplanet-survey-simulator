@@ -1,7 +1,7 @@
 import pytest  # type: ignore
 import numpy as np
 import pandas as pd
-from detectors.hwo_data import HWOData
+from telescopes.hwo.detection_model import HWOData
 
 class DummyConst:
     h = 6.62607015e-34

@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
-from detectors.hwo_data import HWOData
+from telescopes.hwo.detection_model import HWOData
 
 # ---------- Set-Up ----------
 

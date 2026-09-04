@@ -57,8 +57,8 @@ warnings.filterwarnings("ignore")
 import PPop.SystemGenerator as SystemGenerator
 from PPop.StarCatalogs import gaia
 from run.ppop.ppop_generator import PPop
-from detectors.kepler_data import KeplerData
-from detectors.tess_data import TESSData
+from telescopes.kepler.detection_model import KeplerData
+from telescopes.tess.detection_model import TESSData
 from run.tess.run_TESS import _build_tess_kwargs
 
 # ── Config ────────────────────────────────────────────────────────────────────

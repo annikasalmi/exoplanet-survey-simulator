@@ -16,19 +16,17 @@ htmlcov/
 .idea/
 
 # Run outputs and logs
-/logs/
+/output/logs/
+/output/results/
 /run/logging/*/*.txt
-/Figures/
-/archive/
-/mdwarfs/
-
-# Generated plots
-/plot/*/*.png
-/plot/old/*/*.png
 
 # Simulation data products
-/run/hwo/data/*.csv
-/run/hwo/data/*/*.csv
+/telescopes/kepler/data/*.csv
+/telescopes/kepler/data/*/*.csv
+/telescopes/tess/data/*.csv
+/telescopes/tess/data/*/*.csv
+/telescopes/hwo/data/*.csv
+/telescopes/hwo/data/*/*.csv
 /run/lifesim/data/*.hdf5
 /run/lifesim/data/*.yaml
 /run/lifesim/data/*/*.hdf5
@@ -42,37 +40,9 @@ TestPlanetPopulation.txt
 
 # Local Python virtual environments
 /venv/
-/hwosim/
-.DS_Store
 
 # Personal Claude Code overrides (not shared)
 /CLAUDE.local.md
-
-/my_outputs/*/*.csv 
-/my_outputs/*/*.png 
-/my_outputs/*.csv 
-/my_outputs/*.png
-
-/run/kepler/data/*.csv
-/run/kepler/data/*/*.csv
-/run/kepler/__pycache__/*.pyc
-
-run/tess/*.csv
-run/tess/*/*.csv
-run/tess/*/*/*.csv
-/run/tess/__pycache__/*.pyc
-
-
-my_outputs/*.npz
-my_outputs/archived/44_2x4_kepler_tess_rocky-fgkm-detection_gaia60pc/.rerun_marker
-my_outputs/archived/28_GOOD_kepler_dr25_detector_check/figure_data_dictionary.txt
-my_outputs/*.txt
-my_outputs/*/*.txt
-my_outputs/*.png
-my_outputs/*/*.png
-my_outputs/*/*.csv
-my_outputs/*/*/*.png
-my_outputs/*/*/*.csv
 
 Ppop/StarCatalogs/*.csv
 

@@ -21,15 +21,20 @@ setup(
     url='https://github.com/annikasalmi/exoplanet-survey-simulator',
     # `lifesim/` is listed by hand so the inherited tree needs no added
     # __init__.py files. It is frozen at a2b8eeb, so the list will not drift.
-    packages=find_packages(exclude=['tests', 'tests.*', 'docs', 'docs.*',
-                                    'lifesim', 'lifesim.*',
+    packages=find_packages(exclude=['tests', 'tests.*', 'docs', 'docs.*', 'data', 'data.*',
+                                    'output', 'output.*', 'lifesim', 'lifesim.*',
                                     '*.data', '*.data.*'])
              + ['lifesim',
                 'lifesim.core',
                 'lifesim.gui',
                 'lifesim.instrument',
                 'lifesim.optimize',
-                'lifesim.util'],
+                'lifesim.util',
+                'telescopes',
+                'telescopes.kepler',
+                'telescopes.tess',
+                'telescopes.hwo',
+                'telescopes.rv'],
     include_package_data=True,
     install_requires=['alphashape',
                       'astropy>=5.2.1',

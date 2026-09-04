@@ -37,10 +37,10 @@ import pandas as pd
 
 # This file-path loader dates from when kepler_data.py lived in lifesim/core/, so
 # importing it dragged in the lifesim package __init__ and with it the GUI
-# Instrument (PyQt5/spectres). It now lives in detectors/, whose __init__ imports
-# nothing, so `from detectors.kepler_data import KeplerData` would do just as well.
+# Instrument (PyQt5/spectres). It now lives in telescopes/kepler/, whose __init__ imports
+# nothing, so `from telescopes.kepler.detection_model import KeplerData` would do just as well.
 def _load_kepler_data_class():
-    path = ROOT / "detectors" / "kepler_data.py"
+    path = ROOT / "telescopes" / "kepler" / "detection_model.py"
     spec = importlib.util.spec_from_file_location("kepler_data_standalone", path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)

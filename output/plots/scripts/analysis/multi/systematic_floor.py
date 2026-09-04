@@ -29,7 +29,7 @@ Outputs (output/plots/46_systematic_floor/):
     floor_table.csv + printed table, systematic_floor.png
 
 Run:
-    python "scripts/statistical_analysis/46_systematic_floor.py"
+    python "output/plots/scripts/analysis/multi/46_systematic_floor.py"
 """
 
 from __future__ import annotations
@@ -40,7 +40,8 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+from tools.paths import LIFESIM_OUTER_DIR
+ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 

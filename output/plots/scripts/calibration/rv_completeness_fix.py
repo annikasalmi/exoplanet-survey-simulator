@@ -47,7 +47,8 @@ try:
 except Exception:
     pass
 
-ROOT = Path(__file__).resolve().parents[2]
+from tools.paths import LIFESIM_OUTER_DIR
+ROOT = Path(LIFESIM_OUTER_DIR)
 _spec = importlib.util.spec_from_file_location("rv_data", ROOT / "detectors" / "rv_data.py")
 _rv = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_rv)

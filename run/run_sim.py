@@ -9,7 +9,7 @@ import logging
 # Add the project root to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from tools.paths import LOGGING, LIFESIM_OUTER_DIR
+from tools.paths import LOGGING, LIFESIM_OUTER_DIR, EXOPLANET_CSV_DIR
 from telescopes.hwo.detection_model import HWOData
 from telescopes.kepler.detection_model import KeplerData #added by Hongyi
 from telescopes.tess.detection_model import TESSData
@@ -19,8 +19,10 @@ from run.lifesim.lifesim_run_multiple import main as main_lifesim
 from run.hwo.hwo_run_multiple import main as main_hwo
 from run.kepler.run_kepler import main as main_kepler
 from run.tess.run_tess import main as main_tess
+from run.flat_universe.run_flat_universe import main as main_flat_universe
 
-from plot.plot import plot_all
+from output.plots.plot import plot_all
+from output.plots.plot_flat_universe import plot_flat_universe
 from tools.exoplanet_catalog import load_and_filter_exoplanets
 
 def run_with_progress(func, name, estimated_minutes=12, *args, **kwargs):
@@ -65,13 +67,21 @@ def run_sim(func=main_hwo, name='hwo', parallel=True, nruns=500, star_catalog='G
         minutes = int((elapsed % 3600) // 60)
         seconds = int(elapsed % 60)
         print(f"\nSimulation completed in: {hours}:{minutes:02d}:{seconds:02d}")
-    bins = [0, 1.5, 3.0, 6.0]
-    labels = ['<1.5', '1.5–3.0', '3.0–6.0']
-    df_concat['radius_bin'] = pd.cut(df_concat['radius_p'], bins=bins, labels=labels, include_lowest=True)
+    if 'radius_bin' not in df_concat.columns:
+        bins = [0, 1.5, 3.0, 6.0]
+        labels = ['<1.5', '1.5–3.0', '3.0–6.0']
+        df_concat['radius_bin'] = pd.cut(df_concat['radius_p'], bins=bins, labels=labels, include_lowest=True)
+
     if plot:
         plot_start_time = time.time()
         print(f"Starting plotting...")
-        plot_all(df=df_concat, sim_name=name, nruns=len(nruns), star_catalog=star_catalog, use_multiprocessing=False)
+
+        # Use dedicated plotter for flat_universe
+        if name.lower() == 'flat_universe':
+            plot_flat_universe(df=df_concat, nruns=len(nruns), use_multiprocessing=False)
+        else:
+            plot_all(df=df_concat, sim_name=name, nruns=len(nruns), star_catalog=star_catalog, use_multiprocessing=False)
+
         plot_end_time = time.time()
         plot_elapsed = plot_end_time - plot_start_time
         plot_hours = int(plot_elapsed // 3600)
@@ -84,7 +94,7 @@ def run_sim(func=main_hwo, name='hwo', parallel=True, nruns=500, star_catalog='G
 def run_exoplanet_plotting(name='HWO_exoplanets', star_catalog='exoplanet_catalog', plot=True):
     print("Loading exoplanets data for plotting...")
 
-    exo_path = os.path.join(LIFESIM_OUTER_DIR, 'exoplanets_2026.csv')
+    exo_path = os.path.join(EXOPLANET_CSV_DIR, 'exoplanets_2026.csv')
     name_lower = name.lower()
 
     telescope_map = {

@@ -31,7 +31,8 @@ import sys
 import importlib.util
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+from tools.paths import LIFESIM_OUTER_DIR
+ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -59,7 +60,7 @@ def _load(name, path):
     return mod
 
 
-S72 = _load("s72", str(ROOT / "scripts" / "statistical_analysis" / "puffy_cuts_flat.py"))
+S72 = _load("s72", str(ROOT / "output" / "plots" / "scripts" / "analysis" / "multi" / "puffy_cuts_flat.py"))
 S72.N_REPEATS = 4000
 
 OUT_DIR = os.path.join(ROOT, "my_outputs", "flat_rocky_mr_vs_nasa")

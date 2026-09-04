@@ -23,7 +23,7 @@ Outputs (output/plots/power_analysis_puffy/):
     power_table.csv + printed table, significance_vs_n.png
 
 Run:
-    python "scripts/statistical_analysis/power_analysis_puffy.py"
+    python "output/plots/scripts/analysis/multi/power_analysis_puffy.py"
 """
 
 from __future__ import annotations
@@ -35,7 +35,8 @@ import sys
 import importlib.util
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+from tools.paths import LIFESIM_OUTER_DIR
+ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -61,7 +62,7 @@ def _load(name, path):
     return mod
 
 
-S77 = _load("s77", str(ROOT / "important_plots" / "flat_rocky_mr_vs_nasa.py"))
+S77 = _load("s77", str(ROOT / "output" / "plots" / "scripts" / "analysis" / "multi" / "flat_rocky_mr_vs_nasa.py"))
 S72 = S77.S72                    # already loaded by S77, N_REPEATS = 4000
 
 OUT_DIR = os.path.join(ROOT, "output/plots", "power_analysis_puffy")

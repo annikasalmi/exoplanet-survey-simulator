@@ -29,7 +29,8 @@ import sys
 import importlib.util
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+from tools.paths import LIFESIM_OUTER_DIR
+ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -57,7 +58,7 @@ def _load(name, path):
 
 
 # reuse script 72's puffy machinery + updated NASA method (precision cut + per-planet perturbation)
-S72 = _load("s72", str(ROOT / "scripts" / "statistical_analysis" / "puffy_cuts_flat.py"))
+S72 = _load("s72", str(ROOT / "output" / "plots" / "scripts" / "analysis" / "multi" / "puffy_cuts_flat.py"))
 S72.N_REPEATS = 4000            # bells smooth at 4k; keeps the 12-panel run quick
 
 OUT_DIR = os.path.join(ROOT, "output/plots", "19_flat_mr_comparison")

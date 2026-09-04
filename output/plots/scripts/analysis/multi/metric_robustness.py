@@ -31,6 +31,8 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
+from tools.paths import LIFESIM_OUTER_DIR, SILICON_CURVE
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -41,13 +43,13 @@ try:
 except Exception:
     pass
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from run.ppop.flat_detect import run_kepler, run_rv, RVData
 
-SILICATE_CURVE = ROOT / "silicon_curve.ddat"
+SILICATE_CURVE = Path(SILICON_CURVE)
 KEPLER_DIR = ROOT / "run" / "kepler" / "data" / "Gaia"
 NASA_FILE = (ROOT / "run" / "kepler" / "data" / "NASA"
              / "NASA_PSCompPars_transiting_confirmed_RM_insolation_errors_limits.csv")

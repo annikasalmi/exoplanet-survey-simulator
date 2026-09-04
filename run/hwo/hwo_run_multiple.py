@@ -41,7 +41,9 @@ def run_single(i, star_catalog='Gaia'):
     hwo_data.determine_detectable()
 
     df = hwo_data.catalog
-    df.to_csv(os.path.join(HWO_DATA_DIR, star_catalog, f'hwo_catalog_{i}.csv'), index=False)
+    save_dir = os.path.join(HWO_DATA_DIR, star_catalog)
+    os.makedirs(save_dir, exist_ok=True)
+    df.to_csv(os.path.join(save_dir, f'hwo_catalog_{i}.csv'), index=False)
 
     return df
 

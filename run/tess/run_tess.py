@@ -25,17 +25,13 @@ from PPop.StarCatalogs import CrossfieldBrightSample, ExoCat_1, LTC_2, LTC_3, ga
 from run.ppop.ppop_generator import PPop
 from telescopes.tess.detection_model import TESSData
 
-try:
-    from tools.paths import TESS_DATA_DIR
-except Exception:
-    ROOT = Path(__file__).resolve().parents[2]
-    TESS_DATA_DIR = str(ROOT / "run" / "tess" / "data")
+from tools.paths import TESS_DATA_DIR
 
 
 TESS_DEFAULTS = {
     "use_tesspoint": True,
     "use_mast_tic": False,
-    "cdpp_dir": str(Path("run") / "tess" / "data" / "CDPP"),
+    "cdpp_dir": os.path.join(TESS_DATA_DIR, "CDPP"),
     "use_cdpp_tables": True,
     # Fallback when tess-point is unavailable.  tess-point is active for the 400
     # Gaia catalogs (tess_sector_source == "tess-point"), so this default is never

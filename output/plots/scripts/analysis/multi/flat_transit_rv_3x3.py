@@ -44,7 +44,8 @@ try:
 except Exception:
     pass
 
-ROOT = Path(__file__).resolve().parents[2]
+from tools.paths import LIFESIM_OUTER_DIR
+ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -59,7 +60,7 @@ def _load(name, path):
     return mod
 
 
-S44 = _load("s44", ROOT / "scripts" / "statistical_analysis" / "rocky_scatter_gaia60pc.py")
+S44 = _load("s44", ROOT / "output" / "plots" / "scripts" / "analysis" / "multi" / "rocky_scatter_gaia60pc.py")
 
 OUT_DIR = ROOT / "my_outputs" / "flat_transit_rv_3x3"
 OUT_DIR.mkdir(parents=True, exist_ok=True)

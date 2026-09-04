@@ -25,12 +25,14 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import numpy as np
 import pandas as pd
+
+from tools.paths import LIFESIM_OUTER_DIR, SILICON_CURVE
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -44,7 +46,7 @@ except Exception:
 
 from run.ppop.flat_detect import run_kepler, run_rv_best
 
-SILICATE_CURVE = ROOT / "silicon_curve.ddat"
+SILICATE_CURVE = Path(SILICON_CURVE)
 PPOP_CATALOG = ROOT / "run" / "kepler" / "data" / "Gaia" / "kepler_catalog_0.csv"
 NASA_FILE = (ROOT / "run" / "kepler" / "data" / "NASA"
              / "NASA_PSCompPars_transiting_confirmed_RM_insolation_errors_limits.csv")

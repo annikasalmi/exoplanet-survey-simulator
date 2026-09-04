@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-from plot.base_plotter import BasePlotter
+from output.plots.base_plotter import BasePlotter
 from tools.physics_constants import HWOConstants
 import pandas as pd
 from tools.plotting_constants import REJECTION_COLUMN_MAPPING, REJECTION_COLORS, REJECTION_SCENARIO_LABELS

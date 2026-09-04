@@ -2,8 +2,8 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from plot.plot_by_type import PlotPlanetType
-from plot.plot_detections import PlanetDetectionPlotter
+from output.plots.plot_by_type import PlotPlanetType
+from output.plots.plot_detections import PlanetDetectionPlotter
 from tools.plotting_constants import (
     TEMP_ZONES, TEMP_COLORS, HATCHES, STAR_ORDER, BIN_LABELS, STAR_COLORS, 
     STAR_HATCHES, BAR_WIDTH_STAR, DISTANCE_LABELS, ERROR_LABEL_OFFSET

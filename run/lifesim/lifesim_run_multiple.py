@@ -14,7 +14,7 @@ from functools import partial
 
 from tools.paths import PPOP_DATA_DIR, LIFESIM_DATA_DIR
 from PPop.StarCatalogs import ExoCat_1,LTC_3, gaia
-from plot.plot import plot_all
+from output.plots.plot import plot_all
 
 RUN_PPOP = False
 

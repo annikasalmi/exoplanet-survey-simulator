@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 
-from plot.base_plotter import BasePlotter
+from output.plots.base_plotter import BasePlotter
 from tools.plotting_constants import PLOT_CONFIGS, PANEL_CONFIGS
 
 plt.rcParams.update({'font.size': 16})

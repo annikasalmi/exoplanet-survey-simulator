@@ -1,4 +1,4 @@
-from plot.base_plotter import BasePlotter
+from output.plots.base_plotter import BasePlotter
 from tools import physics_constants as const
 from tools.plotting_constants import DETECTION_COLORS
 import pandas as pd
@@ -11,7 +11,7 @@ from matplotlib.lines import Line2D
 from matplotlib.axes import Axes
 from matplotlib.colors import LinearSegmentedColormap
 from lifesim.util.habitable import single_habitable_zone
-from plot.exoplanet_data_utils import load_exoplanet_luminosity_distance
+from output.plots.exoplanet_data_utils import load_exoplanet_luminosity_distance
 
 plt.rcParams.update({'font.size': 16})
 

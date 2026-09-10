@@ -42,7 +42,7 @@ import sys
 import numpy as np
 import pandas as pd
 
-from tools.paths import SILICON_CURVE
+from tools.paths import SILICON_CURVE, ANALYSIS_DIR, PAPER_FIGURES_DIR, KEPLER_DATA_DIR, TESS_DATA_DIR
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -89,8 +89,8 @@ N_UNIVERSES = 10
 # only contains one spectral type, it adds counts solely to that type's panel.
 EXTRA_START_INDEX = 8001
 
-KEPLER_PPOP_DIR = ROOT / "run" / "kepler" / "data" / "Gaia"
-TESS_PPOP_DIR   = ROOT / "run" / "tess"   / "data" / "Gaia_cdpp_v1"
+KEPLER_PPOP_DIR = Path(KEPLER_DATA_DIR) / "Gaia"
+TESS_PPOP_DIR   = Path(TESS_DATA_DIR) / "Gaia_cdpp_v1"
 
 
 def _ppop_files(directory: Path, stem: str) -> list[Path]:
@@ -142,16 +142,16 @@ REF_CURVE_PATH = ROOT / "run" / "kepler" / "reference_curves" / "ref.ddat"
 ROCKY_CURVE_PATH  = Path(SILICON_CURVE)
 ROCKY_CURVE_LABEL = "silicate rocky curve"
 
-NASA_DATA_DIR = ROOT / "run" / "kepler" / "data" / "NASA"
+NASA_DATA_DIR = Path(KEPLER_DATA_DIR) / "NASA"
 NASA_DATA_DIR.mkdir(parents=True, exist_ok=True)
 NASA_FLAGS_CACHE = (
     NASA_DATA_DIR / "NASA_PSCompPars_transiting_confirmed_RM_insolation_errors_limits.csv"
 )
 
-OUT_DIR = ROOT / "my_outputs" / "rocky_scatter_gaia60pc"
+OUT_DIR = Path(ANALYSIS_DIR) / "rocky_scatter_gaia60pc"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-PAPER_FIG_DIR = ROOT / "paper" / "figures"
+PAPER_FIG_DIR = Path(PAPER_FIGURES_DIR)
 PAPER_FIG_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── LHS 1140 b anchor ────────────────────────────────────────────────────────

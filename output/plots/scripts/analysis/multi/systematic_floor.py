@@ -40,7 +40,7 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 import sys
 from pathlib import Path
 
-from tools.paths import LIFESIM_OUTER_DIR
+from tools.paths import LIFESIM_OUTER_DIR, ANALYSIS_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -57,8 +57,8 @@ try:
 except Exception:
     pass
 
-POWER_CSV = ROOT / "output/plots" / "power_analysis_puffy" / "power_table.csv"
-OUT_DIR = os.path.join(ROOT, "output/plots", "46_systematic_floor")
+POWER_CSV = Path(ANALYSIS_DIR) / "power_analysis_puffy" / "power_table.csv"
+OUT_DIR = os.path.join(ANALYSIS_DIR, "46_systematic_floor")
 N_GRID = np.logspace(1, 3.5, 200)
 
 

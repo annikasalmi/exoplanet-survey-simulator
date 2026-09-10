@@ -28,7 +28,7 @@ import os
 import sys
 from pathlib import Path
 
-from tools.paths import LIFESIM_OUTER_DIR
+from tools.paths import LIFESIM_OUTER_DIR, ANALYSIS_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -45,7 +45,7 @@ from run.ppop.flat_detect import run_kepler, run_tess, run_rv_best
 N_PLANETS = 300000
 RV_MAG_TARGET = 12.0
 CACHE_CSV = os.path.join(UNIFORM_OUT_DIR, "flat_catalog.csv")
-OUT_DIR = os.path.join(ROOT, "output/plots", "59_flat_detfrac_radius_mass")
+OUT_DIR = os.path.join(ANALYSIS_DIR, "59_flat_detfrac_radius_mass")
 
 RADIUS_BINS = np.linspace(0.5, 2.2, 13)
 MASS_BINS = np.logspace(np.log10(0.1), np.log10(12.0), 13)

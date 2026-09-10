@@ -38,7 +38,7 @@ if str(ROOT) not in sys.path:
 import numpy as np
 import pandas as pd
 
-from tools.paths import LIFESIM_OUTER_DIR, SILICON_CURVE
+from tools.paths import LIFESIM_OUTER_DIR, SILICON_CURVE, KEPLER_DATA_DIR, ANALYSIS_DIR
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -50,9 +50,9 @@ try:
 except Exception:
     pass
 
-NASA_FILE = (ROOT / "run" / "kepler" / "data" / "NASA"
+NASA_FILE = (Path(KEPLER_DATA_DIR) / "NASA"
              / "NASA_PSCompPars_transiting_confirmed_RM_insolation_errors_limits.csv")
-OUT_DIR = os.path.join(ROOT, "output/plots", "29_radius_valley_slope")
+OUT_DIR = os.path.join(ANALYSIS_DIR, "29_radius_valley_slope")
 
 R_LO, R_HI = 1.0, 4.0          # radius range that brackets the valley
 VALLEY_LO, VALLEY_HI = 1.5, 2.2  # search the dip here

@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from tools.paths import KEPLER_DATA_DIR, ANALYSIS_DIR
 import re
 import sys
 
@@ -37,10 +38,10 @@ if str(ROOT) not in sys.path:
 
 STAR_CATALOG_FOLDER = "Gaia_C_F_K_combined"
 
-PPOP_DATA_DIR = ROOT / "run" / "kepler" / "data" / STAR_CATALOG_FOLDER
-NASA_MODEL_CSV = ROOT / "run" / "kepler" / "data" / "NASA" / "kepler_catalog_nasa_pscomppars.csv"
+PPOP_DATA_DIR = Path(KEPLER_DATA_DIR) / STAR_CATALOG_FOLDER
+NASA_MODEL_CSV = Path(KEPLER_DATA_DIR) / "NASA" / "kepler_catalog_nasa_pscomppars.csv"
 
-OUT_DIR = ROOT / "output/plots" / f"52_kepler_fgkm_insolation_radius_detected_only_{STAR_CATALOG_FOLDER}"
+OUT_DIR = Path(ANALYSIS_DIR) / f"52_kepler_fgkm_insolation_radius_detected_only_{STAR_CATALOG_FOLDER}"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 STAR_ORDER = ["F", "G", "K", "M"]

@@ -15,23 +15,14 @@ htmlcov/
 .vscode/
 .idea/
 
-# Run outputs and logs
-/output/logs/
+# Everything generated lives under results/ -- one rule, so a new
+# pipeline cannot leak a catalogue into a commit by being forgotten here.
 /output/results/
-/run/logging/*/*.txt
+/results/*
+!results/README.md
 
-# Simulation data products
-/run/kepler/data/*.csv
-/run/kepler/data/*/*.csv
-/run/tess/data/*.csv
-/run/tess/data/*/*.csv
-/run/hwo/data/*.csv
-/run/hwo/data/*/*.csv
-/run/lifesim/data/*.hdf5
-/run/lifesim/data/*.yaml
-/run/lifesim/data/*/*.hdf5
-/run/lifesim/data/*/*.yaml
-/run/flat_universe/data/*.csv
+# Run outputs and logs
+
 
 # PPop generated
 /PPop/data/
@@ -55,17 +46,10 @@ run/__pycache__/*
 
 *.md
 memory/*.md
-my_outputs/*.npz
-my_outputs/*/*.npz
-my_outputs/*/*.txt
-my_outputs/*/*/*.txt
-my_outputs/*/*.npy
-/*/*.png
 overleaf_packages/*
 overleaf_packages/*/*
 overleaf_packages/*/*/*
 overleaf_packages/*/*/*/*
-paper/*
 tests/*/*.pyc
 paper.zip
 texput.log
@@ -93,9 +77,5 @@ dist/
 
 # Generated plot output
 /output/figures/
-my_outputs/*/*.png
-my_outputs/*/*.csv
 
 # Per-script generated output under output/plots/
-/output/plots/bayesian_cold_rocky_desert/
-/output/plots/mission_calibration/*/

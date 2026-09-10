@@ -34,7 +34,7 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 import sys
 from pathlib import Path
 
-from tools.paths import LIFESIM_OUTER_DIR, PSCOMPPARS_CSV
+from tools.paths import LIFESIM_OUTER_DIR, PSCOMPPARS_CSV, ANALYSIS_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -74,7 +74,7 @@ def _mlabel():
 
 
 def _out_dir():
-    return os.path.join(ROOT, "output/plots", _OUT_NAME[MISSION])
+    return os.path.join(ANALYSIS_DIR, _OUT_NAME[MISSION])
 
 
 SILICATE_CURVE = Path(SILICON_CURVE)

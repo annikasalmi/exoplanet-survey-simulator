@@ -12,7 +12,7 @@ import os
 import sys
 from pathlib import Path
 
-from tools.paths import LIFESIM_OUTER_DIR
+from tools.paths import LIFESIM_OUTER_DIR, KEPLER_DATA_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -28,7 +28,7 @@ except Exception:
 from run.ppop.uniform_generator import generate_flat_catalog
 from run.ppop.flat_detect import run_kepler, run_rv_best
 
-PPOP_CATALOG = ROOT / "run" / "kepler" / "data" / "Gaia" / "kepler_catalog_0.csv"
+PPOP_CATALOG = Path(KEPLER_DATA_DIR) / "Gaia" / "kepler_catalog_0.csv"
 BOX = dict(r_lo=0.5, r_hi=2.2, m_lo=0.1, m_hi=12.0, f_lo=1e-2, f_hi=1e4)
 FLAT_N_POOL = 300000
 R_EARTH_OVER_R_SUN = 1.0 / 109.2

@@ -24,6 +24,7 @@ Run from repo root:
 
 import os
 import sys
+from tools.paths import KEPLER_DATA_DIR
 import importlib.util
 import tempfile
 from pathlib import Path
@@ -48,7 +49,7 @@ def _load_kepler_data_class():
 
 KeplerData = _load_kepler_data_class()
 
-KEPLER_DIR = ROOT / "run" / "kepler" / "data" / "Gaia"
+KEPLER_DIR = Path(KEPLER_DATA_DIR) / "Gaia"
 N_UNIVERSES = 10
 
 

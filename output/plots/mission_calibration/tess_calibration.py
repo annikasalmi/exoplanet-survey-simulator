@@ -22,7 +22,7 @@ figure, script 47):
   False Positive  = FP (False Positive)    + FA (False Alarm)
 
 Outputs:
-    my_outputs/tess_calibration/
+    results/figures/analysis/tess_calibration/
         tess_3in1_calibration.png
         toi_cached.csv
         summary.txt
@@ -49,7 +49,7 @@ try:
 except Exception:
     pass
 
-from tools.paths import LIFESIM_OUTER_DIR, EXOFOP_TOI_CSV
+from tools.paths import LIFESIM_OUTER_DIR, EXOFOP_TOI_CSV, PAPER_FIGURES_DIR, CALIBRATION_DIR, TESS_DATA_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -59,11 +59,11 @@ try:
 except Exception as exc:
     raise ImportError(f"Cannot import TESSData. Run from repo root.\n{exc}") from exc
 
-OUT_DIR = ROOT / "output" / "plots" / "mission_calibration" / "tess_calibration"
+OUT_DIR = Path(CALIBRATION_DIR) / "tess_calibration"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 CACHE = OUT_DIR / "toi_cached.csv"
 
-PAPER_FIG_DIR = ROOT / "paper" / "figures"
+PAPER_FIG_DIR = Path(PAPER_FIGURES_DIR)
 PAPER_FIG_DIR.mkdir(parents=True, exist_ok=True)
 
 SNR_THRESHOLD = 7.1
@@ -99,7 +99,7 @@ DISP_COLORS = {
 SMOOTH_REF_PPM = 30.0    # photon-noise reference at Tmag=10 (was 60)
 SMOOTH_FLOOR_PPM = 10.0  # systematic noise floor (was 30)
 
-CDPP_DIR = ROOT / "run" / "tess" / "data" / "CDPP"
+CDPP_DIR = Path(TESS_DATA_DIR) / "CDPP"
 
 
 # ── Download ExoFOP TOI catalog ────────────────────────────────────────────────

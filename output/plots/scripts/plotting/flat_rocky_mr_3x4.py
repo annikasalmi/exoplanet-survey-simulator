@@ -30,7 +30,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from tools.paths import LIFESIM_OUTER_DIR
+from tools.paths import LIFESIM_OUTER_DIR, ANALYSIS_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -56,7 +56,7 @@ S44, S53 = S75.S44, S75.S53
 from run.ppop.uniform_generator import generate_flat_catalog
 from run.ppop.flat_detect import run_tess
 
-OUT_DIR = ROOT / "output/plots" / "62_flat_rocky_mr_3x4"
+OUT_DIR = Path(ANALYSIS_DIR) / "62_flat_rocky_mr_3x4"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 MR_SCATTER_DEX = 0.15

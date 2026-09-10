@@ -27,7 +27,7 @@ from pathlib import Path
 
 import numpy as np
 
-from tools.paths import LIFESIM_OUTER_DIR
+from tools.paths import LIFESIM_OUTER_DIR, ANALYSIS_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -54,7 +54,7 @@ SUBSET_SEED = 12345
 DRAW_SEED = 0
 TARGET = 1_000_000
 N_FLAT = 200_000           # flat planets kept for the population panels
-OUT_DIR = os.path.join(ROOT, "output/plots", "08_generator_comparison")
+OUT_DIR = os.path.join(ANALYSIS_DIR, "08_generator_comparison")
 CACHE = os.path.join(OUT_DIR, "three_generators_data.npz")
 
 COL = {"old": "#d1495b", "new": "#1f77b4", "flat": "#6c757d"}

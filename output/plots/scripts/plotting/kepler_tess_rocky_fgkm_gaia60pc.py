@@ -35,6 +35,7 @@ Run from repo root:
 from __future__ import annotations
 
 from pathlib import Path
+from tools.paths import KEPLER_DATA_DIR, TESS_DATA_DIR, ANALYSIS_DIR
 from urllib.parse import quote
 import re
 import sys
@@ -87,8 +88,8 @@ N_UNIVERSES = 10
 # only contains one spectral type, it adds counts solely to that type's panel.
 EXTRA_START_INDEX = 8001
 
-KEPLER_PPOP_DIR = ROOT / "run" / "kepler" / "data" / "Gaia"
-TESS_PPOP_DIR   = ROOT / "run" / "tess"   / "data" / "Gaia_cdpp_v1"
+KEPLER_PPOP_DIR = Path(KEPLER_DATA_DIR) / "Gaia"
+TESS_PPOP_DIR   = Path(TESS_DATA_DIR) / "Gaia_cdpp_v1"
 
 
 def _ppop_files(directory: Path, stem: str) -> list[Path]:
@@ -134,13 +135,13 @@ REF_CURVE_PATH = ROOT / "run" / "kepler" / "reference_curves" / "ref.ddat"
 ROCKY_CURVE_PATH  = ROOT / "Hongyi-silicon.ddat"
 ROCKY_CURVE_LABEL = "silicate rocky curve (Hongyi-silicon.ddat)"
 
-NASA_DATA_DIR = ROOT / "run" / "kepler" / "data" / "NASA"
+NASA_DATA_DIR = Path(KEPLER_DATA_DIR) / "NASA"
 NASA_DATA_DIR.mkdir(parents=True, exist_ok=True)
 NASA_FLAGS_CACHE = (
     NASA_DATA_DIR / "NASA_PSCompPars_transiting_confirmed_RM_insolation_errors_limits.csv"
 )
 
-OUT_DIR = ROOT / "output/plots" / "56_kepler_tess_rocky_fgkm_gaia60pc"
+OUT_DIR = Path(ANALYSIS_DIR) / "56_kepler_tess_rocky_fgkm_gaia60pc"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── LHS 1140 b anchor ────────────────────────────────────────────────────────

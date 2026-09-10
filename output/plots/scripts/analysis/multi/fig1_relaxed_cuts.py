@@ -8,6 +8,7 @@ Writes to output/plots/47_fig1_relaxed_cuts/ only, never to paper/figures/.
 
 import importlib.util
 import sys
+from tools.paths import ANALYSIS_DIR
 from pathlib import Path
 
 import numpy as np
@@ -28,7 +29,7 @@ CORNER_RADIUS = 1.35
 MAX_RADIUS_REL_UNCERTAINTY = 0.10
 MAX_MASS_REL_UNCERTAINTY = 0.30
 
-OUT_DIR = ROOT / "output/plots" / "47_fig1_relaxed_cuts"
+OUT_DIR = Path(ANALYSIS_DIR) / "47_fig1_relaxed_cuts"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 CORNER_COLOR = "#ff9ec4"

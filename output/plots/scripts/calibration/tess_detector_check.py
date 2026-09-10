@@ -29,10 +29,10 @@ try:
 except Exception:
     pass
 
-from tools.paths import LIFESIM_OUTER_DIR
+from tools.paths import LIFESIM_OUTER_DIR, TESS_DATA_DIR, ANALYSIS_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
-CATALOG = ROOT / "run" / "tess" / "data" / "Gaia_cdpp_v1" / "tess_catalog_0.csv"
-OUT_DIR = ROOT / "output/plots" / "04_tess_detector_check"
+CATALOG = Path(TESS_DATA_DIR) / "Gaia_cdpp_v1" / "tess_catalog_0.csv"
+OUT_DIR = Path(ANALYSIS_DIR) / "04_tess_detector_check"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 SNR_THRESHOLD = 7.1

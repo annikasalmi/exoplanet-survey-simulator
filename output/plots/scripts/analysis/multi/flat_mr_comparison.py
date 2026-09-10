@@ -29,7 +29,7 @@ import sys
 import importlib.util
 from pathlib import Path
 
-from tools.paths import LIFESIM_OUTER_DIR
+from tools.paths import LIFESIM_OUTER_DIR, ANALYSIS_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -61,7 +61,7 @@ def _load(name, path):
 S72 = _load("s72", str(ROOT / "output" / "plots" / "scripts" / "analysis" / "multi" / "puffy_cuts_flat.py"))
 S72.N_REPEATS = 4000            # bells smooth at 4k; keeps the 12-panel run quick
 
-OUT_DIR = os.path.join(ROOT, "output/plots", "19_flat_mr_comparison")
+OUT_DIR = os.path.join(ANALYSIS_DIR, "19_flat_mr_comparison")
 FLAT_N = 200000                 # flat Forecaster pool (cached; first build is the slow part)
 SEED = 0
 FLAT_CACHE = os.path.join(UNIFORM_OUT_DIR, f"flat_catalog_forecaster_n{FLAT_N}_s{SEED}.csv")

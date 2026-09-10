@@ -41,7 +41,7 @@ import sys
 import importlib.util
 from pathlib import Path
 
-from tools.paths import LIFESIM_OUTER_DIR
+from tools.paths import LIFESIM_OUTER_DIR, ANALYSIS_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -67,7 +67,7 @@ def _load_by_path(name: str, rel: str):
 
 S82 = _load_by_path("s82", "important_plots/likelihood_ratio_catalog.py")
 
-OUT_DIR = os.path.join(ROOT, "output/plots", "36_corner_theta_interval")
+OUT_DIR = os.path.join(ANALYSIS_DIR, "36_corner_theta_interval")
 
 THETA_GRID = np.round(np.arange(0.0, 1.2001, 0.025), 3)
 N_NULL = 2000            # null catalogs per theta (acceptance bands)

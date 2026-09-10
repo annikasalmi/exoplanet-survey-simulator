@@ -53,7 +53,7 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 import sys
 from pathlib import Path
 
-from tools.paths import LIFESIM_OUTER_DIR, SILICON_CURVE, PSCOMPPARS_CSV
+from tools.paths import LIFESIM_OUTER_DIR, SILICON_CURVE, PSCOMPPARS_CSV, ANALYSIS_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -80,7 +80,7 @@ from run.ppop.flat_detect import run_kepler, run_rv_best
 
 SILICATE_CURVE = Path(SILICON_CURVE)
 NASA_FILE = Path(PSCOMPPARS_CSV)
-OUT_DIR = os.path.join(ROOT, "my_outputs", "likelihood_ratio_catalog")
+OUT_DIR = os.path.join(ANALYSIS_DIR, "likelihood_ratio_catalog")
 
 FLAT_N_POOL = 1_000_000
 RNG_SEED = 0                      # same flat universe family as script 79

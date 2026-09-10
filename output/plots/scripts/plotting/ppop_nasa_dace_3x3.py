@@ -36,6 +36,7 @@ Caveman version:
 from __future__ import annotations
 
 from pathlib import Path
+from tools.paths import KEPLER_DATA_DIR, ANALYSIS_DIR
 from urllib.parse import quote
 import glob
 import os
@@ -62,15 +63,15 @@ def find_project_root(start_path: Path) -> Path:
 
 ROOT = find_project_root(Path(__file__).resolve())
 
-PPOP_DATA_DIR = ROOT / "run" / "kepler" / "data" / "Gaia"
-NASA_DATA_DIR = ROOT / "run" / "kepler" / "data" / "NASA"
-DACE_DATA_DIR = ROOT / "run" / "kepler" / "data" / "DACE"
+PPOP_DATA_DIR = Path(KEPLER_DATA_DIR) / "Gaia"
+NASA_DATA_DIR = Path(KEPLER_DATA_DIR) / "NASA"
+DACE_DATA_DIR = Path(KEPLER_DATA_DIR) / "DACE"
 REF_CURVE_PATH = ROOT / "run" / "kepler" / "reference_curves" / "ref.ddat"
 
 NASA_DATA_DIR.mkdir(parents=True, exist_ok=True)
 DACE_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-OUT_DIR = ROOT / "output/plots" / "50_ppop_nasa_dace_3x3"
+OUT_DIR = Path(ANALYSIS_DIR) / "50_ppop_nasa_dace_3x3"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # New safer NASA cache. This is the file this script downloads and then uses.
@@ -105,10 +106,10 @@ MAX_MASS_REL_UNCERTAINTY = 0.25    # 25%
 # P-Pop settings.
 PPOP_DETECTION_COLUMNS = ["detected", "detected_best"]
 PPOP_FALLBACK_PATHS = [
-    ROOT / "output/plots" / "19_w3_nasa_vs_ppop_notebook_style" / "plot_data_ppop_detected.csv",
-    ROOT / "output/plots" / "21_ppop_nasa_dace_insolation_3x3" / "plot_data_ppop_detected.csv",
-    ROOT / "output/plots" / "w2_nasa_real_vs_ppop_insolation" / "plot_data_ppop_detected.csv",
-    ROOT / "output/plots" / "w2_nasa_pscomppars_vs_ppop_insolation" / "plot_data_ppop_detected.csv",
+    Path(ANALYSIS_DIR) / "19_w3_nasa_vs_ppop_notebook_style" / "plot_data_ppop_detected.csv",
+    Path(ANALYSIS_DIR) / "21_ppop_nasa_dace_insolation_3x3" / "plot_data_ppop_detected.csv",
+    Path(ANALYSIS_DIR) / "w2_nasa_real_vs_ppop_insolation" / "plot_data_ppop_detected.csv",
+    Path(ANALYSIS_DIR) / "w2_nasa_pscomppars_vs_ppop_insolation" / "plot_data_ppop_detected.csv",
 ]
 
 # DACE settings. This follows the same spirit as your attached script.

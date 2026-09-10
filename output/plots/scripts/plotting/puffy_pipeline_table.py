@@ -13,13 +13,13 @@ import os
 import textwrap
 from pathlib import Path
 
-from tools.paths import LIFESIM_OUTER_DIR
+from tools.paths import LIFESIM_OUTER_DIR, ANALYSIS_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-OUT_DIR = os.path.join(ROOT, "output/plots", "64_puffy_pipeline_table")
+OUT_DIR = os.path.join(ANALYSIS_DIR, "64_puffy_pipeline_table")
 TITLE = "Puffy-Fraction Distribution — Build Pipeline"
 HEAD = ("Step", "What we do  (flat / P-Pop universes)", "NASA — what's different")
 

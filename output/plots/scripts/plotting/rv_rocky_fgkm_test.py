@@ -79,7 +79,7 @@ try:
 except Exception:
     pass
 
-from tools.paths import LIFESIM_OUTER_DIR
+from tools.paths import LIFESIM_OUTER_DIR, TESS_DATA_DIR, ANALYSIS_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -99,8 +99,8 @@ def _load_module(name: str, path: Path):
 S44 = _load_module("s44", ROOT / "plot" / "script plots" / "56_kepler_tess_rocky_fgkm_gaia60pc.py")
 RVData = _load_module("rv_data", ROOT / "detectors" / "rv_data.py").RVData
 
-TESS_PPOP_DIR = ROOT / "run" / "tess" / "data" / "Gaia_cdpp_v1"
-OUT_DIR = ROOT / "output/plots" / "58_rv_rocky_fgkm_test"
+TESS_PPOP_DIR = Path(TESS_DATA_DIR) / "Gaia_cdpp_v1"
+OUT_DIR = Path(ANALYSIS_DIR) / "58_rv_rocky_fgkm_test"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 STAR_ORDER         = S44.STAR_ORDER

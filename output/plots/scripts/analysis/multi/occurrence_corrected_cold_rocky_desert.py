@@ -41,6 +41,7 @@ import os
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 
 import sys
+from tools.paths import ANALYSIS_DIR
 import importlib.util
 from pathlib import Path
 
@@ -76,7 +77,7 @@ C_FLOOR = 0.02   # completeness below this -> correction amplifies noise unbound
 
 
 def _out_dir():
-    return os.path.join(ROOT, "output/plots", _OUT_NAME[_bayes.MISSION])
+    return os.path.join(ANALYSIS_DIR, _OUT_NAME[_bayes.MISSION])
 
 
 def _smooth_nan(field, sigma=1.0):

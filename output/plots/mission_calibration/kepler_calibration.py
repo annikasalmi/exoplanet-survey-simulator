@@ -11,7 +11,7 @@ The core fix over script 28:
     cause of the flat ~0.6x under-estimate in toy MES.
 
 Outputs (single combined figure):
-    my_outputs/kepler_calibration/
+    results/figures/analysis/kepler_calibration/
         kepler_3in1_calibration.png   — scatter | recovery | ratio
         koi_stellar_cached.csv        — downloaded / cached KOI+stellar data
         summary.txt                   — key calibration numbers
@@ -38,7 +38,7 @@ try:
 except Exception:
     pass
 
-from tools.paths import LIFESIM_OUTER_DIR, KOI_CUMULATIVE_CSV
+from tools.paths import LIFESIM_OUTER_DIR, KOI_CUMULATIVE_CSV, PAPER_FIGURES_DIR, CALIBRATION_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -48,11 +48,11 @@ try:
 except Exception as exc:
     raise ImportError(f"Cannot import KeplerData. Run from repo root.\n{exc}") from exc
 
-OUT_DIR = ROOT / "output" / "plots" / "mission_calibration" / "kepler_calibration"
+OUT_DIR = Path(CALIBRATION_DIR) / "kepler_calibration"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 CACHE = OUT_DIR / "koi_stellar_cached.csv"
 
-PAPER_FIG_DIR = ROOT / "paper" / "figures"
+PAPER_FIG_DIR = Path(PAPER_FIGURES_DIR)
 PAPER_FIG_DIR.mkdir(parents=True, exist_ok=True)
 
 MES_THRESHOLD = 7.1

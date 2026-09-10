@@ -38,7 +38,7 @@ if str(ROOT) not in sys.path:
 import numpy as np
 import pandas as pd
 
-from tools.paths import LIFESIM_OUTER_DIR, SILICON_CURVE
+from tools.paths import LIFESIM_OUTER_DIR, SILICON_CURVE, KEPLER_DATA_DIR, ANALYSIS_DIR
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -54,10 +54,10 @@ from run.ppop.uniform_generator import generate_flat_catalog
 from run.ppop.flat_detect import run_kepler, run_rv_best
 
 SILICATE_CURVE = Path(SILICON_CURVE)
-PPOP_CATALOG = ROOT / "run" / "kepler" / "data" / "Gaia" / "kepler_catalog_0.csv"
-NASA_FILE = (ROOT / "run" / "kepler" / "data" / "NASA"
+PPOP_CATALOG = Path(KEPLER_DATA_DIR) / "Gaia" / "kepler_catalog_0.csv"
+NASA_FILE = (Path(KEPLER_DATA_DIR) / "NASA"
              / "NASA_PSCompPars_transiting_confirmed_RM_insolation_errors_limits.csv")
-OUT_DIR = os.path.join(ROOT, "output/plots", "33_energy_bayes_2d")
+OUT_DIR = os.path.join(ANALYSIS_DIR, "33_energy_bayes_2d")
 
 MASS_THRESHOLD = 2.0
 MASS_FRAC_ERR, RAD_FRAC_ERR = 0.20, 0.047

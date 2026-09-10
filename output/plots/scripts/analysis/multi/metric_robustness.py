@@ -32,7 +32,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from tools.paths import LIFESIM_OUTER_DIR, SILICON_CURVE
+from tools.paths import LIFESIM_OUTER_DIR, SILICON_CURVE, KEPLER_DATA_DIR, ANALYSIS_DIR
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -50,10 +50,10 @@ if str(ROOT) not in sys.path:
 from run.ppop.flat_detect import run_kepler, run_rv, RVData
 
 SILICATE_CURVE = Path(SILICON_CURVE)
-KEPLER_DIR = ROOT / "run" / "kepler" / "data" / "Gaia"
-NASA_FILE = (ROOT / "run" / "kepler" / "data" / "NASA"
+KEPLER_DIR = Path(KEPLER_DATA_DIR) / "Gaia"
+NASA_FILE = (Path(KEPLER_DATA_DIR) / "NASA"
              / "NASA_PSCompPars_transiting_confirmed_RM_insolation_errors_limits.csv")
-OUT_DIR = ROOT / "output/plots" / "25_metric_robustness"
+OUT_DIR = Path(ANALYSIS_DIR) / "25_metric_robustness"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 RHO_EARTH = 5.513

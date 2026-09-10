@@ -38,15 +38,15 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import BoundaryNorm
 from matplotlib.patches import Rectangle
 
-from tools.paths import LIFESIM_OUTER_DIR
+from tools.paths import LIFESIM_OUTER_DIR, KEPLER_DATA_DIR, TESS_DATA_DIR, ANALYSIS_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-PPOP_DATA_DIR = ROOT / "run" / "tess" / "data" / "Gaia_C_F_K_combined_cdpp_v1"
-NASA_FILE = (ROOT / "run" / "kepler" / "data" / "NASA"
+PPOP_DATA_DIR = Path(TESS_DATA_DIR) / "Gaia_C_F_K_combined_cdpp_v1"
+NASA_FILE = (Path(KEPLER_DATA_DIR) / "NASA"
              / "NASA_PSCompPars_transiting_confirmed_RM_insolation_errors_limits.csv")
-OUT_DIR = ROOT / "output/plots" / "51_tess_cold_completeness_map"
+OUT_DIR = Path(ANALYSIS_DIR) / "51_tess_cold_completeness_map"
 
 # grid refined around the cold corner (radius floor 1.35, cold cut I<10 / <50)
 R_EDGES = np.array([0.5, 1.0, 1.35, 1.7, 2.2, 3.0, 4.0])

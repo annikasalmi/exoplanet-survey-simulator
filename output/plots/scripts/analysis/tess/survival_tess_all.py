@@ -61,6 +61,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from tools.paths import KEPLER_DATA_DIR, TESS_DATA_DIR, ANALYSIS_DIR
 from pathlib import Path
 
 import matplotlib
@@ -82,15 +83,15 @@ ROOT = find_root(Path(__file__).resolve())
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-OUT_DIR = ROOT / "output/plots" / "11_survival_tess_all"
+OUT_DIR = Path(ANALYSIS_DIR) / "11_survival_tess_all"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # -- Paths (mirror script 36) --------------------------------------------------
 
-PPOP_DATA_DIR = ROOT / "run" / "tess" / "data" / "Gaia_C_F_K_combined_cdpp_v1"
+PPOP_DATA_DIR = Path(TESS_DATA_DIR) / "Gaia_C_F_K_combined_cdpp_v1"
 
 NASA_FLAGS_CACHE = (
-    ROOT / "run" / "kepler" / "data" / "NASA"
+    Path(KEPLER_DATA_DIR) / "NASA"
     / "NASA_PSCompPars_transiting_confirmed_RM_insolation_errors_limits.csv"
 )
 

@@ -40,4 +40,4 @@ else:
     plot_all(df=df, sim_name=SIM_NAME, nruns=NRUNS,
              star_catalog=STAR_CATALOG, use_multiprocessing=True)
 
-print("Done. Plots are under output/ and my_outputs/.")
+print("Done. Plots are under results/.")

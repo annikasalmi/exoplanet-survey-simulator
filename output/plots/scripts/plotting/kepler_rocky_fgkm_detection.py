@@ -19,6 +19,7 @@ Rocky threshold anchor (Cadieux et al. 2024, JWST era):
 from __future__ import annotations
 
 from pathlib import Path
+from tools.paths import KEPLER_DATA_DIR, ANALYSIS_DIR
 from urllib.parse import quote
 import re
 import sys
@@ -52,10 +53,10 @@ except Exception:
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
 STAR_CATALOG_FOLDER = "Gaia_C_F_K_combined"
-PPOP_DATA_DIR = ROOT / "run" / "kepler" / "data" / STAR_CATALOG_FOLDER
+PPOP_DATA_DIR = Path(KEPLER_DATA_DIR) / STAR_CATALOG_FOLDER
 REF_CURVE_PATH = ROOT / "run" / "kepler" / "reference_curves" / "ref.ddat"
 
-NASA_DATA_DIR = ROOT / "run" / "kepler" / "data" / "NASA"
+NASA_DATA_DIR = Path(KEPLER_DATA_DIR) / "NASA"
 NASA_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # Reuse the cache from script 24 if available; download to the same location if not.
@@ -63,7 +64,7 @@ NASA_FLAGS_CACHE = (
     NASA_DATA_DIR / "NASA_PSCompPars_transiting_confirmed_RM_insolation_errors_limits.csv"
 )
 
-OUT_DIR = ROOT / "output/plots" / "53_kepler_rocky_fgkm_detection"
+OUT_DIR = Path(ANALYSIS_DIR) / "53_kepler_rocky_fgkm_detection"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── LHS 1140 b anchor (Cadieux et al. 2024) ──────────────────────────────────

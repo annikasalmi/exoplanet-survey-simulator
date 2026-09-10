@@ -49,7 +49,7 @@ try:
 except Exception:
     pass
 
-from tools.paths import LIFESIM_OUTER_DIR
+from tools.paths import LIFESIM_OUTER_DIR, ANALYSIS_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -80,7 +80,7 @@ TESS_SNR_THRESHOLD = S44.TESS_SNR_THRESHOLD
 CMAP_DETECTED      = S44.CMAP_DETECTED
 
 N_PLANETS_DEFAULT = 1_000_000
-OUT_DIR = ROOT / "output/plots" / "61_flat_transit_rv_3x4"
+OUT_DIR = Path(ANALYSIS_DIR) / "61_flat_transit_rv_3x4"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 

@@ -29,10 +29,10 @@ try:
 except Exception:
     pass
 
-from tools.paths import LIFESIM_OUTER_DIR
+from tools.paths import LIFESIM_OUTER_DIR, KEPLER_DATA_DIR, ANALYSIS_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
-CATALOG = ROOT / "run" / "kepler" / "data" / "Gaia" / "kepler_catalog_0.csv"
-OUT_DIR = ROOT / "output/plots" / "01_kepler_detector_check"
+CATALOG = Path(KEPLER_DATA_DIR) / "Gaia" / "kepler_catalog_0.csv"
+OUT_DIR = Path(ANALYSIS_DIR) / "01_kepler_detector_check"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 MES_THRESHOLD = 7.1

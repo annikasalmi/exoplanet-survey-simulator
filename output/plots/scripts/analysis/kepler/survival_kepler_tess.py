@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from tools.paths import KEPLER_DATA_DIR, TESS_DATA_DIR, ANALYSIS_DIR
 from pathlib import Path
 
 import matplotlib
@@ -77,14 +78,14 @@ ROOT = find_root(Path(__file__).resolve())
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-OUT_DIR = ROOT / "output/plots" / "14_survival_kepler_tess"
+OUT_DIR = Path(ANALYSIS_DIR) / "14_survival_kepler_tess"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # -- Survey configurations -----------------------------------------------------
 
 SURVEYS = {
     "TESS": {
-        "ppop_dir":        ROOT / "run" / "tess" / "data" / "Gaia_C_F_K_combined_cdpp_v1",
+        "ppop_dir":        Path(TESS_DATA_DIR) / "Gaia_C_F_K_combined_cdpp_v1",
         "catalog_pattern": "tess_catalog_*.csv",
         "trans_col":       "tess_transiting_geometric",
         "obs_col":         "tess_observed",       # falls back to all-True if missing
@@ -94,7 +95,7 @@ SURVEYS = {
         "color":           "#e6550d",
     },
     "Kepler": {
-        "ppop_dir":        ROOT / "run" / "kepler" / "data" / "Gaia_C_F_K_combined",
+        "ppop_dir":        Path(KEPLER_DATA_DIR) / "Gaia_C_F_K_combined",
         "catalog_pattern": "kepler_catalog_*.csv",
         "trans_col":       "transiting_geometric",
         "obs_col":         "bright_enough_kepler",
@@ -105,7 +106,7 @@ SURVEYS = {
 }
 
 NASA_FLAGS_CACHE = (
-    ROOT / "run" / "kepler" / "data" / "NASA"
+    Path(KEPLER_DATA_DIR) / "NASA"
     / "NASA_PSCompPars_transiting_confirmed_RM_insolation_errors_limits.csv"
 )
 REF_CURVE_PATH = ROOT / "run" / "kepler" / "reference_curves" / "ref.ddat"

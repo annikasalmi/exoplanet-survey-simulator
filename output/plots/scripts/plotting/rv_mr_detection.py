@@ -51,13 +51,13 @@ try:
 except Exception:
     pass
 
-from tools.paths import LIFESIM_OUTER_DIR
+from tools.paths import LIFESIM_OUTER_DIR, KEPLER_DATA_DIR, TESS_DATA_DIR, ANALYSIS_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
-PPOP_DIR = ROOT / "run" / "tess" / "data" / "Gaia_C_F_K_combined_cdpp_v1"
+PPOP_DIR = Path(TESS_DATA_DIR) / "Gaia_C_F_K_combined_cdpp_v1"
 PPOP_PATTERN = "tess_catalog_*.csv"
-NASA_FILE = (ROOT / "run" / "kepler" / "data" / "NASA"
+NASA_FILE = (Path(KEPLER_DATA_DIR) / "NASA"
              / "NASA_PSCompPars_transiting_confirmed_RM_insolation_errors_limits.csv")
-OUT_DIR = ROOT / "output/plots" / "57_rv_mr_detection"
+OUT_DIR = Path(ANALYSIS_DIR) / "57_rv_mr_detection"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 _spec = importlib.util.spec_from_file_location("rv_data", ROOT / "detectors" / "rv_data.py")

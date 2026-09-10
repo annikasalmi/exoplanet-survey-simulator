@@ -43,7 +43,7 @@ import sys
 import importlib.util
 from pathlib import Path
 
-from tools.paths import LIFESIM_OUTER_DIR
+from tools.paths import LIFESIM_OUTER_DIR, ANALYSIS_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -82,7 +82,7 @@ CORNER_RADIUS = 1.35
 COLD_CUT = dict(mass_min=2.0, insol_max=COLD_INSOL)
 SEED = S77.SEED
 
-OUT_DIR = ROOT / "output/plots" / "49_targeted_precision_power"
+OUT_DIR = Path(ANALYSIS_DIR) / "49_targeted_precision_power"
 FIGS_V2 = ROOT / "paper" / "figures_v2"
 
 # mass-precision ladder for the six candidates (today's worst is ~28%); radius kept as published,

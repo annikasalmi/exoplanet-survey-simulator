@@ -36,7 +36,7 @@ if str(ROOT) not in sys.path:
 import numpy as np
 import pandas as pd
 
-from tools.paths import LIFESIM_OUTER_DIR, SILICON_CURVE
+from tools.paths import LIFESIM_OUTER_DIR, SILICON_CURVE, KEPLER_DATA_DIR, ANALYSIS_DIR
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -52,9 +52,9 @@ from run.ppop.uniform_generator import generate_flat_catalog
 from run.ppop.flat_detect import run_kepler, run_rv_best
 
 SILICATE_CURVE = Path(SILICON_CURVE)
-NASA_FILE = (ROOT / "run" / "kepler" / "data" / "NASA"
+NASA_FILE = (Path(KEPLER_DATA_DIR) / "NASA"
              / "NASA_PSCompPars_transiting_confirmed_RM_insolation_errors_limits.csv")
-OUT_DIR = os.path.join(ROOT, "output/plots", "28_insolation_rocky_fraction")
+OUT_DIR = os.path.join(ANALYSIS_DIR, "28_insolation_rocky_fraction")
 
 FLAT_N_POOL = 300000
 RNG_SEED = 0

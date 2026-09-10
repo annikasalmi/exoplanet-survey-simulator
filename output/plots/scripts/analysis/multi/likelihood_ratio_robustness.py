@@ -38,7 +38,7 @@ import sys
 import importlib.util
 from pathlib import Path
 
-from tools.paths import LIFESIM_OUTER_DIR
+from tools.paths import LIFESIM_OUTER_DIR, ANALYSIS_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -68,7 +68,7 @@ S82 = S83.S82
 from run.ppop.uniform_generator import generate_flat_catalog
 from run.ppop.flat_detect import KeplerData, TESSData, RVData
 
-OUT_DIR = os.path.join(ROOT, "output/plots", "40_likelihood_ratio_robustness")
+OUT_DIR = os.path.join(ANALYSIS_DIR, "40_likelihood_ratio_robustness")
 NOISE_SEED = 11            # same as scripts 82/83 precision config
 N_P = 5000                 # catalogs for p-values
 N_BAND = 1500              # catalogs per theta grid point (bands)

@@ -24,6 +24,7 @@ Run from repo root:
 from __future__ import annotations
 
 from pathlib import Path
+from tools.paths import KEPLER_DATA_DIR, TESS_DATA_DIR, ANALYSIS_DIR
 from urllib.parse import quote
 import re
 import sys
@@ -61,18 +62,18 @@ except Exception:
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
-KEPLER_PPOP_DIR = ROOT / "run" / "kepler" / "data" / "Gaia_C_F_K_combined"
-TESS_PPOP_DIR   = ROOT / "run" / "tess"   / "data" / "Gaia_C_F_K_combined_cdpp_v1"
+KEPLER_PPOP_DIR = Path(KEPLER_DATA_DIR) / "Gaia_C_F_K_combined"
+TESS_PPOP_DIR   = Path(TESS_DATA_DIR) / "Gaia_C_F_K_combined_cdpp_v1"
 
 REF_CURVE_PATH = ROOT / "run" / "kepler" / "reference_curves" / "ref.ddat"
 
-NASA_DATA_DIR = ROOT / "run" / "kepler" / "data" / "NASA"
+NASA_DATA_DIR = Path(KEPLER_DATA_DIR) / "NASA"
 NASA_DATA_DIR.mkdir(parents=True, exist_ok=True)
 NASA_FLAGS_CACHE = (
     NASA_DATA_DIR / "NASA_PSCompPars_transiting_confirmed_RM_insolation_errors_limits.csv"
 )
 
-OUT_DIR = ROOT / "output/plots" / "55_kepler_tess_rocky_fgkm_detection"
+OUT_DIR = Path(ANALYSIS_DIR) / "55_kepler_tess_rocky_fgkm_detection"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── LHS 1140 b anchor ────────────────────────────────────────────────────────

@@ -26,6 +26,7 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 import importlib.util
 import shutil
 import sys
+from tools.paths import ANALYSIS_DIR
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -42,8 +43,8 @@ except Exception:
 NEW_MASS_PREC = 0.30
 NEW_RAD_PREC = 0.10
 
-STRICT_DIR = ROOT / "output/plots" / "bayesian_cold_rocky_desert"
-V2_DIR = ROOT / "output/plots" / "49_bayesian_relaxed"
+STRICT_DIR = Path(ANALYSIS_DIR) / "bayesian_cold_rocky_desert"
+V2_DIR = Path(ANALYSIS_DIR) / "49_bayesian_relaxed"
 FIGS_V2 = ROOT / "paper" / "figures_v2"
 POOLS = ["pool_powerlaw_mass_scatter_dex0.15_mr_C1.03_mr_beta0.29_N10000000_s0.npz",
          "pool_independent_N10000000_s0.npz"]

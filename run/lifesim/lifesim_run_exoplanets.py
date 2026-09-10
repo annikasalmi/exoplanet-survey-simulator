@@ -9,6 +9,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 import lifesim
 
 from tools.paths import LIFESIM_DATA_DIR
+import os
+os.makedirs(LIFESIM_DATA_DIR, exist_ok=True)
 from tools.exoplanet_catalog import load_and_filter_exoplanets
 
 from run.run_sim import plot_all

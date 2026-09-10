@@ -43,7 +43,9 @@ def run_lifesim_single(i, star_catalog='Gaia'):
     bus = lifesim.Bus()
     bus.data.options.set_scenario('baseline')
     bus.data.options.set_manual(diameter=4.0)
-    bus.data.options.set_manual(output_path=os.path.join(LIFESIM_DATA_DIR, star_catalog))
+    out_dir = os.path.join(LIFESIM_DATA_DIR, star_catalog)
+    os.makedirs(out_dir, exist_ok=True)
+    bus.data.options.set_manual(output_path=out_dir)
     bus.data.options.set_manual(output_filename=f'/test_runs_{i}')
     bus.data.catalog_from_ppop(data_path, df=df)
 
@@ -83,6 +85,7 @@ def run_lifesim_import_catalog(i, star_catalog='Gaia'):
     bus = lifesim.Bus()
     bus.data.options.set_scenario('baseline')
     bus.data.options.set_manual(diameter=4.0)
+    os.makedirs(LIFESIM_DATA_DIR, exist_ok=True)
     bus.data.options.set_manual(output_path=LIFESIM_DATA_DIR)
     bus.data.options.set_manual(output_filename=f'/test_runs_{i}')
 

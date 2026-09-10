@@ -47,14 +47,14 @@ try:
 except Exception:
     pass
 
-from tools.paths import LIFESIM_OUTER_DIR
+from tools.paths import LIFESIM_OUTER_DIR, KEPLER_DATA_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
 _spec = importlib.util.spec_from_file_location("rv_data", ROOT / "detectors" / "rv_data.py")
 _rv = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_rv)
 RVData = _rv.RVData
 
-NASA_FILE = ROOT / "run" / "kepler" / "data" / "NASA" / "NASA_PSCompPars_rvamp_calibration.csv"
+NASA_FILE = Path(KEPLER_DATA_DIR) / "NASA" / "NASA_PSCompPars_rvamp_calibration.csv"
 
 
 # --------------------------------------------------------------------------- #

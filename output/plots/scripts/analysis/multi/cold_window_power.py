@@ -74,7 +74,7 @@ try:
 except Exception:
     pass
 
-from tools.paths import LIFESIM_OUTER_DIR
+from tools.paths import LIFESIM_OUTER_DIR, ANALYSIS_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -90,7 +90,7 @@ def _load_module(name: str, path: Path):
 S44 = _load_module("s44", ROOT / "plot" / "script plots" / "56_kepler_tess_rocky_fgkm_gaia60pc.py")
 S53 = _load_module("s53", ROOT / "plot" / "script plots" / "58_rv_rocky_fgkm_test.py")
 
-OUT_DIR = ROOT / "output/plots" / "34_cold_window_power"
+OUT_DIR = Path(ANALYSIS_DIR) / "34_cold_window_power"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 STAR_ORDER         = S44.STAR_ORDER

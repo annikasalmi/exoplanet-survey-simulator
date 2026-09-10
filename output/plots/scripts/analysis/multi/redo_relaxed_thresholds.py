@@ -24,6 +24,7 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 import importlib.util
 import shutil
 import sys
+from tools.paths import KEPLER_DATA_DIR, ANALYSIS_DIR
 from pathlib import Path
 
 import numpy as np
@@ -46,7 +47,7 @@ NEW_CORNER_RADIUS = 1.35
 N_REPEATS = 4000
 COLD_INSOL = 50.0
 
-OUT_DIR = ROOT / "output/plots" / "48_relaxed_redo"
+OUT_DIR = Path(ANALYSIS_DIR) / "48_relaxed_redo"
 FIGS_V2 = ROOT / "paper" / "figures_v2"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 FIGS_V2.mkdir(parents=True, exist_ok=True)
@@ -148,7 +149,7 @@ def census():
     gkm = cold_rocky & np.isin(stype, ["G", "K", "M"])
     print(f"    GKM pooled: P_geom={transits[gkm].mean():.3%}  (N={int(gkm.sum()):,})")
 
-    pp = pd.read_csv(ROOT / "run" / "kepler" / "data" / "Gaia" / "kepler_catalog_0.csv",
+    pp = pd.read_csv(Path(KEPLER_DATA_DIR) / "Gaia" / "kepler_catalog_0.csv",
                      usecols=lambda c: c in ["radius_p", "mass_p", "inc_p", "semimajor_p",
                                              "radius_s", "flux_p"], low_memory=False)
     pm = pp["mass_p"].to_numpy(float)
@@ -164,7 +165,7 @@ def census():
 
     s47 = _load("s47_v2", HERE / "47_fig1_relaxed_cuts.py")
     s47.main()
-    src = ROOT / "output/plots" / "47_fig1_relaxed_cuts" / "rocky_mr_insolation_3panel_r135_prec10_30.png"
+    src = Path(ANALYSIS_DIR) / "47_fig1_relaxed_cuts" / "rocky_mr_insolation_3panel_r135_prec10_30.png"
     shutil.copy(src, FIGS_V2 / "rocky_mr_insolation_3panel_v2.png")
     print(f"\nCopied fig 1 v2 -> {FIGS_V2 / 'rocky_mr_insolation_3panel_v2.png'}")
 

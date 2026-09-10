@@ -5,7 +5,7 @@ run_flat.py — Generate flat universe test populations and run analysis plots.
 This script orchestrates the full flat-universe workflow:
   1. Generate required flat universe configurations
   2. Run Tier 3 analysis plots (flat_rocky_mr_vs_nasa, flat_transit_rv_3x3, two_universe_puffy_overlap)
-  3. Collect outputs to my_outputs/
+  3. Collect outputs to results/figures/analysis/
 
 Usage:
   python run/run_flat.py          # Default: generate nominal_150k and run all plots
@@ -78,7 +78,7 @@ def main():
             run_cmd(["python", script], label)
 
     print("\n" + "="*60)
-    print("  Done. Outputs in my_outputs/")
+    print("  Done. Outputs in results/figures/analysis/")
     print("="*60)
 
 

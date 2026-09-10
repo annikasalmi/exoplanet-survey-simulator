@@ -25,7 +25,7 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 import sys
 from pathlib import Path
 
-from tools.paths import LIFESIM_OUTER_DIR
+from tools.paths import LIFESIM_OUTER_DIR, KEPLER_DATA_DIR, ANALYSIS_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -46,10 +46,10 @@ from run.ppop.uniform_generator import generate_flat_catalog
 from run.ppop.flat_detect import run_kepler, run_rv_best
 
 SILICATE_CURVE = ROOT / "Hongyi-silicon.ddat"
-PPOP_CATALOG = ROOT / "run" / "kepler" / "data" / "Gaia" / "kepler_catalog_0.csv"
-NASA_FILE = (ROOT / "run" / "kepler" / "data" / "NASA"
+PPOP_CATALOG = Path(KEPLER_DATA_DIR) / "Gaia" / "kepler_catalog_0.csv"
+NASA_FILE = (Path(KEPLER_DATA_DIR) / "NASA"
              / "NASA_PSCompPars_transiting_confirmed_RM_insolation_errors_limits.csv")
-OUT_DIR = os.path.join(ROOT, "output/plots", "63_universe_mr_scatter_cuts")
+OUT_DIR = os.path.join(ANALYSIS_DIR, "63_universe_mr_scatter_cuts")
 
 MASS_THRESHOLD = 2.0
 MASS_FRAC_ERR = 0.20

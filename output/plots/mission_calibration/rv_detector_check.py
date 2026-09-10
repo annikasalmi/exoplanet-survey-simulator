@@ -48,14 +48,14 @@ try:
 except Exception:
     pass
 
-from tools.paths import LIFESIM_OUTER_DIR, TESS_DATA_DIR
+from tools.paths import LIFESIM_OUTER_DIR, TESS_DATA_DIR, PAPER_FIGURES_DIR, CALIBRATION_DIR, KEPLER_DATA_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
 PPOP_DIR = Path(TESS_DATA_DIR) / "Gaia_cdpp_v1"
-RVAMP_CACHE = ROOT / "run" / "kepler" / "data" / "NASA" / "NASA_PSCompPars_rvamp_calibration.csv"
-OUT_DIR = ROOT / "output" / "plots" / "mission_calibration" / "rv_detector_check"
+RVAMP_CACHE = Path(KEPLER_DATA_DIR) / "NASA" / "NASA_PSCompPars_rvamp_calibration.csv"
+OUT_DIR = Path(CALIBRATION_DIR) / "rv_detector_check"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-PAPER_FIG_DIR = ROOT / "paper" / "figures"
+PAPER_FIG_DIR = Path(PAPER_FIGURES_DIR)
 PAPER_FIG_DIR.mkdir(parents=True, exist_ok=True)
 
 _spec = importlib.util.spec_from_file_location("rv_data", ROOT / "telescopes" / "rv" / "detection_model.py")

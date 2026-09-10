@@ -27,7 +27,7 @@ from PPop.StarCatalogs import (
     gaia,
 )
 
-NASA_DATA_DIR = ROOT / "run" / "kepler" / "data" / "NASA"
+NASA_DATA_DIR = Path(KEPLER_DATA_DIR) / "NASA"
 NASA_INPUT_CSV = Path(PSCOMPPARS_CSV)
 NASA_OUTPUT_CSV = NASA_DATA_DIR / "kepler_catalog_nasa_pscomppars.csv"
 

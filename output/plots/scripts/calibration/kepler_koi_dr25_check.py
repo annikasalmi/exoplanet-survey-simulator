@@ -14,7 +14,7 @@ toy detector. The goal is signal detectability, not planet validation.
 
 Outputs
 -------
-ROOT / "output/plots" / "02_kepler_koi_dr25_check"
+Path(ANALYSIS_DIR) / "02_kepler_koi_dr25_check"
 
 Main products:
     koi_dr25_detector_check_results.csv
@@ -54,6 +54,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from tools.paths import ANALYSIS_DIR
 from pathlib import Path
 from urllib.parse import quote
 
@@ -91,11 +92,11 @@ except Exception as exc:
     ) from exc
 
 
-OUT_DIR = ROOT / "output/plots" / "02_kepler_koi_dr25_check"
+OUT_DIR = Path(ANALYSIS_DIR) / "02_kepler_koi_dr25_check"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 CACHE_PATH = OUT_DIR / "koi_cumulative_dr25_cached.csv"
-OLD_CACHE_PATH = ROOT / "output/plots" / "24_koi_dr25_detector_check" / "koi_cumulative_dr25_cached.csv"
+OLD_CACHE_PATH = Path(ANALYSIS_DIR) / "24_koi_dr25_detector_check" / "koi_cumulative_dr25_cached.csv"
 RESULTS_PATH = OUT_DIR / "koi_dr25_detector_check_results.csv"
 
 MES_THRESHOLD = 7.1

@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from tools.paths import KEPLER_DATA_DIR, ANALYSIS_DIR
 from pathlib import Path
 
 import matplotlib
@@ -63,15 +64,15 @@ ROOT = find_root(Path(__file__).resolve())
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-OUT_DIR = ROOT / "output/plots" / "13_survival_kepler"
+OUT_DIR = Path(ANALYSIS_DIR) / "13_survival_kepler"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # -- Paths ---------------------------------------------------------------------
 
-PPOP_DATA_DIR = ROOT / "run" / "kepler" / "data" / "Gaia_C_F_K_combined"
+PPOP_DATA_DIR = Path(KEPLER_DATA_DIR) / "Gaia_C_F_K_combined"
 
 NASA_FLAGS_CACHE = (
-    ROOT / "run" / "kepler" / "data" / "NASA"
+    Path(KEPLER_DATA_DIR) / "NASA"
     / "NASA_PSCompPars_transiting_confirmed_RM_insolation_errors_limits.csv"
 )
 

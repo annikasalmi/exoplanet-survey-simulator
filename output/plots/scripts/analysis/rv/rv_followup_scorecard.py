@@ -35,15 +35,15 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from tools.paths import LIFESIM_OUTER_DIR
+from tools.paths import LIFESIM_OUTER_DIR, KEPLER_DATA_DIR, ANALYSIS_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-NASA_FILE = (ROOT / "run" / "kepler" / "data" / "NASA"
+NASA_FILE = (Path(KEPLER_DATA_DIR) / "NASA"
              / "NASA_PSCompPars_transiting_confirmed_RM_insolation_errors_limits.csv")
-CANDIDATE_VALUE_CSV = ROOT / "output/plots" / "49_targeted_precision_power" / "candidate_value.csv"
-OUT_DIR = ROOT / "output/plots" / "50_rv_followup_scorecard"
+CANDIDATE_VALUE_CSV = Path(ANALYSIS_DIR) / "49_targeted_precision_power" / "candidate_value.csv"
+OUT_DIR = Path(ANALYSIS_DIR) / "50_rv_followup_scorecard"
 
 # the cold (I<10) occupants of the relaxed-cut census; the two TOIs are TESS discoveries
 COLD_INSOL = 10.0

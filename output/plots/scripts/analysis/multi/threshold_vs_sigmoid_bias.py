@@ -30,6 +30,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import sys
+from tools.paths import ANALYSIS_DIR
 from pathlib import Path
 
 import matplotlib
@@ -51,7 +52,7 @@ ROOT = find_root(Path(__file__).resolve())
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-OUT_DIR = ROOT / "output/plots" / "threshold_vs_sigmoid_bias"
+OUT_DIR = Path(ANALYSIS_DIR) / "threshold_vs_sigmoid_bias"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── TESSData import (bypass package __init__ to avoid 'git' dependency) ───────

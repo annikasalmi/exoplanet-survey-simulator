@@ -58,6 +58,7 @@ def run_single(i, star_catalog='Gaia'):
     data_path = os.path.join(TESS_DATA_DIR, f'test_runs_tess_{i}')
     df = PPopObj.run_ppop(data_path=data_path)
     PPopObj.catalog_from_ppop(data_path, df=df)
+    PPopObj.catalog_remove_distance(stype='A', mode='larger', dist=0.0)
 
     # random_seed fixes each run's transit phases, so reruns reproduce.
     tess_data = TESSData(PPopObj.catalog, source="ppop", random_seed=i, **TESS_DEFAULTS)

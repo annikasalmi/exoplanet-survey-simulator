@@ -1165,8 +1165,20 @@ def plot_mr_insolation_panels(m_ref, r_ref, nasa_win: pd.DataFrame,
     YLIM = (RADIUS_LIMITS[0], RADIUS_LIMITS[1])
     m_line = np.linspace(XLIM[0] + 1e-3, XLIM[1], 600)
     r_curve = np.interp(m_line, m_ref, r_ref, left=np.nan, right=np.nan)
+    # The silicate grid stops at ~11.8 M_earth; extend its last segment as a
+    # power law so the curve and the pink band reach the edge of the axis.
+    beyond = m_line > m_ref[-1]
+    slope = np.log(r_ref[-1] / r_ref[-2]) / np.log(m_ref[-1] / m_ref[-2])
+    r_curve[beyond] = r_ref[-1] * (m_line[beyond] / m_ref[-1]) ** slope
+    # Gray reference = Earth-like composition (ref.ddat: 32% Fe core, 68% silicate mantle).
+    r_earth = np.full_like(m_line, np.nan)
+    if REF_CURVE_PATH.exists():
+        _ref = np.loadtxt(REF_CURVE_PATH, comments="#")
+        _ref = _ref[_ref[:, 0] > 0]
+        _o = np.argsort(_ref[:, 0])
+        r_earth = np.interp(m_line, _ref[_o, 0], _ref[_o, 1], left=np.nan, right=np.nan)
 
-    fig, axes = plt.subplots(1, 3, figsize=(18, 5.6), sharey=True,
+    fig, axes = plt.subplots(1, 3, figsize=(20, 5.0), sharey=True,
                              constrained_layout=True)
     fac_all = nasa_win["discovery_facility"].fillna("Unknown")
 
@@ -1177,6 +1189,7 @@ def plot_mr_insolation_panels(m_ref, r_ref, nasa_win: pd.DataFrame,
         print(f"  {title:16s}  N={len(panel):3d}")
 
         ax.plot(m_line, r_curve, "k--", lw=1.6, zorder=5)
+        ax.plot(m_line, r_earth, color="0.5", lw=2.0, zorder=5)
 
         for f in major:
             sub = panel[fac == f]
@@ -1191,48 +1204,69 @@ def plot_mr_insolation_panels(m_ref, r_ref, nasa_win: pd.DataFrame,
                 fmt="o", ms=5, color=color_map[f], alpha=0.9,
                 elinewidth=0.7, capsize=2, ecolor="0.6", zorder=4,
             )
+        lhs = panel["planet_label"].str.contains(r"LHS\s*1140\s*b", case=False, na=False, regex=True)
         other = panel[~fac.isin(major)]
-        if len(other) > 0:
+        for sub, ms in [(other[~lhs.loc[other.index]], 5), (other[lhs.loc[other.index]], 8)]:
+            if len(sub) == 0:
+                continue
             ax.errorbar(
-                other["mass_p"], other["radius_p"],
-                xerr=[other["mass_err_minus"].abs().fillna(0).values,
-                      other["mass_err_plus"].abs().fillna(0).values],
-                yerr=[other["radius_err_minus"].abs().fillna(0).values,
-                      other["radius_err_plus"].abs().fillna(0).values],
-                fmt="o", ms=5, color=OTHER_COLOR, alpha=0.75,
+                sub["mass_p"], sub["radius_p"],
+                xerr=[sub["mass_err_minus"].abs().fillna(0).values,
+                      sub["mass_err_plus"].abs().fillna(0).values],
+                yerr=[sub["radius_err_minus"].abs().fillna(0).values,
+                      sub["radius_err_plus"].abs().fillna(0).values],
+                fmt="o", ms=ms, color=OTHER_COLOR, alpha=0.75,
                 elinewidth=0.7, capsize=2, ecolor="0.6", zorder=3,
             )
+        for _, row in panel[lhs].iterrows():
+            ax.annotate("LHS 1140 b", xy=(row["mass_p"], row["radius_p"]),
+                        xytext=(12, 0), textcoords="offset points", va="center",
+                        fontsize=20, color="black", zorder=8)
+
+        # Solar-system reference points: Earth and Venus (M = 0.815 M_earth,
+        # R = 0.949 R_earth, I = 1.91 I_earth), drawn in the panels whose
+        # insolation cut they satisfy.
+        for name, mass, radius, flux, offset in [("Earth", 1.0, 1.0, 1.0, (12, -2)),
+                                                 ("Venus", 0.815, 0.949, 1.91, (12, -20))]:
+            if not sel(np.array([flux]))[0]:
+                continue
+            ax.plot([mass], [radius], "o", ms=8, color="black", zorder=6)
+            ax.annotate(name, xy=(mass, radius), xytext=offset, textcoords="offset points",
+                        va="center", fontsize=20, color="black", zorder=8)
 
         if draw_corner:
             draw_cold_corner_band(ax, m_line, r_curve)
 
         ax.set_xlim(*XLIM)
+        ax.set_xticks(np.arange(XLIM[0], XLIM[1] + 1, 2))
         ax.set_ylim(*YLIM)
-        ax.set_title(title, fontsize=13)
-        ax.set_xlabel(r"Mass [$M_\oplus$]", fontsize=12)
+        ax.set_title(title, fontsize=26)
+        ax.set_xlabel(r"Mass [$M_\oplus$]", fontsize=24)
         ax.grid(alpha=0.25, linestyle="--")
-        ax.tick_params(labelsize=11)
+        ax.tick_params(labelsize=21)
 
-    axes[0].set_ylabel(r"Radius [$R_\oplus$]", fontsize=12)
+    axes[0].set_ylabel(r"Radius [$R_\oplus$]", fontsize=24)
 
     handles = [
         Line2D([0], [0], marker="o", linestyle="", color=color_map[f],
-               markersize=7, label=f"{short_facility(f)}  (N={counts[f]})")
+               markersize=7, label=short_facility(f))
         for f in major
     ]
     n_other = int(len(nasa_win) - sum(counts[f] for f in major))
     if n_other > 0:
         handles.append(Line2D([0], [0], marker="o", linestyle="", color=OTHER_COLOR,
-                              markersize=7, label=f"Other facilities  (N={n_other})"))
+                              markersize=7, label="Other observatories"))
     handles.append(Line2D([0], [0], color="black", lw=1.6, ls="--",
-                          label=f"Silicate rocky curve ({ROCKY_CURVE_PATH.name})"))
+                          label=r"MgSiO$_3$ rocky curve"))
+    handles.append(Line2D([0], [0], color="0.5", lw=2.0,
+                          label="Earth-like rocky curve"))
     handles.append(Patch(facecolor=COLD_CORNER_COLOR, alpha=0.35,
-                         label=r"Cold Rocky Desert ($R>1.4\,R_\oplus$, $I<50$)"))
+                         label=r"$R>1.4\,R_\oplus$, $I<50\,I_\oplus$"))
 
-    fig.legend(handles=handles, loc="outside lower center",
-               ncol=min(len(handles), 5), fontsize=10, framealpha=0.9,
-               title="Observed planets — colored by discovery facility",
-               title_fontsize=11)
+    fig.legend(handles=handles, loc="outside right center",
+               ncol=1, fontsize=20, framealpha=0.9)
+    # Extra horizontal padding so the legend frame clears the last panel.
+    fig.get_layout_engine().set(w_pad=0.15)
 
     out = OUT_DIR / "rocky_mr_insolation_3panel.png"
     fig.savefig(out, dpi=250, bbox_inches="tight")
@@ -1248,57 +1282,71 @@ def plot_mr_insolation_panels(m_ref, r_ref, nasa_win: pd.DataFrame,
 def plot_rocky_scatter_standalone(rocky_win: pd.DataFrame, shift: float) -> Path:
     """Insolation vs radius for in-window confirmed rocky planets, colored by
     host star type, with a straight 90% upper-bound fit line."""
-    fig, ax = plt.subplots(figsize=(9, 6.5), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=(10, 7.5), constrained_layout=True)
+    xlim = (INSOLATION_LIMITS[0], 1e4)
+    ylim = (0.6, RADIUS_LIMITS[1])
 
     # Insolation-bin shading (matches the survival-analysis bins).
-    ax.axvspan(INSOLATION_LIMITS[0], COLD_CORNER_INSOL, color="#74add1", alpha=0.06, zorder=0,
-               label="S < 50 (cold)")
-    ax.axvspan(COLD_CORNER_INSOL, INSOLATION_LIMITS[1], color="#fdae61", alpha=0.06, zorder=0,
-               label="S ≥ 50 (hot)")
-    ax.axvline(COLD_CORNER_INSOL, color="gray", lw=0.8, ls="--", alpha=0.5, zorder=1)
+    ax.axvspan(xlim[0], COLD_CORNER_INSOL, color="#74add1", alpha=0.06, zorder=0)
+    ax.axvspan(COLD_CORNER_INSOL, xlim[1], color="#fdae61", alpha=0.06, zorder=0)
 
     # Cold Corner: large (R > 1.4 R_earth), low-insolation (I < 50) box.
     ax.add_patch(Rectangle(
         (INSOLATION_LIMITS[0], COLD_CORNER_RADIUS),
         COLD_CORNER_INSOL - INSOLATION_LIMITS[0], RADIUS_LIMITS[1] - COLD_CORNER_RADIUS,
         fill=False, edgecolor="red", lw=2.2, zorder=6,
-        label=r"Cold Rocky Desert ($R>1.4\,R_\oplus$, $I<50$)",
+        label=r"$R>1.4\,R_\oplus$, $I<50\,I_\oplus$",
     ))
 
-    for stype in STAR_ORDER:
-        sub = rocky_win[rocky_win["stype_clean"] == stype]
-        if len(sub) == 0:
-            continue
-        color = STYPE_COLORS.get(stype, "gray")
+    # Labelled planets (LHS 1140 b, Earth, Venus) use the same style as their
+    # host-star group, just with a larger dot.
+    labelled_ms = 6.5
+    lhs_mask = rocky_win["planet_label"].str.contains(r"LHS\s*1140\s*b", case=False, na=False, regex=True)
+
+    def draw_group(sub, color, ms, label=None):
         yerr_hi = sub["radius_err_plus"].abs().fillna(0).values
         yerr_lo = sub["radius_err_minus"].abs().fillna(0).values
         ax.errorbar(
             sub["flux_p"], sub["radius_p"], yerr=[yerr_lo, yerr_hi],
-            fmt="o", ms=5, color=color, alpha=0.85,
+            fmt="o", ms=ms, color=color, alpha=0.85,
             elinewidth=0.9, capsize=2.5, ecolor=color,
-            label=f"{stype} stars (N={len(sub)})", zorder=4,
+            label=label, zorder=4,
         )
 
+    for stype in STAR_ORDER:
+        sub = rocky_win[(rocky_win["stype_clean"] == stype) & ~lhs_mask]
+        if len(sub) == 0:
+            continue
+        draw_group(sub, STYPE_COLORS.get(stype, "gray"), 5, label=f"{stype} stars")
 
     # Cold window is the square (S<50, R>1.4) only; the 90% upper-bound line
     # (competing definition) is intentionally omitted.
-    lhs_mask = rocky_win["planet_label"].str.contains(r"LHS\s*1140\s*b", case=False, na=False, regex=True)
-    for _, row in rocky_win[lhs_mask].iterrows():
-        ax.scatter([row["flux_p"]], [row["radius_p"]],
-                   s=100, marker="*", color="gold", edgecolors="darkred",
-                   linewidths=1.0, zorder=7)
+    for idx, row in rocky_win[lhs_mask].iterrows():
+        draw_group(rocky_win.loc[[idx]], STYPE_COLORS.get(row["stype_clean"], "gray"), labelled_ms)
         ax.annotate("LHS 1140 b",
                     xy=(row["flux_p"], row["radius_p"]),
-                    xytext=(6, 5), textcoords="offset points",
-                    fontsize=11, color="darkred", fontweight="bold", zorder=8)
+                    xytext=(8, 6), textcoords="offset points",
+                    fontsize=20, color="black", zorder=8)
+
+    # Solar-system reference points (G host): Earth and Venus (I = 1.91 I_earth, R = 0.949 R_earth).
+    for name, flux, radius, offset, ha in [("Earth", 1.0, 1.0, (0, 14), "center"),
+                                           ("Venus", 1.91, 0.949, (10, -22), "left")]:
+        ax.plot([flux], [radius], "o", ms=labelled_ms, color=STYPE_COLORS["G"],
+                alpha=0.85, zorder=4)
+        ax.annotate(name, xy=(flux, radius), xytext=offset, textcoords="offset points",
+                    ha=ha, fontsize=20, color="black", zorder=8)
 
     _setup_axis(ax, "")
-    ax.set_title(f"Confirmed rocky planets (N={len(rocky_win)})", fontsize=14)
-    ax.set_xlabel(r"Insolation flux [$I_\oplus$]", fontsize=13)
-    ax.set_ylabel(r"Planet radius [$R_\oplus$]", fontsize=13)
-    ax.tick_params(labelsize=11)
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+    ax.set_yticks([1.0, 1.5, 2.0])
+    ax.set_title("Confirmed rocky planets", fontsize=26)
+    ax.set_xlabel(r"Insolation flux [$I_\oplus$]", fontsize=24)
+    ax.set_ylabel(r"Planet radius [$R_\oplus$]", fontsize=24)
+    ax.tick_params(labelsize=20)
     ax.set_facecolor("#fafafa")
-    ax.legend(loc="lower left", fontsize=10, framealpha=0.90)
+    ax.legend(loc="lower left", ncol=5, fontsize=16, framealpha=0.90, handlelength=1.4,
+              handletextpad=0.4, columnspacing=1.0, borderaxespad=0.3).set_zorder(10)
 
     out = OUT_DIR / "rocky_scatter_standalone.png"
     fig.savefig(out, dpi=250, bbox_inches="tight")
@@ -1349,8 +1397,14 @@ def main():
 
     # 1x3 mass-radius insolation panels (professor's figure, our data). Facility
     # styles are built from the full in-window sample shown here (rocky + puffy).
-    cm_win, major_win, counts_win = build_facility_styles(nasa_win)
-    plot_mr_insolation_panels(m_ref, r_ref, nasa_win, cm_win, major_win, counts_win)
+    # Kepler and K2 are the same spacecraft, so they share one color here.
+    mr_win = nasa_win.assign(discovery_facility=nasa_win["discovery_facility"].replace(
+        {"Kepler": "Kepler and K2", "K2": "Kepler and K2"}))
+    cm_win, major_win, counts_win = build_facility_styles(mr_win)
+    # Only TESS and Kepler/K2 get their own color; everything else is "Other observatories".
+    major_win = [f for f in major_win
+                 if f in ("Transiting Exoplanet Survey Satellite (TESS)", "Kepler and K2")]
+    plot_mr_insolation_panels(m_ref, r_ref, mr_win, cm_win, major_win, counts_win)
     print()
 
     if "--full" not in sys.argv:

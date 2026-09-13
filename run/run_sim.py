@@ -19,6 +19,7 @@ from run.lifesim.lifesim_run_multiple import main as main_lifesim
 from run.hwo.hwo_run_multiple import main as main_hwo
 from run.kepler.run_kepler import main as main_kepler
 from run.tess.run_tess import main as main_tess
+from run.rv.run_rv import main as main_rv
 from run.flat_universe.run_flat_universe import main as main_flat_universe
 
 from output.plots.plot import plot_all

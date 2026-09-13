@@ -5,7 +5,7 @@ nothing here is a source of truth — any of it can be deleted and regenerated.
 
 ```
 catalogs/     simulated planet populations, one directory per pipeline
-  kepler/  tess/  hwo/  lifesim/  flat_universe/
+  kepler/  tess/  rv/  hwo/  lifesim/  flat_universe/
 figures/
   simulation/   plot_all output, per run: <sim>_<nruns>_<catalog>/
   analysis/     the analysis scripts, one directory each

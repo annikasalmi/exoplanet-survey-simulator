@@ -4,6 +4,7 @@ from run.lifesim.lifesim_run_multiple import main as main_lifesim
 from run.hwo.hwo_run_multiple import main as main_hwo
 from run.kepler.run_kepler import main as main_kepler
 from run.tess.run_tess import main as main_tess
+from run.rv.run_rv import main as main_rv
 from run.flat_universe.run_flat_universe import main as main_flat_universe
 from output.plots.plot import plot_all
 from output.plots.plot_flat_universe import plot_flat_universe
@@ -13,7 +14,7 @@ from output.plots.plot_flat_universe import plot_flat_universe
 
 NRUNS = 1
 STAR_CATALOG = 'Gaia'        # or 'ExoCat_1'
-SIM_NAME = 'flat_universe'   # 'flat_universe', 'kepler', 'tess', 'hwo', 'lifesim'
+SIM_NAME = 'flat_universe'   # 'flat_universe', 'kepler', 'tess', 'rv', 'hwo', 'lifesim'
 
 # flat_universe draws its own stars and takes about a minute. The others build a
 # P-Pop universe per run, which takes hours -- raise NRUNS only if you mean it.
@@ -23,6 +24,7 @@ sim_funcs = {
     'lifesim': main_lifesim,
     'kepler': main_kepler,
     'tess': main_tess,
+    'rv': main_rv,
 }
 
 if SIM_NAME not in sim_funcs:

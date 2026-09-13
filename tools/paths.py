@@ -19,6 +19,7 @@ RESULTS_DIR = os.path.join(LIFESIM_OUTER_DIR, "results")
 CATALOGS_DIR = os.path.join(RESULTS_DIR, "catalogs")
 KEPLER_DATA_DIR = os.path.join(CATALOGS_DIR, "kepler")
 TESS_DATA_DIR = os.path.join(CATALOGS_DIR, "tess")
+RV_DATA_DIR = os.path.join(CATALOGS_DIR, "rv")
 HWO_DATA_DIR = os.path.join(CATALOGS_DIR, "hwo")
 LIFESIM_DATA_DIR = os.path.join(CATALOGS_DIR, "lifesim")
 FLAT_UNIVERSE_DATA_DIR = os.path.join(CATALOGS_DIR, "flat_universe")
@@ -32,8 +33,6 @@ PAPER_FIGURES_DIR = os.path.join(RESULTS_DIR, "paper")
 LOGGING = os.path.join(RESULTS_DIR, "logs")
 DEMO_DIR = os.path.join(RESULTS_DIR, "demo")  # hwo_demo / lifesim_demo
 
-# Older name for the analysis figures; kept so existing scripts keep working.
-MY_OUTPUTS_DIR = ANALYSIS_DIR
 
 SILICON_CURVE = os.path.join(DATA_DIR, "silicon_curve.ddat")
 EXOPLANET_CSV_DIR = os.path.join(DATA_DIR, "exoplanet_csv")

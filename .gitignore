@@ -17,21 +17,17 @@ htmlcov/
 
 # Everything generated lives under results/ -- one rule, so a new
 # pipeline cannot leak a catalogue into a commit by being forgotten here.
-/output/results/
+# results/README.md is re-included at the bottom, after the *.md rule.
 /results/*
-!results/README.md
-
-# Run outputs and logs
-
+/output/results/
+/output/figures/
+/logs/
 
 # PPop generated
 /PPop/data/
 /PPop/Figures/
 /PPop/TestPlanetPopulation.out
 TestPlanetPopulation.txt
-
-# Local Python virtual environments
-/venv/
 
 # Personal Claude Code overrides (not shared)
 /CLAUDE.local.md
@@ -40,44 +36,15 @@ PPop/StarCatalogs/*.csv
 # The default catalogue every P-Pop pipeline reads; without it a clone cannot simulate.
 !PPop/StarCatalogs/gaia_within_60pc.csv
 
-
-scripts/__pycache__/*
-scripts/*/__pycache__/*
-plot/script plots/__pycache__/*
-run/__pycache__/*
-
-*.md
-memory/*.md
-overleaf_packages/*
-overleaf_packages/*/*
-overleaf_packages/*/*/*
-overleaf_packages/*/*/*/*
-tests/*/*.pyc
+# Paper drafting
+overleaf_packages/
 paper.zip
 texput.log
 
-memory/*.md
-
-# --- added with the vendored-fork relabelling ---
-__pycache__/
-*.py[cod]
-*.egg-info/
-build/
-dist/
-.pytest_cache/
-.coverage
-.vscode/
-/logs/
-/PPop/TestPlanetPopulation.out
-
-# `*.md` above is deliberate, but these record who wrote what and must ship
+# `*.md` is deliberate, but these record who wrote what and must ship
+*.md
 !README.md
 !MANIFEST.in
 !PPop/UPSTREAM.md
 !lifesim/UPSTREAM.md
 !results/README.md
-
-# Generated plot output
-/output/figures/
-
-# Per-script generated output under output/plots/

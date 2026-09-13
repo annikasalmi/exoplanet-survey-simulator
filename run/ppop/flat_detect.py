@@ -58,6 +58,10 @@ def run_rv_best(catalog: pd.DataFrame, mag_target: float = 12.0) -> pd.DataFrame
     n = run_rv(catalog, "NIRPS")
     best = h.copy()
     best["detected"] = h["detected"].astype(bool) | n["detected"].astype(bool)
+    # RVData has no best/worst split (both copy `detected`), so keep them on the
+    # combined value rather than HARPS alone.
+    best["detected_best"] = best["detected"]
+    best["detected_worst"] = best["detected"]
     h_mag = pd.to_numeric(h["rv_mag"], errors="coerce")
     n_mag = pd.to_numeric(n["rv_mag"], errors="coerce")
     best["rv_is_target"] = (h_mag <= mag_target) | (n_mag <= mag_target)

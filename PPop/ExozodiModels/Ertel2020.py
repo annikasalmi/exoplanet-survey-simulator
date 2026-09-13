@@ -36,6 +36,10 @@ class ExozodiModel():
             Scenario for exozodi level.
         """
         self.rng = rng
+        # z draws from a child of the run's generator: seeded, so a run reproduces,
+        # but spawning does not advance the parent, so the planets drawn from it
+        # are the same as before this generator existed.
+        self.zrng = rng.spawn(1)[0] if rng is not None else np.random.default_rng()
         
         # Model parameters.
         if (Scenario == 'baseline'):
@@ -62,7 +66,7 @@ class ExozodiModel():
             Exozodiacal dust level of drawn system.
         """
         
-        z = np.exp(self.LogExozodiKDE.resample(1)[0][0])
+        z = np.exp(self.LogExozodiKDE.resample(1, seed=self.zrng)[0][0])
         
         return z
     

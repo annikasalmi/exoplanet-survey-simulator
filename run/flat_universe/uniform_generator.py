@@ -143,7 +143,10 @@ def _mass_from_radius(radius, mass_model, rng, mass_lims, scatter_dex, mr_C=1.0,
         mass = MassModel(rng).RadiusToMass(np.asarray(radius, float))
     else:
         raise ValueError(f"unknown mass_model {mass_model!r}")
-    return np.clip(mass, mass_lims[0], mass_lims[1])
+    # Only the lower bound is clipped; masses above the upper bound are returned
+    # as-is so generate_flat_catalog can discard those planets (clipping them
+    # piled every heavier planet up at exactly mass_lims[1]).
+    return np.maximum(mass, mass_lims[0])
 
 
 def generate_flat_catalog(
@@ -234,6 +237,10 @@ def generate_flat_catalog(
     if mass_model != "independent":
         df["mass_p"] = _mass_from_radius(df["radius_p"].to_numpy(), mass_model, rng,
                                          mass_lims, mass_scatter_dex, mr_C, mr_beta)
+        # Planets whose relation-derived mass exceeds the box are discarded, so the
+        # catalogue can hold fewer than n_planets rows. No random draws follow, so
+        # every surviving planet is identical to the unfiltered catalogue.
+        df = df[df["mass_p"] <= mass_lims[1]].reset_index(drop=True)
     return df
 
 

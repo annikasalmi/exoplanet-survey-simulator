@@ -36,7 +36,7 @@ Caveman version:
 from __future__ import annotations
 
 from pathlib import Path
-from tools.paths import KEPLER_DATA_DIR, ANALYSIS_DIR
+from tools.paths import KEPLER_DATA_DIR, ANALYSIS_DIR, KEPLER_REF_CURVE
 from urllib.parse import quote
 import glob
 import os
@@ -66,7 +66,7 @@ ROOT = find_project_root(Path(__file__).resolve())
 PPOP_DATA_DIR = Path(KEPLER_DATA_DIR) / "Gaia"
 NASA_DATA_DIR = Path(KEPLER_DATA_DIR) / "NASA"
 DACE_DATA_DIR = Path(KEPLER_DATA_DIR) / "DACE"
-REF_CURVE_PATH = ROOT / "run" / "kepler" / "reference_curves" / "ref.ddat"
+REF_CURVE_PATH = Path(KEPLER_REF_CURVE)
 
 NASA_DATA_DIR.mkdir(parents=True, exist_ok=True)
 DACE_DATA_DIR.mkdir(parents=True, exist_ok=True)

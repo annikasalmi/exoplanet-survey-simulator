@@ -35,7 +35,7 @@ Run from repo root:
 from __future__ import annotations
 
 from pathlib import Path
-from tools.paths import KEPLER_DATA_DIR, TESS_DATA_DIR, ANALYSIS_DIR
+from tools.paths import KEPLER_DATA_DIR, TESS_DATA_DIR, ANALYSIS_DIR, KEPLER_REF_CURVE
 from urllib.parse import quote
 import re
 import sys
@@ -124,7 +124,7 @@ def _ppop_files(directory: Path, stem: str) -> list[Path]:
 
 # Pure-rock reference curve (kept as the BLACK comparison line in the M-R
 # diagnostic only; it no longer defines the threshold).
-REF_CURVE_PATH = ROOT / "run" / "kepler" / "reference_curves" / "ref.ddat"
+REF_CURVE_PATH = Path(KEPLER_REF_CURVE)
 
 # Rocky / silicate mass-radius curve supplied by the professor (Hongyi-silicon.ddat).
 # Column 0 = mass [M_earth], column 1 = radius [R_earth]; the rest are unused

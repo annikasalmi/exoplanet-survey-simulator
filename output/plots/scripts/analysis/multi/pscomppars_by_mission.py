@@ -23,7 +23,7 @@ They do NOT go through your kepler_Data detector. Only P-Pop is detector-made.
 from __future__ import annotations
 
 from pathlib import Path
-from tools.paths import ANALYSIS_DIR, KEPLER_DATA_DIR
+from tools.paths import ANALYSIS_DIR, KEPLER_DATA_DIR, KEPLER_REF_CURVE
 from urllib.parse import quote
 import sys
 
@@ -49,7 +49,7 @@ def find_project_root(start_path: Path) -> Path:
 ROOT = find_project_root(Path(__file__).resolve())
 
 NASA_DATA_DIR = Path(KEPLER_DATA_DIR) / "NASA"
-REF_CURVE_PATH = ROOT / "run" / "kepler" / "reference_curves" / "ref.ddat"
+REF_CURVE_PATH = Path(KEPLER_REF_CURVE)
 NASA_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 OUT_DIR = Path(ANALYSIS_DIR) / "pscomppars_by_mission"

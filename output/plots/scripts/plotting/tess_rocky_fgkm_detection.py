@@ -27,7 +27,7 @@ Run from repo root:
 from __future__ import annotations
 
 from pathlib import Path
-from tools.paths import KEPLER_DATA_DIR, TESS_DATA_DIR, ANALYSIS_DIR
+from tools.paths import KEPLER_DATA_DIR, TESS_DATA_DIR, ANALYSIS_DIR, KEPLER_REF_CURVE
 from urllib.parse import quote
 import re
 import sys
@@ -64,7 +64,7 @@ except Exception:
 
 PPOP_DATA_DIR = Path(TESS_DATA_DIR) / "Gaia_C_F_K_combined_cdpp_v1"
 
-REF_CURVE_PATH = ROOT / "run" / "kepler" / "reference_curves" / "ref.ddat"
+REF_CURVE_PATH = Path(KEPLER_REF_CURVE)
 
 NASA_DATA_DIR = Path(KEPLER_DATA_DIR) / "NASA"
 NASA_DATA_DIR.mkdir(parents=True, exist_ok=True)

@@ -42,7 +42,7 @@ import sys
 import numpy as np
 import pandas as pd
 
-from tools.paths import SILICON_CURVE, ANALYSIS_DIR, PAPER_FIGURES_DIR, KEPLER_DATA_DIR, TESS_DATA_DIR
+from tools.paths import SILICON_CURVE, ANALYSIS_DIR, PAPER_FIGURES_DIR, KEPLER_DATA_DIR, TESS_DATA_DIR, KEPLER_REF_CURVE
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -131,7 +131,7 @@ def _ppop_files(directory: Path, stem: str) -> list[Path]:
 
 # Pure-rock reference curve (kept as the BLACK comparison line in the M-R
 # diagnostic only; it no longer defines the threshold).
-REF_CURVE_PATH = ROOT / "run" / "kepler" / "reference_curves" / "ref.ddat"
+REF_CURVE_PATH = Path(KEPLER_REF_CURVE)
 
 # Rocky / silicate mass-radius curve supplied by the professor (silicon_curve.ddat).
 # Column 0 = mass [M_earth], column 1 = radius [R_earth]; the rest are unused

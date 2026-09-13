@@ -36,7 +36,9 @@ TestPlanetPopulation.txt
 # Personal Claude Code overrides (not shared)
 /CLAUDE.local.md
 
-Ppop/StarCatalogs/*.csv
+PPop/StarCatalogs/*.csv
+# The default catalogue every P-Pop pipeline reads; without it a clone cannot simulate.
+!PPop/StarCatalogs/gaia_within_60pc.csv
 
 
 scripts/__pycache__/*

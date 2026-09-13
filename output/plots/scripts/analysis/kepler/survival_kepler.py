@@ -41,7 +41,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-from tools.paths import KEPLER_DATA_DIR, ANALYSIS_DIR
+from tools.paths import KEPLER_DATA_DIR, ANALYSIS_DIR, KEPLER_REF_CURVE
 from pathlib import Path
 
 import matplotlib
@@ -76,7 +76,7 @@ NASA_FLAGS_CACHE = (
     / "NASA_PSCompPars_transiting_confirmed_RM_insolation_errors_limits.csv"
 )
 
-REF_CURVE_PATH = ROOT / "run" / "kepler" / "reference_curves" / "ref.ddat"
+REF_CURVE_PATH = Path(KEPLER_REF_CURVE)
 
 # Kepler primary mission + K2 (K2 weights approximated via Kepler P-Pop; see docstring).
 KEPLER_FACILITIES = {"Kepler", "K2"}

@@ -256,6 +256,24 @@ def make_otegi_2x1(arr, nasa, m_sil, r_sil, rng):
     print(f"--> Saved paper copy: {PAPER_FIG_DIR / 'flat_otegi_2x1_cold_cut.png'}")
 
 
+def make_otegi_bells_only(arr, nasa, m_sil, r_sil, rng):
+    """Standalone panel: the Otegi volatile-fraction count histograms under the
+    cold super-Earth cut, with no mass-radius panel."""
+    print("\n--> Otegi volatile-fraction panel only (cold super-Earth cut):")
+    cut_label, cut = OTEGI_2X2_CUTS[1]
+    fig, ax = plt.subplots(figsize=(7.0, 5.2))
+    _draw_bells(ax, arr, cut, nasa, m_sil, r_sil, rng, tag=f"[bells only] {cut_label}")
+    fig.tight_layout()
+    fname = "flat_otegi_bells_cold_cut.png"
+    out_png = os.path.join(OUT_DIR, fname)
+    fig.savefig(out_png, dpi=170, bbox_inches="tight")
+    PAPER_FIG_DIR.mkdir(parents=True, exist_ok=True)
+    fig.savefig(PAPER_FIG_DIR / fname, dpi=170, bbox_inches="tight")
+    plt.close(fig)
+    print(f"--> Saved: {out_png}")
+    print(f"--> Saved paper copy: {PAPER_FIG_DIR / fname}")
+
+
 def make_paper_2col(pools, nasa, m_sil, r_sil, rng):
     """Paper figure (fig:mrrel): cold super-Earth cut, two representative rocky
     mass-radius relations (Chen & Kipping, Otegi) side by side, mass-radius draw
@@ -295,6 +313,7 @@ def main():
     make_otegi_2x2(otegi_arr, nasa, m_sil, r_sil, rng)
     make_otegi_2x1(otegi_arr, nasa, m_sil, r_sil, rng)
     make_paper_2col(pools, nasa, m_sil, r_sil, rng)
+    make_otegi_bells_only(otegi_arr, nasa, m_sil, r_sil, rng)
 
 
 if __name__ == "__main__":

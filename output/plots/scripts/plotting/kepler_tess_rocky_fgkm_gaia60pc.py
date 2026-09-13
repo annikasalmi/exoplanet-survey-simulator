@@ -5,7 +5,7 @@ New-universe version of script 44. Reads the P-Pop catalogs generated from the
 Gaia-60pc star catalog, stacking up to N_UNIVERSES seeded universes per mission
 to smooth the (locally sparse) F/G/K detection background:
     Kepler : run/kepler/data/Gaia/kepler_catalog_{0..N-1}.csv
-    TESS   : run/tess/data/Gaia_cdpp_v1/tess_catalog_{0..N-1}.csv
+    TESS   : run/tess/data/Gaia/tess_catalog_{0..N-1}.csv
 Files are addressed by explicit index (0..N_UNIVERSES-1), NOT globbed, so stale
 higher-numbered catalogs left in the same folder by older runs are ignored.
 Each universe shares the same fixed star catalog with a different RNG seed, so
@@ -89,7 +89,7 @@ N_UNIVERSES = 10
 EXTRA_START_INDEX = 8001
 
 KEPLER_PPOP_DIR = Path(KEPLER_DATA_DIR) / "Gaia"
-TESS_PPOP_DIR   = Path(TESS_DATA_DIR) / "Gaia_cdpp_v1"
+TESS_PPOP_DIR   = Path(TESS_DATA_DIR) / "Gaia"
 
 
 def _ppop_files(directory: Path, stem: str) -> list[Path]:

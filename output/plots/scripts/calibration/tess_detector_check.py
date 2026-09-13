@@ -5,7 +5,7 @@ TESS P-Pop detector verification (transiting planets only).
 Loads the single-file universe catalog, filters to transiting planets,
 then shows where in the detection pipeline losses occur.
 
-Input:  run/tess/data/Gaia_cdpp_v1/tess_catalog_0.csv
+Input:  run/tess/data/Gaia/tess_catalog_0.csv
 Output: output/plots/04_tess_detector_check/
 
 Run from repo root:
@@ -31,7 +31,7 @@ except Exception:
 
 from tools.paths import LIFESIM_OUTER_DIR, TESS_DATA_DIR, ANALYSIS_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
-CATALOG = Path(TESS_DATA_DIR) / "Gaia_cdpp_v1" / "tess_catalog_0.csv"
+CATALOG = Path(TESS_DATA_DIR) / "Gaia" / "tess_catalog_0.csv"
 OUT_DIR = Path(ANALYSIS_DIR) / "04_tess_detector_check"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 

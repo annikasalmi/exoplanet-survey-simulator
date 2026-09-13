@@ -41,13 +41,13 @@ class ExozodiModel():
         if (Scenario == 'baseline'):
             self.ExozodiData = np.load(os.path.join(PPOP_DIR,'ExozodiModels/ExozodiNominal.npy'))
         elif (Scenario == 'pessimistic'):
-            self.ExozodiData = np.load('ExozodiModels/ExozodiPessimistic.npy')
+            self.ExozodiData = np.load(os.path.join(PPOP_DIR, 'ExozodiModels', 'ExozodiPessimistic.npy'))
         elif (Scenario == 'optimistic'):
-            self.ExozodiData = np.load('ExozodiModels/ExozodiOptimistic.npy')
+            self.ExozodiData = np.load(os.path.join(PPOP_DIR, 'ExozodiModels', 'ExozodiOptimistic.npy'))
         else:
             print('--> WARNING: '+str(Scenario)+' is an unknown scenario')
             Scenario = 'baseline'
-            self.ExozodiData = np.load('ExozodiModels/ExozodiNominal.npy')
+            self.ExozodiData = np.load(os.path.join(PPOP_DIR, 'ExozodiModels', 'ExozodiNominal.npy'))
         # print('--> Using scenario '+str(Scenario))
         
         self.LogExozodiKDE = stats.gaussian_kde(np.log(self.ExozodiData[0]))

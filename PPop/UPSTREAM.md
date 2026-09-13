@@ -11,6 +11,7 @@ It is copied in rather than pip-installed because upstream P-pop cannot be impor
 - Output DataFrames instead of .txt. No need to save files locally when PPop reruns frequently. Saving to .txt is optional.
 - Added new files: `StarCatalogs/gaia.py`, `StarCatalogs/build_gaia_60pc.py` and `PlanetDistributions/SAG13_extrap.py`.
 - Cleaned up names for consistency: renamed some files/functions to follow snake_case; added a tools.paths file.
+  Star catalogs and exozodi models are found through it, so PPop runs from any working directory.
 
 This is an old fork, so there are some newer distributions that have not been copied over.
 These include: `Kaminski2025`, `Bryson2021*` and `Dressing2015Extrap`; the

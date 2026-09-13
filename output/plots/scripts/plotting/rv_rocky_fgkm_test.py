@@ -99,7 +99,7 @@ def _load_module(name: str, path: Path):
 S44 = _load_module("s44", ROOT / "plot" / "script plots" / "56_kepler_tess_rocky_fgkm_gaia60pc.py")
 RVData = _load_module("rv_data", ROOT / "detectors" / "rv_data.py").RVData
 
-TESS_PPOP_DIR = Path(TESS_DATA_DIR) / "Gaia_cdpp_v1"
+TESS_PPOP_DIR = Path(TESS_DATA_DIR) / "Gaia"
 OUT_DIR = Path(ANALYSIS_DIR) / "58_rv_rocky_fgkm_test"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 

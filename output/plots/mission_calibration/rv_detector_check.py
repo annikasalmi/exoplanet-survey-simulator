@@ -50,7 +50,7 @@ except Exception:
 
 from tools.paths import LIFESIM_OUTER_DIR, TESS_DATA_DIR, PAPER_FIGURES_DIR, CALIBRATION_DIR, KEPLER_DATA_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
-PPOP_DIR = Path(TESS_DATA_DIR) / "Gaia_cdpp_v1"
+PPOP_DIR = Path(TESS_DATA_DIR) / "Gaia"
 RVAMP_CACHE = Path(KEPLER_DATA_DIR) / "NASA" / "NASA_PSCompPars_rvamp_calibration.csv"
 OUT_DIR = Path(CALIBRATION_DIR) / "rv_detector_check"
 OUT_DIR.mkdir(parents=True, exist_ok=True)

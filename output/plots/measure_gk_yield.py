@@ -12,7 +12,7 @@ import pandas as pd
 from tools.paths import LIFESIM_OUTER_DIR, KEPLER_DATA_DIR, TESS_DATA_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
 KEP = Path(KEPLER_DATA_DIR) / "Gaia"
-TES = Path(TESS_DATA_DIR) / "Gaia_cdpp_v1"
+TES = Path(TESS_DATA_DIR) / "Gaia"
 FLUX = (0.1, 1e4)
 RAD = (0.6, 2.2)
 

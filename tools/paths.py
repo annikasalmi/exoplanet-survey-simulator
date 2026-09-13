@@ -30,6 +30,7 @@ CALIBRATION_DIR = os.path.join(FIGURES_DIR, "calibration")
 PAPER_FIGURES_DIR = os.path.join(RESULTS_DIR, "paper")
 
 LOGGING = os.path.join(RESULTS_DIR, "logs")
+DEMO_DIR = os.path.join(RESULTS_DIR, "demo")  # hwo_demo / lifesim_demo
 
 # Older name for the analysis figures; kept so existing scripts keep working.
 MY_OUTPUTS_DIR = ANALYSIS_DIR

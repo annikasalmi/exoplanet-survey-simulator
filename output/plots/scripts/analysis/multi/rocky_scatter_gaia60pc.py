@@ -49,18 +49,13 @@ except Exception:
 # FGK background. Files are listed by index, not globbed, so stale higher-numbered runs are ignored.
 N_UNIVERSES = 10
 
-# Single-type (G-only or K-only) top-up universes start at this index; their generator
-# (run/generate_gk_8000.py) is not in the repo. They stack on top of universes 0..N_UNIVERSES-1
-# and only add counts to their own type's panel.
-EXTRA_START_INDEX = 8001
-
 KEPLER_PPOP_DIR = Path(KEPLER_DATA_DIR) / "Gaia"
 TESS_PPOP_DIR   = Path(TESS_DATA_DIR) / "Gaia"
 
 
 def _ppop_files(directory: Path, stem: str) -> list[Path]:
-    """Return <stem>_<i>.csv for i in 0..N_UNIVERSES-1 PLUS any top-up universes
-    with index >= EXTRA_START_INDEX, in order. Falls back to local CSV if DOWNLOAD_NASA_DATA=False."""
+    """Return <stem>_<i>.csv for i in 0..N_UNIVERSES-1, in order.
+    Falls back to local CSV if DOWNLOAD_NASA_DATA=False."""
     wanted = [directory / f"{stem}_{i}.csv" for i in range(N_UNIVERSES)]
     present = [f for f in wanted if f.exists()]
     if not present:
@@ -78,21 +73,7 @@ def _ppop_files(directory: Path, stem: str) -> list[Path]:
     if missing:
         print(f"  [warn] {len(missing)} expected universe(s) missing, "
               f"stacking {len(present)}: missing {missing}")
-
-    # Additively stack any top-up (G/K-only) universes numbered >= EXTRA_START_INDEX.
-    extra = []
-    for f in directory.glob(f"{stem}_*.csv"):
-        try:
-            idx = int(f.stem.rsplit("_", 1)[1])
-        except ValueError:
-            continue
-        if idx >= EXTRA_START_INDEX:
-            extra.append((idx, f))
-    extra.sort()
-    if extra:
-        print(f"  + stacking {len(extra)} top-up universe(s) "
-              f"(idx >= {EXTRA_START_INDEX}) for stem '{stem}'")
-    return present + [f for _, f in extra]
+    return present
 
 # Pure-rock reference curve (kept as the BLACK comparison line in the M-R
 # diagnostic only; it no longer defines the threshold).

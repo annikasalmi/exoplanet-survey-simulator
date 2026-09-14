@@ -20,10 +20,18 @@ pip install -e .
 ## Quickstart
 
 ```bash
-python run/run_sim.py
+python simulation_demo.py
 ```
 
-That runs the simulation set up in `run/hwo/` or `run/lifesim/` and draws default plots from `plot/plot.py`. 
+That builds one flat universe, runs it through the Kepler, TESS and RV detection
+models, and writes plots under `results/figures/`. It takes under a minute. To try
+another pipeline, change `SIM_NAME` at the top of the script; every option except
+`flat_universe` builds a P-Pop universe and takes about 30 minutes.
+
+`run/run_sim.py` runs the full study. As checked in, it runs 10 Kepler and 10 TESS
+universes on the Gaia 60 pc catalog, which takes half an hour or longer, then plots with
+`output/plots/plot.py` into `results/figures/simulation/`. The HWO and LIFEsim runs
+are in the same file but commented out.
 
 ## Credit and licence
 

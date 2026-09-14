@@ -164,20 +164,55 @@ def nasa_cut(nasa, cut):
     return m, r, me1, me2, re1, re2
 
 
+def true_scatter_AB(arrays, cut, n_plot, rng):
+    """Detected planets at their TRUE masses and radii, with the cut applied to
+    true values; split into flat-A-kept vs dropped-by-A. Sub-Neptunes on or
+    below the silicate line are removed, as in the volatile-fraction MC."""
+    mass, radius, flux, puffy, det = arrays
+    keep = det.copy()
+    if cut.get("insol_max"):
+        keep &= flux < cut["insol_max"]
+    if cut.get("mass_min"):
+        keep &= mass > cut["mass_min"]
+    dropped = (~puffy) & (mass > S72.MASS_THRESHOLD)
+    keep &= dropped | (radius > np.interp(mass, *S72.load_silicate()))
+    idx = np.flatnonzero(keep)
+    if idx.size > n_plot:
+        idx = rng.choice(idx, n_plot, replace=False)
+    return mass[idx], radius[idx], dropped[idx]
+
+
+def _frac_err_bars(x, frac_sd):
+    """1-sigma bars for a log-normal fractional error: [lower, upper] offsets."""
+    return np.array([x * (1 - np.exp(-frac_sd)), x * (np.exp(frac_sd) - 1)])
+
+
 SCATTER_LABELS = ("Escape-only (kept)", "Primordial-rocky: rocky super-Earths (M>2)")
 
 
 def _draw_scatter(ax, arr, cut, nasa, m_sil, r_sil, rng, title,
-                  labels=SCATTER_LABELS, drop_blue_below=False):
-    """Top-row panel: one detected, noise-perturbed mass-radius draw."""
-    mo, ro, dropped = noised_scatter_AB(arr, cut, rng, drop_blue_below=drop_blue_below)
+                  labels=SCATTER_LABELS, drop_blue_below=False, true_values=False):
+    """Top-row panel: one detected, noise-perturbed mass-radius draw. With
+    true_values, the planets are drawn at their true masses and radii with the
+    simulated measurement errors as error bars instead."""
     nmc, nrc, nme1, nme2, nre1, nre2 = nasa_cut(nasa, cut)
     ax.fill_between(m_sil, r_sil, 2.6, color="0.965", zorder=0)
     ax.plot(m_sil, r_sil, "k-", lw=1.2, zorder=6, label="silicate line")
-    ax.scatter(mo[~dropped], ro[~dropped], s=15, color="tab:blue", alpha=0.45, lw=0,
-               zorder=3, label=labels[0])
-    ax.scatter(mo[dropped], ro[dropped], s=15, color="tab:orange", alpha=0.5, lw=0,
-               zorder=4, label=labels[1])
+    if true_values:
+        mt, rt, dropped = true_scatter_AB(arr, cut, 150, rng)
+        for sel, colour, lbl, z in [(~dropped, "tab:blue", labels[0], 3),
+                                    (dropped, "tab:orange", labels[1], 4)]:
+            ax.errorbar(mt[sel], rt[sel],
+                        xerr=_frac_err_bars(mt[sel], S72.MASS_FRAC_ERR),
+                        yerr=_frac_err_bars(rt[sel], S72.RAD_FRAC_ERR),
+                        fmt="o", ms=4, color=colour, alpha=0.6, elinewidth=0.6,
+                        capsize=0, zorder=z, label=lbl)
+    else:
+        mo, ro, dropped = noised_scatter_AB(arr, cut, rng, drop_blue_below=drop_blue_below)
+        ax.scatter(mo[~dropped], ro[~dropped], s=15, color="tab:blue", alpha=0.45, lw=0,
+                   zorder=3, label=labels[0])
+        ax.scatter(mo[dropped], ro[dropped], s=15, color="tab:orange", alpha=0.5, lw=0,
+                   zorder=4, label=labels[1])
     ax.errorbar(nmc, nrc, xerr=np.array([nme2, nme1]), yerr=np.array([nre2, nre1]),
                 fmt="o", mfc="none", mec="k", ecolor="k", ms=5, mew=1.0,
                 elinewidth=0.6, capsize=1.5, alpha=0.8, zorder=5,
@@ -327,7 +362,9 @@ def make_otegi_1x2(nasa, m_sil, r_sil, rng):
     Blue = "Sub-Neptunes only" (universe A), orange = "Sub-Neptunes and
     super-Earths" (universe B) in both panels. The rocky super-Earths are
     redrawn as a normal around the silicate line, and any sub-Neptune that
-    lands on or below the silicate line is removed from each sample.
+    lands on or below the silicate line is removed from each sample. The left
+    panel shows true masses and radii with the simulated errors as bars; the
+    histograms use the noise-perturbed ("measured") values.
     """
     print("\n--> Otegi 1x2 (cold super-Earth cut; super-Earths on the silicate line):")
     cut_label, cut = OTEGI_2X2_CUTS[1]
@@ -337,7 +374,7 @@ def make_otegi_1x2(nasa, m_sil, r_sil, rng):
     fig, axes = plt.subplots(1, 2, figsize=(13.0, 5.4))
     _draw_scatter(axes[0], arr, cut, nasa, m_sil, r_sil, rng, "",
                   labels=("Sub-Neptunes only", "Sub-Neptunes and super-Earths"),
-                  drop_blue_below=True)
+                  true_values=True)
     _draw_bells(axes[1], arr, cut, nasa, m_sil, r_sil, rng, tag=f"[1x2] {cut_label}",
                 style=(("Sub-Neptunes only", "tab:blue"),
                        ("Sub-Neptunes and super-Earths", "tab:orange")),

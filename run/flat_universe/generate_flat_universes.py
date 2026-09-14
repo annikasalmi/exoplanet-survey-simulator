@@ -8,7 +8,6 @@ generates the standard configurations used by Tier 2/3 analysis scripts.
 Configurations:
   - rocky_mr_powerlaw: 150k planets, powerlaw M-R with scatter, seed=0
   - transit_rv_by_stype: 3M planets, independent mass, seeds per spectral type (F:75, G:76, K:77, M:78)
-  - puffy_overlap_base: 300k planets, independent mass, seed=0
   - nominal_150k: 150k planets, independent mass, seed=0
 """
 
@@ -40,12 +39,6 @@ CONFIGS = {
         "cache_path": os.path.join(UNIFORM_OUT_DIR, "flat_3M_seed75-78_independent.csv"),
         "n_planets": 3_000_000,
         "seed": 0,  # combined seed; actual seeds per stype in script
-        "mass_model": "independent",
-    },
-    "puffy_overlap_base": {
-        "cache_path": os.path.join(UNIFORM_OUT_DIR, "flat_300k_seed0_independent.csv"),
-        "n_planets": 300_000,
-        "seed": 0,
         "mass_model": "independent",
     },
     "nominal_150k": {

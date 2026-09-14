@@ -4,7 +4,7 @@ run_flat.py — Generate flat universe test populations and run analysis plots.
 
 This script orchestrates the full flat-universe workflow:
   1. Generate required flat universe configurations
-  2. Run Tier 3 analysis plots (flat_rocky_mr_vs_nasa, flat_transit_rv_3x3, two_universe_puffy_overlap)
+  2. Run Tier 3 analysis plots (flat_rocky_mr_vs_nasa, flat_transit_rv_3x3)
   3. Collect outputs to results/figures/analysis/
 
 Usage:
@@ -69,9 +69,8 @@ def main():
     if not args.skip_plots:
         # Run Tier 3 plot scripts
         plots = [
-            ("output/plots/hongyi_plots/flat_rocky_mr_vs_nasa.py", "Flat rocky M-R vs NASA"),
-            ("output/plots/hongyi_plots/flat_transit_rv_3x3.py", "Flat transit/RV selection map"),
-            ("output/plots/hongyi_plots/two_universe_puffy_overlap.py", "Flat vs PPop puffy overlap"),
+            ("output/plots/scripts/analysis/multi/flat_rocky_mr_vs_nasa.py", "Flat rocky M-R vs NASA"),
+            ("output/plots/scripts/analysis/multi/flat_transit_rv_3x3.py", "Flat transit/RV selection map"),
         ]
 
         for script, label in plots:

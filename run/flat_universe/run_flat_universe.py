@@ -32,9 +32,7 @@ HONGYI_CONFIGS = {
     'flat_transit_rv_3x3_G': {'seed': 75, 'n_planets': 3_000_000},
     'flat_transit_rv_3x3_K': {'seed': 76, 'n_planets': 2_500_000},
     'flat_transit_rv_3x3_M': {'seed': 77, 'n_planets': 1_500_000},
-    'two_universe_puffy_overlap': {'seed': 0, 'n_planets': 300_000},
     'likelihood_ratio_catalog': {'seed': 0, 'n_planets': 1_000_000},
-    'mc_mr_density_priors': {'seed': 1},
 }
 
 

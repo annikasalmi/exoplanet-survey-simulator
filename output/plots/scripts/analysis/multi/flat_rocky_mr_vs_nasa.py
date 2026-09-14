@@ -31,13 +31,14 @@ import sys
 import importlib.util
 from pathlib import Path
 
-from tools.paths import LIFESIM_OUTER_DIR, ANALYSIS_DIR, PAPER_FIGURES_DIR
+from tools.paths import LIFESIM_OUTER_DIR, ANALYSIS_DIR, PAPER_FIGURES_DIR, KEPLER_REF_CURVE
 ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import numpy as np
 import pandas as pd
+from scipy.stats import norm
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -83,7 +84,31 @@ RELATIONS = [
 ]
 
 
-def build_arrays(rel_kw, m_sil, r_sil):
+def load_earthlike_curve():
+    """Earth-like composition curve (ref.ddat: 32% Fe core), sorted by mass."""
+    ref = np.loadtxt(KEPLER_REF_CURVE, comments="#")
+    ref = ref[ref[:, 0] > 0]
+    o = np.argsort(ref[:, 0])
+    return ref[o, 0], ref[o, 1]
+
+
+def redraw_rocky_around(mass, m_curve, r_curve, m_sil, r_sil, sigma_ln, rng):
+    """Radii scattered log-normally (width sigma_ln) around r_curve(mass), with a
+    hard cut at the silicate line: the normal is truncated at ln R_sil(mass)."""
+    mu = np.log(np.interp(mass, m_curve, r_curve))
+    upper = (np.log(np.interp(mass, m_sil, r_sil)) - mu) / sigma_ln
+    u = rng.uniform(0.0, 1.0, mass.size) * norm.cdf(upper)
+    return np.exp(mu + sigma_ln * norm.ppf(u))
+
+
+def build_arrays(rel_kw, m_sil, r_sil, rocky_curve=None, rng=None):
+    """Detected flat-universe pool for one mass-radius relation.
+
+    With rocky_curve=(m, r), the planets universe A drops (rocky, true M > 2)
+    keep their masses but have their radii redrawn around that curve, hard-cut
+    at the silicate line; every other planet is unchanged. The detectors are
+    deterministic, so the unchanged planets keep their detections.
+    """
     cat = generate_flat_catalog(FLAT_N, seed=SEED, mass_model="powerlaw",
                                 mass_scatter_dex=MR_SCATTER_DEX, **rel_kw)
     r = pd.to_numeric(cat["radius_p"], errors="coerce")
@@ -94,6 +119,14 @@ def build_arrays(rel_kw, m_sil, r_sil):
     cat = cat[keep].copy()
     mass = pd.to_numeric(cat["mass_p"], errors="coerce").to_numpy(float)
     radius = pd.to_numeric(cat["radius_p"], errors="coerce").to_numpy(float)
+    if rocky_curve is not None:
+        radius = radius.copy()  # pandas hands back a read-only view
+        dropped = (radius <= np.interp(mass, m_sil, r_sil)) & (mass > S72.MASS_THRESHOLD)
+        # Same radius scatter the relation implies: 0.15 dex in mass times the slope.
+        sigma_ln = rel_kw["mr_beta"] * MR_SCATTER_DEX * np.log(10)
+        radius[dropped] = redraw_rocky_around(mass[dropped], *rocky_curve, m_sil, r_sil,
+                                              sigma_ln, rng)
+        cat["radius_p"] = radius
     flux = pd.to_numeric(cat["flux_p"], errors="coerce").to_numpy(float)
     puffy = radius > np.interp(mass, m_sil, r_sil)
     td = run_kepler(cat)["detected"].to_numpy(bool)
@@ -143,12 +176,14 @@ def nasa_cut(nasa, cut):
     return m, r, me1, me2, re1, re2
 
 
-def _draw_scatter(ax, arr, cut, nasa, m_sil, r_sil, rng, title):
+def _draw_scatter(ax, arr, cut, nasa, m_sil, r_sil, rng, title, earth_curve=None):
     """Top-row panel: one detected, noise-perturbed mass-radius draw."""
     mo, ro, dropped = noised_scatter_AB(arr, cut, rng)
     nmc, nrc, nme1, nme2, nre1, nre2 = nasa_cut(nasa, cut)
     ax.fill_between(m_sil, r_sil, 2.6, color="0.965", zorder=0)
     ax.plot(m_sil, r_sil, "k-", lw=1.2, zorder=6, label="silicate line")
+    if earth_curve is not None:
+        ax.plot(*earth_curve, color="0.5", lw=1.6, zorder=6, label="Earth-like rocky curve")
     ax.scatter(mo[~dropped], ro[~dropped], s=15, color="tab:blue", alpha=0.45, lw=0,
                zorder=3, label="Escape-only (kept)")
     ax.scatter(mo[dropped], ro[dropped], s=15, color="tab:orange", alpha=0.5, lw=0,
@@ -256,13 +291,22 @@ def make_otegi_2x1(arr, nasa, m_sil, r_sil, rng):
     print(f"--> Saved paper copy: {PAPER_FIG_DIR / 'flat_otegi_2x1_cold_cut.png'}")
 
 
-def make_otegi_1x2(arr, nasa, m_sil, r_sil, rng):
+def make_otegi_1x2(nasa, m_sil, r_sil, rng):
     """Side-by-side panel pair: the Otegi mass-radius draw (left) and its
-    volatile-fraction count histograms (right), under the cold super-Earth cut."""
-    print("\n--> Otegi 1x2 (cold super-Earth cut, side by side):")
+    volatile-fraction count histograms (right), under the cold super-Earth cut.
+
+    The rocky super-Earths (the population only universe B keeps) are redrawn
+    around the Earth-like composition curve, hard-cut at the silicate line;
+    the rest of the Otegi pool is unchanged.
+    """
+    print("\n--> Otegi 1x2 (cold super-Earth cut, rocky super-Earths around the Earth-like curve):")
     cut_label, cut = OTEGI_2X2_CUTS[1]
+    otegi_kw = next(kw for name, eq, applies, kw in RELATIONS if "Otegi" in name)
+    earth = load_earthlike_curve()
+    arr = build_arrays(otegi_kw, m_sil, r_sil, rocky_curve=earth,
+                       rng=np.random.default_rng(SEED + 1))
     fig, axes = plt.subplots(1, 2, figsize=(13.0, 5.4))
-    _draw_scatter(axes[0], arr, cut, nasa, m_sil, r_sil, rng, "")
+    _draw_scatter(axes[0], arr, cut, nasa, m_sil, r_sil, rng, "", earth_curve=earth)
     _draw_bells(axes[1], arr, cut, nasa, m_sil, r_sil, rng, tag=f"[1x2] {cut_label}")
     fig.tight_layout()
     fname = "flat_otegi_1x2_cold_cut.png"
@@ -314,7 +358,7 @@ def main():
     make_otegi_2x2(otegi_arr, nasa, m_sil, r_sil, rng)
     make_otegi_2x1(otegi_arr, nasa, m_sil, r_sil, rng)
     make_paper_2col(pools, nasa, m_sil, r_sil, rng)
-    make_otegi_1x2(otegi_arr, nasa, m_sil, r_sil, rng)
+    make_otegi_1x2(nasa, m_sil, r_sil, rng)
 
 
 if __name__ == "__main__":

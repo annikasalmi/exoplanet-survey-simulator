@@ -22,6 +22,7 @@ except Exception:
     pass
 
 from tools.paths import LIFESIM_OUTER_DIR, KOI_CUMULATIVE_CSV, PAPER_FIGURES_DIR, CALIBRATION_DIR
+from tools.exoplanet_catalog import read_nasa_csv
 ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -82,7 +83,7 @@ def load_or_download(redownload: bool = False) -> pd.DataFrame:
     local = Path(KOI_CUMULATIVE_CSV)
     if local.exists() and not (DOWNLOAD_NASA_DATA or redownload):
         print(f"Loading local KOI table: {local}")
-        df = pd.read_csv(local, comment="#", low_memory=False)
+        df = read_nasa_csv(local)
         missing = [c for c in ("koi_max_mult_ev", "koi_num_transits")
                    if c not in df.columns]
         if missing:

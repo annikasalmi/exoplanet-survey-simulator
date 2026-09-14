@@ -1,6 +1,21 @@
+from itertools import takewhile
+
 import numpy as np
 import pandas as pd
 from tools import physics_constants as const
+
+def read_nasa_csv(path, **kwargs):
+    """
+    Read a NASA Exoplanet Archive or ExoFOP CSV export.
+
+    Exports open with a block of '#' comment lines. Only that block is skipped:
+    pandas' comment='#' would also cut data rows at their first '#', and the
+    archive's reference strings carry HTML entities such as '&#x131;'.
+    """
+    with open(path, encoding='utf-8', errors='replace') as f:
+        n_header = sum(1 for _ in takewhile(lambda line: line.startswith('#'), f))
+    kwargs.setdefault('low_memory', False)
+    return pd.read_csv(path, skiprows=n_header, **kwargs)
 
 def load_and_filter_exoplanets(csv_path, instrument='LIFE'):
     """
@@ -17,8 +32,7 @@ def load_and_filter_exoplanets(csv_path, instrument='LIFE'):
         disc_facility; a flux ratio is not meaningful for a transit survey and
         is not computed.
     """
-    # NASA Exoplanet Archive exports carry '#' comment headers.
-    df = pd.read_csv(csv_path, comment='#', low_memory=False)
+    df = read_nasa_csv(csv_path)
 
     facility_filters = {
         'KEPLER': 'Kepler',

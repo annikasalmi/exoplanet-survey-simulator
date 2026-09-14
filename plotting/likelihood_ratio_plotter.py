@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 
 from tools.paths import LIFESIM_OUTER_DIR, SILICON_CURVE, PSCOMPPARS_CSV, ANALYSIS_DIR
+from tools.exoplanet_catalog import read_nasa_csv
 ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -85,7 +86,7 @@ def _sigma_log(err_hi, err_lo, value, floor, missing):
 
 
 def load_nasa(precision: bool):
-    df = pd.read_csv(NASA_FILE, comment="#", low_memory=False)
+    df = read_nasa_csv(NASA_FILE)
     m = pd.to_numeric(df["pl_bmasse"], errors="coerce")
     r = pd.to_numeric(df["pl_rade"], errors="coerce")
     ins = pd.to_numeric(df["pl_insol"], errors="coerce")

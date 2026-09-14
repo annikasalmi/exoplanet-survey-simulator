@@ -22,6 +22,7 @@ except Exception:
     pass
 
 from tools.paths import LIFESIM_OUTER_DIR, EXOFOP_TOI_CSV, PAPER_FIGURES_DIR, CALIBRATION_DIR, TESS_DATA_DIR
+from tools.exoplanet_catalog import read_nasa_csv
 ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -87,7 +88,7 @@ def load_or_download(redownload: bool = False) -> pd.DataFrame:
     local = Path(EXOFOP_TOI_CSV)
     if local.exists() and not (DOWNLOAD_NASA_DATA or redownload):
         print(f"Loading local TOI table: {local}")
-        df = pd.read_csv(local, comment="#", low_memory=False)
+        df = read_nasa_csv(local)
         if "Period (days)" not in df.columns:
             raise RuntimeError(
                 f"{local.name} is not an ExoFOP TOI table (no 'Period (days)' "

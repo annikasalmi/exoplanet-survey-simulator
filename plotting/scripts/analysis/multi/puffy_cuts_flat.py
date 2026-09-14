@@ -20,6 +20,7 @@ import numpy as np
 import pandas as pd
 
 from tools.paths import SILICON_CURVE
+from tools.exoplanet_catalog import read_nasa_csv
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -122,7 +123,7 @@ def mc_universe(arrays, drop, cut, m_sil, r_sil, rng):
 
 
 def load_nasa():
-    df = pd.read_csv(NASA_FILE, comment="#", low_memory=False)
+    df = read_nasa_csv(NASA_FILE)
     m = pd.to_numeric(df["pl_bmasse"], errors="coerce")
     r = pd.to_numeric(df["pl_rade"], errors="coerce")
     ins = pd.to_numeric(df["pl_insol"], errors="coerce")

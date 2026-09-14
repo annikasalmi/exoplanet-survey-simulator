@@ -1,5 +1,6 @@
 import pandas as pd
 from tools.paths import PSCOMPPARS_CSV
+from tools.exoplanet_catalog import read_nasa_csv
 from tools import physics_constants as const
 
 def load_exoplanet_luminosity_distance(region_lum=(0.001, 10), region_dist=(1, 35), return_names=False):
@@ -18,7 +19,7 @@ def load_exoplanet_luminosity_distance(region_lum=(0.001, 10), region_dist=(1, 3
     exo_path = PSCOMPPARS_CSV
     
     try:
-        exo_df = pd.read_csv(exo_path, comment="#", low_memory=False)
+        exo_df = read_nasa_csv(exo_path)
     except FileNotFoundError:
         print(f"Warning: Exoplanet data file not found at {exo_path}")
         return None

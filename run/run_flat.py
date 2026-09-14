@@ -60,8 +60,8 @@ def main():
     if not args.skip_plots:
         # Run Tier 3 plot scripts
         plots = [
-            ("output/plots/scripts/analysis/multi/flat_rocky_mr_vs_nasa.py", "Flat rocky M-R vs NASA"),
-            ("output/plots/scripts/analysis/multi/flat_transit_rv_3x3.py", "Flat transit/RV selection map"),
+            ("plotting/scripts/analysis/multi/flat_rocky_mr_vs_nasa.py", "Flat rocky M-R vs NASA"),
+            ("plotting/scripts/analysis/multi/flat_transit_rv_3x3.py", "Flat transit/RV selection map"),
         ]
 
         for script, label in plots:

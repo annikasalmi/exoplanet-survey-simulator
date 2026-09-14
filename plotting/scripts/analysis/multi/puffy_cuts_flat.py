@@ -1,6 +1,6 @@
 """Puffy fraction of flat and P-Pop universes (A/B each) vs NASA under four cuts: all, M > 2,
 I < 50, both. Detection is transit+RV with NASA-like measurement error. Also loaded by
-flat_rocky_mr_vs_nasa.py. Run: python output/plots/scripts/analysis/multi/puffy_cuts_flat.py
+flat_rocky_mr_vs_nasa.py. Run: python plotting/scripts/analysis/multi/puffy_cuts_flat.py
 """
 
 from __future__ import annotations

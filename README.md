@@ -30,8 +30,18 @@ another pipeline, change `SIM_NAME` at the top of the script; every option excep
 
 `run/run_sim.py` runs the full study. As checked in, it runs 10 Kepler and 10 TESS
 universes on the Gaia 60 pc catalog, which takes half an hour or longer, then plots with
-`output/plots/plot.py` into `results/figures/simulation/`. The HWO and LIFEsim runs
+`plotting/plot.py` into `results/figures/simulation/`. The HWO and LIFEsim runs
 are in the same file but commented out.
+
+## Layout
+
+- `run/`: simulation entry points
+- `telescopes/`: detection models for Kepler, TESS, HWO and RV
+- `plotting/`: plotting and analysis code
+- `tools/`: shared paths and constants
+- `data/`: input data (tracked)
+- `results/`: everything the pipelines write (git-ignored, see `results/README.md`)
+- `lifesim/`, `PPop/`: the vendored forks
 
 ## Credit and licence
 

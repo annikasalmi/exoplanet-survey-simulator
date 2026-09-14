@@ -22,8 +22,8 @@ from run.tess.run_tess import main as main_tess
 from run.rv.run_rv import main as main_rv
 from run.flat_universe.run_flat_universe import main as main_flat_universe
 
-from output.plots.plot import plot_all
-from output.plots.plot_flat_universe import plot_flat_universe
+from plotting.plot import plot_all
+from plotting.plot_flat_universe import plot_flat_universe
 from tools.exoplanet_catalog import load_and_filter_exoplanets
 
 def run_with_progress(func, name, estimated_minutes=12, *args, **kwargs):

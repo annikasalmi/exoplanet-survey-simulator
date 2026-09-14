@@ -1,6 +1,6 @@
 """Paper selection map (flat_transit_rv_3x3_otegi.png): rows = TESS transit, RV mass (best of
 HARPS/NIRPS), both; columns = G, K, M hosts. Background = rocky flat-universe planets (Otegi masses).
-Run: python output/plots/scripts/analysis/multi/flat_transit_rv_3x3.py
+Run: python plotting/scripts/analysis/multi/flat_transit_rv_3x3.py
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ def _load(name, path):
     return mod
 
 
-S44 = _load("s44", ROOT / "output" / "plots" / "scripts" / "analysis" / "multi" / "rocky_scatter_gaia60pc.py")
+S44 = _load("s44", ROOT / "plotting" / "scripts" / "analysis" / "multi" / "rocky_scatter_gaia60pc.py")
 
 OUT_DIR = Path(ANALYSIS_DIR) / "flat_transit_rv_3x3"
 OUT_DIR.mkdir(parents=True, exist_ok=True)

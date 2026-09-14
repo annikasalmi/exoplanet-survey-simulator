@@ -1,6 +1,6 @@
 """Which rocky M-R relation (Chen & Kipping 2017, Otegi 2020, Edmondson 2023, Müller 2024), imposed
 on the flat universe, best matches NASA's volatile ("puffy") fraction? Makes the 2x4 grids and the
-paper's Otegi panels. Run: python output/plots/scripts/analysis/multi/flat_rocky_mr_vs_nasa.py
+paper's Otegi panels. Run: python plotting/scripts/analysis/multi/flat_rocky_mr_vs_nasa.py
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ def _load(name, path):
     return mod
 
 
-S72 = _load("s72", str(ROOT / "output" / "plots" / "scripts" / "analysis" / "multi" / "puffy_cuts_flat.py"))
+S72 = _load("s72", str(ROOT / "plotting" / "scripts" / "analysis" / "multi" / "puffy_cuts_flat.py"))
 S72.N_REPEATS = 4000
 
 OUT_DIR = os.path.join(ANALYSIS_DIR, "flat_rocky_mr_vs_nasa")

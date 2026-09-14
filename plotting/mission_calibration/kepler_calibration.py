@@ -1,6 +1,6 @@
 """Kepler detector calibration: model MES vs official DR25 KOI MES (kepler_3in1_calibration.png).
 Uses real per-target CDPP (rrmscdpp*) from the KOI stellar table instead of the magnitude fallback.
-Run from repo root: python output/plots/mission_calibration/kepler_calibration.py
+Run from repo root: python plotting/mission_calibration/kepler_calibration.py
 """
 
 from __future__ import annotations

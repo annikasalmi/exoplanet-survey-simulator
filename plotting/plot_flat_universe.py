@@ -1,5 +1,5 @@
 """Plots driven by the flat-universe simulation alone. Plots that also need P-Pop,
-Kepler or TESS runs live in output/plots/scripts/analysis/multi/.
+Kepler or TESS runs live in plotting/scripts/analysis/multi/.
 """
 
 from __future__ import annotations
@@ -7,7 +7,7 @@ from __future__ import annotations
 import matplotlib
 matplotlib.use('Agg')
 
-from output.plots import likelihood_ratio_plotter
+from plotting import likelihood_ratio_plotter
 
 
 def plot_flat_universe(df, nruns=1, use_multiprocessing=False, **kwargs):

@@ -1,6 +1,6 @@
 """Rocky-planet figures: FGKM detection-fraction maps from stacked Gaia-60pc Kepler/TESS catalogs
 with NASA rocky planets overlaid, plus the paper's rocky_mr_insolation_3panel / rocky_scatter_standalone.
-Run: python output/plots/scripts/analysis/multi/rocky_scatter_gaia60pc.py
+Run: python plotting/scripts/analysis/multi/rocky_scatter_gaia60pc.py
 """
 
 from __future__ import annotations

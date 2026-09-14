@@ -1,6 +1,6 @@
 """Compare the three planet generators (old P-Pop SAG13, new P-Pop Bergsten2022, flat universe) on
 generation time and per-parameter distributions (three_generators_comparison.png).
-Run: python output/plots/scripts/calibration/generator_comparison.py [--rebuild to re-time P-Pop]
+Run: python plotting/scripts/calibration/generator_comparison.py [--rebuild to re-time P-Pop]
 """
 import os
 import sys

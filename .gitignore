@@ -19,8 +19,6 @@ htmlcov/
 # pipeline cannot leak a catalogue into a commit by being forgotten here.
 # results/README.md is re-included at the bottom, after the *.md rule.
 /results/*
-/output/results/
-/output/figures/
 /logs/
 
 # PPop generated

@@ -256,15 +256,16 @@ def make_otegi_2x1(arr, nasa, m_sil, r_sil, rng):
     print(f"--> Saved paper copy: {PAPER_FIG_DIR / 'flat_otegi_2x1_cold_cut.png'}")
 
 
-def make_otegi_bells_only(arr, nasa, m_sil, r_sil, rng):
-    """Standalone panel: the Otegi volatile-fraction count histograms under the
-    cold super-Earth cut, with no mass-radius panel."""
-    print("\n--> Otegi volatile-fraction panel only (cold super-Earth cut):")
+def make_otegi_1x2(arr, nasa, m_sil, r_sil, rng):
+    """Side-by-side panel pair: the Otegi mass-radius draw (left) and its
+    volatile-fraction count histograms (right), under the cold super-Earth cut."""
+    print("\n--> Otegi 1x2 (cold super-Earth cut, side by side):")
     cut_label, cut = OTEGI_2X2_CUTS[1]
-    fig, ax = plt.subplots(figsize=(7.0, 5.2))
-    _draw_bells(ax, arr, cut, nasa, m_sil, r_sil, rng, tag=f"[bells only] {cut_label}")
+    fig, axes = plt.subplots(1, 2, figsize=(13.0, 5.4))
+    _draw_scatter(axes[0], arr, cut, nasa, m_sil, r_sil, rng, "")
+    _draw_bells(axes[1], arr, cut, nasa, m_sil, r_sil, rng, tag=f"[1x2] {cut_label}")
     fig.tight_layout()
-    fname = "flat_otegi_bells_cold_cut.png"
+    fname = "flat_otegi_1x2_cold_cut.png"
     out_png = os.path.join(OUT_DIR, fname)
     fig.savefig(out_png, dpi=170, bbox_inches="tight")
     PAPER_FIG_DIR.mkdir(parents=True, exist_ok=True)
@@ -313,7 +314,7 @@ def main():
     make_otegi_2x2(otegi_arr, nasa, m_sil, r_sil, rng)
     make_otegi_2x1(otegi_arr, nasa, m_sil, r_sil, rng)
     make_paper_2col(pools, nasa, m_sil, r_sil, rng)
-    make_otegi_bells_only(otegi_arr, nasa, m_sil, r_sil, rng)
+    make_otegi_1x2(otegi_arr, nasa, m_sil, r_sil, rng)
 
 
 if __name__ == "__main__":

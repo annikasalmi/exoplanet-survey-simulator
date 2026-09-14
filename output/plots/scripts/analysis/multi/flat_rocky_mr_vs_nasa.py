@@ -31,13 +31,14 @@ import sys
 import importlib.util
 from pathlib import Path
 
-from tools.paths import LIFESIM_OUTER_DIR, ANALYSIS_DIR, PAPER_FIGURES_DIR
+from tools.paths import LIFESIM_OUTER_DIR, ANALYSIS_DIR, PAPER_FIGURES_DIR, KEPLER_REF_CURVE
 ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import numpy as np
 import pandas as pd
+from scipy.stats import truncnorm
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -83,16 +84,37 @@ RELATIONS = [
 ]
 
 
-def build_arrays(rel_kw, m_sil, r_sil, super_earths_on_silicate=False, rng=None):
+OTEGI_VOLATILE = dict(mr_C=0.70, mr_beta=0.63)   # Otegi et al. 2020 volatile-rich branch
+TWO_POP_FRAC_SD = 0.10                            # fractional radius width of every normal
+
+
+def load_earthlike_curve():
+    """Earth-like composition curve (ref.ddat: 32% Fe core), sorted by mass."""
+    ref = np.loadtxt(KEPLER_REF_CURVE, comments="#")
+    ref = ref[ref[:, 0] > 0]
+    o = np.argsort(ref[:, 0])
+    return ref[o, 0], ref[o, 1]
+
+
+def otegi_volatile_radius(mass):
+    return OTEGI_VOLATILE["mr_C"] * mass ** OTEGI_VOLATILE["mr_beta"]
+
+
+def build_arrays(rel_kw, m_sil, r_sil, two_populations=False, rng=None):
     """Detected flat-universe pool for one mass-radius relation.
 
-    With super_earths_on_silicate, the rocky super-Earths (true rocky, true
-    M > 2: the planets only universe B keeps) keep their masses but get radii
-    drawn from a normal centred on the silicate line, with the relation's own
-    implied radius scatter, so some land above it. They stay flagged as
-    super-Earths (the returned `puffy` keeps the original classification), so
-    the A/B split is by population, not by where the redraw put them. The
-    detectors are deterministic, so every other planet keeps its detection.
+    With two_populations, every planet keeps its mass but gets a new radius:
+      * sub-Neptunes (all planets except the rocky super-Earths): a normal
+        around Otegi's volatile-rich relation, truncated to stay above the
+        silicate line;
+      * rocky super-Earths (true rocky, true M > 2 under the base relation; the
+        planets only universe B keeps): half from a normal around the same
+        volatile-rich relation, half from a normal around the Earth-like
+        curve, with no cut.
+    Every normal is TWO_POP_FRAC_SD wide (fractional). Redrawn planets outside the
+    radius box (0.5-2.2 R_earth, as for NASA) are dropped. The returned `puffy`
+    flags the sub-Neptunes, so the A/B split is by population, not by where a
+    planet landed. Detection runs on the redrawn radii.
     """
     cat = generate_flat_catalog(FLAT_N, seed=SEED, mass_model="powerlaw",
                                 mass_scatter_dex=MR_SCATTER_DEX, **rel_kw)
@@ -106,13 +128,23 @@ def build_arrays(rel_kw, m_sil, r_sil, super_earths_on_silicate=False, rng=None)
     radius = pd.to_numeric(cat["radius_p"], errors="coerce").to_numpy(float).copy()
     flux = pd.to_numeric(cat["flux_p"], errors="coerce").to_numpy(float)
     puffy = radius > np.interp(mass, m_sil, r_sil)
-    if super_earths_on_silicate:
+    if two_populations:
         se = (~puffy) & (mass > S72.MASS_THRESHOLD)
-        # 0.15 dex in mass times the relation's slope, as a fractional radius width.
-        frac_sd = rel_kw["mr_beta"] * MR_SCATTER_DEX * np.log(10)
-        r_on_line = np.interp(mass[se], m_sil, r_sil)
-        radius[se] = r_on_line * (1.0 + frac_sd * rng.standard_normal(se.sum()))
+        sn = ~se
+        # Sub-Neptunes: normal around the volatile-rich curve, kept above the silicate line.
+        mu = otegi_volatile_radius(mass[sn])
+        sd = TWO_POP_FRAC_SD * mu
+        a = (np.interp(mass[sn], m_sil, r_sil) - mu) / sd
+        radius[sn] = truncnorm.rvs(a, np.inf, loc=mu, scale=sd, random_state=rng)
+        # Super-Earths: 50/50 mix of the volatile-rich and Earth-like normals, no cut.
+        m_se = mass[se]
+        centre = np.where(rng.random(m_se.size) < 0.5, otegi_volatile_radius(m_se),
+                          np.interp(m_se, *load_earthlike_curve()))
+        radius[se] = centre * (1.0 + TWO_POP_FRAC_SD * rng.standard_normal(m_se.size))
+        in_box = (radius >= S72.BOX["r_lo"]) & (radius <= S72.BOX["r_hi"])
         cat["radius_p"] = radius
+        cat = cat[in_box].copy()
+        mass, radius, flux, puffy = mass[in_box], radius[in_box], flux[in_box], sn[in_box]
     td = run_kepler(cat)["detected"].to_numpy(bool)
     rd = run_rv_best(cat, mag_target=S72.RV_MAG_TARGET)["detected"].to_numpy(bool)
     return mass, radius, flux, puffy, td & rd
@@ -332,22 +364,26 @@ def make_otegi_1x2(nasa, m_sil, r_sil, rng):
     volatile-fraction count histograms (right), under the cold super-Earth cut.
 
     Blue = "Sub-Neptunes only" (universe A), orange = "Sub-Neptunes and
-    super-Earths" (universe B) in both panels. The rocky super-Earths are
-    redrawn as a normal around the silicate line, and planets that are truly
-    below the line but are not super-Earths are left out, so the blue
-    population is all sub-Neptunes. The left panel shows true masses and radii
-    with the simulated errors as bars; the histograms use the noise-perturbed
+    super-Earths" (universe B) in both panels; radii come from build_arrays'
+    two-population redraw. The left panel shows true masses and radii with the
+    simulated errors as bars; the histograms use the noise-perturbed
     ("measured") values, so noise can put some sub-Neptunes below the line.
     """
-    print("\n--> Otegi 1x2 (cold super-Earth cut; super-Earths on the silicate line):")
+    print("\n--> Otegi 1x2 (cold super-Earth cut; two-population radii):")
     cut_label, cut = OTEGI_2X2_CUTS[1]
     otegi_kw = next(kw for name, eq, applies, kw in RELATIONS if "Otegi" in name)
-    arr = build_arrays(otegi_kw, m_sil, r_sil, super_earths_on_silicate=True,
+    arr = build_arrays(otegi_kw, m_sil, r_sil, two_populations=True,
                        rng=np.random.default_rng(SEED + 1))
     fig, axes = plt.subplots(1, 2, figsize=(13.0, 5.4))
     _draw_scatter(axes[0], arr, cut, nasa, m_sil, r_sil, rng, "",
                   labels=("Sub-Neptunes only", "Sub-Neptunes and super-Earths"),
                   true_values=True)
+    m_line = np.linspace(0.2, 12, 300)
+    axes[0].plot(m_line, otegi_volatile_radius(m_line), color="tab:blue", lw=1.2, ls="--",
+                 zorder=6, label=r"Otegi volatile-rich ($R=0.70\,M^{0.63}$)")
+    axes[0].plot(*load_earthlike_curve(), color="0.5", lw=1.4, zorder=6,
+                 label="Earth-like rocky curve")
+    axes[0].legend(fontsize=9, loc="lower right", framealpha=0.9)
     axes[0].set_xlim(0, 12)
     _draw_bells(axes[1], arr, cut, nasa, m_sil, r_sil, rng, tag=f"[1x2] {cut_label}",
                 style=(("Sub-Neptunes only", "tab:blue"),

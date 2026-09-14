@@ -31,14 +31,13 @@ import sys
 import importlib.util
 from pathlib import Path
 
-from tools.paths import LIFESIM_OUTER_DIR, ANALYSIS_DIR, PAPER_FIGURES_DIR, KEPLER_REF_CURVE
+from tools.paths import LIFESIM_OUTER_DIR, ANALYSIS_DIR, PAPER_FIGURES_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import numpy as np
 import pandas as pd
-from scipy.stats import norm
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -84,30 +83,16 @@ RELATIONS = [
 ]
 
 
-def load_earthlike_curve():
-    """Earth-like composition curve (ref.ddat: 32% Fe core), sorted by mass."""
-    ref = np.loadtxt(KEPLER_REF_CURVE, comments="#")
-    ref = ref[ref[:, 0] > 0]
-    o = np.argsort(ref[:, 0])
-    return ref[o, 0], ref[o, 1]
-
-
-def redraw_rocky_around(mass, m_curve, r_curve, m_sil, r_sil, sigma_ln, rng):
-    """Radii scattered log-normally (width sigma_ln) around r_curve(mass), with a
-    hard cut at the silicate line: the normal is truncated at ln R_sil(mass)."""
-    mu = np.log(np.interp(mass, m_curve, r_curve))
-    upper = (np.log(np.interp(mass, m_sil, r_sil)) - mu) / sigma_ln
-    u = rng.uniform(0.0, 1.0, mass.size) * norm.cdf(upper)
-    return np.exp(mu + sigma_ln * norm.ppf(u))
-
-
-def build_arrays(rel_kw, m_sil, r_sil, rocky_curve=None, rng=None):
+def build_arrays(rel_kw, m_sil, r_sil, super_earths_on_silicate=False, rng=None):
     """Detected flat-universe pool for one mass-radius relation.
 
-    With rocky_curve=(m, r), the planets universe A drops (rocky, true M > 2)
-    keep their masses but have their radii redrawn around that curve, hard-cut
-    at the silicate line; every other planet is unchanged. The detectors are
-    deterministic, so the unchanged planets keep their detections.
+    With super_earths_on_silicate, the rocky super-Earths (true rocky, true
+    M > 2: the planets only universe B keeps) keep their masses but get radii
+    drawn from a normal centred on the silicate line, with the relation's own
+    implied radius scatter, so some land above it. They stay flagged as
+    super-Earths (the returned `puffy` keeps the original classification), so
+    the A/B split is by population, not by where the redraw put them. The
+    detectors are deterministic, so every other planet keeps its detection.
     """
     cat = generate_flat_catalog(FLAT_N, seed=SEED, mass_model="powerlaw",
                                 mass_scatter_dex=MR_SCATTER_DEX, **rel_kw)
@@ -118,26 +103,24 @@ def build_arrays(rel_kw, m_sil, r_sil, rocky_curve=None, rng=None):
             & (f.isna() | f.between(S72.BOX["f_lo"], S72.BOX["f_hi"])))
     cat = cat[keep].copy()
     mass = pd.to_numeric(cat["mass_p"], errors="coerce").to_numpy(float)
-    radius = pd.to_numeric(cat["radius_p"], errors="coerce").to_numpy(float)
-    if rocky_curve is not None:
-        radius = radius.copy()  # pandas hands back a read-only view
-        dropped = (radius <= np.interp(mass, m_sil, r_sil)) & (mass > S72.MASS_THRESHOLD)
-        # Same radius scatter the relation implies: 0.15 dex in mass times the slope.
-        sigma_ln = rel_kw["mr_beta"] * MR_SCATTER_DEX * np.log(10)
-        radius[dropped] = redraw_rocky_around(mass[dropped], *rocky_curve, m_sil, r_sil,
-                                              sigma_ln, rng)
-        cat["radius_p"] = radius
+    radius = pd.to_numeric(cat["radius_p"], errors="coerce").to_numpy(float).copy()
     flux = pd.to_numeric(cat["flux_p"], errors="coerce").to_numpy(float)
     puffy = radius > np.interp(mass, m_sil, r_sil)
+    if super_earths_on_silicate:
+        se = (~puffy) & (mass > S72.MASS_THRESHOLD)
+        # 0.15 dex in mass times the relation's slope, as a fractional radius width.
+        frac_sd = rel_kw["mr_beta"] * MR_SCATTER_DEX * np.log(10)
+        r_on_line = np.interp(mass[se], m_sil, r_sil)
+        radius[se] = r_on_line * (1.0 + frac_sd * rng.standard_normal(se.sum()))
+        cat["radius_p"] = radius
     td = run_kepler(cat)["detected"].to_numpy(bool)
     rd = run_rv_best(cat, mag_target=S72.RV_MAG_TARGET)["detected"].to_numpy(bool)
     return mass, radius, flux, puffy, td & rd
 
 
-def noised_scatter_AB(arrays, cut, rng, n_plot=400, remove_crossing=False):
+def noised_scatter_AB(arrays, cut, rng, n_plot=400, drop_blue_below=False):
     """One detected + noised draw (with the cut applied); split into flat-A-kept vs dropped-by-A.
-    remove_crossing drops the dropped-by-A (rocky super-Earth) planets that the
-    measurement noise pushes above the silicate line."""
+    drop_blue_below removes the flat-A-kept planets that land on or below the silicate line."""
     mass, radius, flux, puffy, det = arrays
     keep = det.copy()
     if cut.get("insol_max"):
@@ -150,8 +133,8 @@ def noised_scatter_AB(arrays, cut, rng, n_plot=400, remove_crossing=False):
         k = mo > cut["mass_min"]
         mo, ro, tmass, tpuffy = mo[k], ro[k], tmass[k], tpuffy[k]
     dropped = (~tpuffy) & (tmass > S72.MASS_THRESHOLD)          # A drops these (true rocky, true M>2)
-    if remove_crossing:
-        k = ~(dropped & (ro > np.interp(mo, *S72.load_silicate())))
+    if drop_blue_below:
+        k = dropped | (ro > np.interp(mo, *S72.load_silicate()))
         mo, ro, dropped = mo[k], ro[k], dropped[k]
     if mo.size > n_plot:
         j = rng.choice(mo.size, n_plot, replace=False)
@@ -181,19 +164,20 @@ def nasa_cut(nasa, cut):
     return m, r, me1, me2, re1, re2
 
 
-def _draw_scatter(ax, arr, cut, nasa, m_sil, r_sil, rng, title, earth_curve=None,
-                  remove_crossing=False):
+SCATTER_LABELS = ("Escape-only (kept)", "Primordial-rocky: rocky super-Earths (M>2)")
+
+
+def _draw_scatter(ax, arr, cut, nasa, m_sil, r_sil, rng, title,
+                  labels=SCATTER_LABELS, drop_blue_below=False):
     """Top-row panel: one detected, noise-perturbed mass-radius draw."""
-    mo, ro, dropped = noised_scatter_AB(arr, cut, rng, remove_crossing=remove_crossing)
+    mo, ro, dropped = noised_scatter_AB(arr, cut, rng, drop_blue_below=drop_blue_below)
     nmc, nrc, nme1, nme2, nre1, nre2 = nasa_cut(nasa, cut)
     ax.fill_between(m_sil, r_sil, 2.6, color="0.965", zorder=0)
     ax.plot(m_sil, r_sil, "k-", lw=1.2, zorder=6, label="silicate line")
-    if earth_curve is not None:
-        ax.plot(*earth_curve, color="0.5", lw=1.6, zorder=6, label="Earth-like rocky curve")
     ax.scatter(mo[~dropped], ro[~dropped], s=15, color="tab:blue", alpha=0.45, lw=0,
-               zorder=3, label="Escape-only (kept)")
+               zorder=3, label=labels[0])
     ax.scatter(mo[dropped], ro[dropped], s=15, color="tab:orange", alpha=0.5, lw=0,
-               zorder=4, label="Primordial-rocky: rocky super-Earths (M>2)")
+               zorder=4, label=labels[1])
     ax.errorbar(nmc, nrc, xerr=np.array([nme2, nme1]), yerr=np.array([nre2, nre1]),
                 fmt="o", mfc="none", mec="k", ecolor="k", ms=5, mew=1.0,
                 elinewidth=0.6, capsize=1.5, alpha=0.8, zorder=5,
@@ -207,20 +191,20 @@ def _draw_scatter(ax, arr, cut, nasa, m_sil, r_sil, rng, title, earth_curve=None
     ax.set_ylabel(r"planet radius [$R_\oplus$]")
 
 
-def mc_universe_remove_crossing(arrays, drop, cut, m_sil, r_sil, rng):
-    """S72.mc_universe, except that in every draw the rocky super-Earths (true
-    rocky, true M > 2) whose noised radius lands above the silicate line are
+def mc_universe_drop_blue_below(arrays, drop, cut, m_sil, r_sil, rng):
+    """S72.mc_universe, except that in every draw the planets that are not rocky
+    super-Earths (the sub-Neptunes) and land on or below the silicate line are
     removed from the sample before the volatile fraction is taken."""
     mass, radius, flux, puffy, det = arrays
-    rocky_se = (~puffy) & (mass > S72.MASS_THRESHOLD)
-    keep = ~rocky_se if drop else np.ones(len(mass), bool)
+    super_earth = (~puffy) & (mass > S72.MASS_THRESHOLD)
+    keep = ~super_earth if drop else np.ones(len(mass), bool)
     if cut.get("insol_max"):
         keep = keep & (flux < cut["insol_max"])
     idx = np.flatnonzero(keep)
     mass_min = cut.get("mass_min")
     out = np.full(S72.N_REPEATS, np.nan); cnt = np.zeros(S72.N_REPEATS)
     if idx.size:
-        m_u, r_u, det_u, se_u = mass[idx], radius[idx], det[idx], rocky_se[idx]
+        m_u, r_u, det_u, se_u = mass[idx], radius[idx], det[idx], super_earth[idx]
         L = idx.size
         for i in range(S72.N_REPEATS):
             s = rng.integers(0, L, S72.N_SAMPLE)
@@ -233,7 +217,7 @@ def mc_universe_remove_crossing(arrays, drop, cut, m_sil, r_sil, rng):
             if mass_min:
                 k = m_obs > mass_min
                 m_obs, r_obs, se = m_obs[k], r_obs[k], se[k]
-            k = ~(se & (r_obs > np.interp(m_obs, m_sil, r_sil)))
+            k = se | (r_obs > np.interp(m_obs, m_sil, r_sil))
             m_obs, r_obs = m_obs[k], r_obs[k]
             if m_obs.size < 5:
                 continue
@@ -241,12 +225,17 @@ def mc_universe_remove_crossing(arrays, drop, cut, m_sil, r_sil, rng):
     return out[np.isfinite(out)], float(np.nanmean(cnt[cnt > 0])) if (cnt > 0).any() else 0.0
 
 
-def _draw_bells(ax, arr, cut, nasa, m_sil, r_sil, rng, tag="", remove_crossing=False):
+BELL_STYLE = (("Escape-only", "tab:orange"), ("Primordial-rocky", "tab:blue"))
+
+
+def _draw_bells(ax, arr, cut, nasa, m_sil, r_sil, rng, tag="", style=BELL_STYLE,
+                mc=None):
     """Bottom-row panel: COUNT histograms of the volatile fraction over the MC draws.
-    y = number of the N_REPEATS draws that landed in each bin; N_p = mean planets/draw."""
+    y = number of the N_REPEATS draws that landed in each bin; N_p = mean planets/draw.
+    style gives (label, colour) for universe A then universe B."""
+    mc = mc or S72.mc_universe
     nv, n_nasa = S72.mc_nasa(nasa, cut, m_sil, r_sil, rng)
     n_mu, n_sd = nv.mean(), nv.std()
-    mc = mc_universe_remove_crossing if remove_crossing else S72.mc_universe
     sA, nA = mc(arr, True, cut, m_sil, r_sil, rng)
     sB, nB = mc(arr, False, cut, m_sil, r_sil, rng)
     all_bell = [b for b in (nv, sA, sB) if b.size]
@@ -258,8 +247,7 @@ def _draw_bells(ax, arr, cut, nasa, m_sil, r_sil, rng, tag="", remove_crossing=F
     edges = np.arange(-0.02, 1.02 + 1e-9, 0.04)
     bw = edges[1] - edges[0]
     y_max = max(np.histogram(b, bins=edges)[0].max() for b in all_bell)
-    for lbl, s, ne, colour in [("Escape-only", sA, nA, "tab:orange"),
-                               ("Primordial-rocky", sB, nB, "tab:blue")]:
+    for (lbl, colour), s, ne in zip(style, (sA, sB), (nA, nB)):
         if s.size == 0:
             continue
         tens = abs(s.mean() - n_mu) / np.sqrt(s.std() ** 2 + n_sd ** 2)
@@ -336,23 +324,24 @@ def make_otegi_1x2(nasa, m_sil, r_sil, rng):
     """Side-by-side panel pair: the Otegi mass-radius draw (left) and its
     volatile-fraction count histograms (right), under the cold super-Earth cut.
 
-    The rocky super-Earths (the population only universe B keeps) are redrawn
-    around the Earth-like composition curve, hard-cut at the silicate line;
-    the rest of the Otegi pool is unchanged. Rocky super-Earths that the
-    measurement noise pushes above the silicate line are removed from each
-    simulated sample, in both panels.
+    Blue = "Sub-Neptunes only" (universe A), orange = "Sub-Neptunes and
+    super-Earths" (universe B) in both panels. The rocky super-Earths are
+    redrawn as a normal around the silicate line, and any sub-Neptune that
+    lands on or below the silicate line is removed from each sample.
     """
-    print("\n--> Otegi 1x2 (cold super-Earth cut, rocky super-Earths around the Earth-like curve):")
+    print("\n--> Otegi 1x2 (cold super-Earth cut; super-Earths on the silicate line):")
     cut_label, cut = OTEGI_2X2_CUTS[1]
     otegi_kw = next(kw for name, eq, applies, kw in RELATIONS if "Otegi" in name)
-    earth = load_earthlike_curve()
-    arr = build_arrays(otegi_kw, m_sil, r_sil, rocky_curve=earth,
+    arr = build_arrays(otegi_kw, m_sil, r_sil, super_earths_on_silicate=True,
                        rng=np.random.default_rng(SEED + 1))
     fig, axes = plt.subplots(1, 2, figsize=(13.0, 5.4))
-    _draw_scatter(axes[0], arr, cut, nasa, m_sil, r_sil, rng, "", earth_curve=earth,
-                  remove_crossing=True)
+    _draw_scatter(axes[0], arr, cut, nasa, m_sil, r_sil, rng, "",
+                  labels=("Sub-Neptunes only", "Sub-Neptunes and super-Earths"),
+                  drop_blue_below=True)
     _draw_bells(axes[1], arr, cut, nasa, m_sil, r_sil, rng, tag=f"[1x2] {cut_label}",
-                remove_crossing=True)
+                style=(("Sub-Neptunes only", "tab:blue"),
+                       ("Sub-Neptunes and super-Earths", "tab:orange")),
+                mc=mc_universe_drop_blue_below)
     fig.tight_layout()
     fname = "flat_otegi_1x2_cold_cut.png"
     out_png = os.path.join(OUT_DIR, fname)

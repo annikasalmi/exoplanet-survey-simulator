@@ -1,25 +1,6 @@
-"""
-recompute_kepler_detection.py — re-apply the Kepler detection model in place.
-
-Only the DETECTION noise model changed (kepler_data.py: a stellar-variability
-CDPP floor added in quadrature, cdpp_variability_ppm=28). The P-Pop planet + star
-parameters in the stored catalogs are unchanged, so there is no need to
-regenerate anything. We simply re-run KeplerData.determine_detectable() on each
-stored catalog, which recomputes kepler_cdpp_ppm / kepler_mes / detected with the
-fixed model, and write the result back.
-
-Why this is safe:
-  * Deterministic & idempotent — detection is recomputed from the preserved
-    radius_p / radius_s / kepler_mag_used / p_orb / inc_p / ... columns, so
-    running it once or ten times gives the same answer.
-  * Same code path as generation — KeplerData(df) infers source='ppop' for these
-    catalogs (no NASA columns), exactly as run_single did, so the output matches
-    what a full regeneration would produce for the detection columns.
-  * Atomic writes — each catalog is written to a temp file then os.replace()'d,
-    so an interruption cannot leave a half-written CSV.
-
-Run from repo root:
-    python run/kepler/recompute_kepler_detection.py
+"""Re-run KeplerData.determine_detectable() on the stored Kepler catalogs after a detection-model
+change, without regenerating planets. Deterministic, and writes each catalog atomically.
+Run from repo root: python run/kepler/recompute_kepler_detection.py
 """
 
 import os

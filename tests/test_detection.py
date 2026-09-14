@@ -7,7 +7,7 @@ from telescopes.hwo.detection_model import HWOData
 
 # Load and process data
 print("Loading exoplanet data...")
-REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 df = load_and_filter_exoplanets(
     os.path.join(REPO_ROOT, 'data/exoplanet_csv', 'exoplanets_2026.csv'))
 

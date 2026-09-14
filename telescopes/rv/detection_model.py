@@ -1,46 +1,6 @@
-"""
-rv_data.py — HARPS / HARPS-N-style radial-velocity detector for P-Pop + NASA.
-
-Sibling of kepler_data.py / tess_data.py.  The transit detectors decide whether a
-planet's *transit* is recoverable; this one decides whether a planet's *mass* is
-recoverable by an optical RV follow-up campaign.  Same usage pattern:
-
-    RVData(PPopObj.catalog, source="ppop").determine_detectable()
-    RVData(nasa_df, source="pscomppars").determine_detectable()
-
-Detection rule (hard threshold, analog of Kepler's 7.1 MES / TESS's 7.1 SNR):
-
-    rv_detected = bright_enough AND (rv_snr >= snr_threshold)
-
-with the semi-amplitude signal-to-noise definition
-
-    sigma_K = sqrt(2 / N_obs) * sigma_rv     # uncertainty on K from N white-noise epochs
-    rv_snr  = K / sigma_K = K * sqrt(N_obs / 2) / sigma_rv
-
-    K       = RV semi-amplitude (m/s), from the planet mass            [signal]
-    sigma_rv= per-measurement RV precision (m/s)                       [noise]
-    N_obs   = number of RV epochs in the follow-up campaign            [looks]
-
-(This is the standard sqrt(2/N) semi-amplitude error; it is a factor sqrt(2)
-stricter than the bare K*sqrt(N)/sigma "looks" form.)
-
-K (canonical form; the whiteboard's 29.8 m/s is a minor-constant variant):
-
-    K = 28.4329 m/s * (Mp*sin i / M_Jup) * (M_star/M_sun)^(-2/3)
-                    * (P / 1 yr)^(-1/3) / sqrt(1 - e^2)
-
-Mass source for K (M sin i vs true mass):
-    apply_sini=True  -> uses Mp * sin(inc)   (realistic: RV only ever measures M sin i)
-    apply_sini=False -> uses Mp              (true mass; for the "what if i were known" run)
-    Toggle it to see the selection effect of the unknown inclination.
-
-Survey constants default to the HARPS / HARPS-N family — the dominant optical
-spectrographs behind the measured masses of small Kepler/TESS planets.  HARPS and
-HARPS-N are twin instruments (R~115,000), so a one- or two-survey model shares the
-same constants.  All numbers are documented parameters; change them per facility.
-
-This is a toy / survey-averaged model.  It does not use a real cadence, window
-function, activity time series, or per-target RV jitter measurement.
+"""HARPS/NIRPS-style RV detector for P-Pop and NASA tables: is a planet's mass recoverable?
+rv_detected = bright enough AND K / sigma_K >= snr_threshold, with sigma_K = sqrt(2/N_obs) * sigma_rv
+and K from M sin i (apply_sini=False uses true mass). A survey-averaged toy model.
 """
 
 from __future__ import annotations
@@ -63,17 +23,9 @@ class RVData:
     M_EARTH_IN_M_JUP = 1.0 / 317.828  # Earth masses -> Jupiter masses
     K_CONST_MS = 28.4329              # m/s, canonical RV semi-amplitude prefactor
 
-    # Stellar (spot-induced) RV jitter (m/s RMS) by spectral type, VISIBLE domain.
-    # Grounded to Bellotti & Korhonen (2021), Astron. Nachr. 342, 926, Table 3
-    # (DOI 10.1002/asna.20210003): median mean peak-to-peak jitter per type over
-    # their 15-star F-M sample, converted p2p -> RMS by /2.8 (phase-sampled
-    # rotational modulation, RMS ~ p2p / 2*sqrt(2)).  Their sample deliberately
-    # spans activity levels, so per-type values partly reflect the sample's
-    # activity mix (active K stars, inactive M stars), NOT a universal type law;
-    # jitter tracks logR'HK / filling factor / vsini, per the paper.  A is not in
-    # their F-M sample -> extrapolated.  NOTE: this OVERRIDES the earlier values
-    # (F=2.5,G=1.2,K=1.3,M=2.5) that were tuned to match published pl_rvamperr on
-    # 342 real small planets; expect M-dwarf jitter to drop ~10x here.
+    # Stellar RV jitter (m/s RMS) by spectral type, visible band: Bellotti & Korhonen (2021) Table 3
+    # median peak-to-peak / 2.8. Reflects their sample's activity mix, not a universal law; A is
+    # extrapolated. Replaces earlier values tuned to pl_rvamperr (M-dwarf jitter now ~10x lower).
     JITTER_BY_STYPE_MS = {"A": 5.0, "F": 1.6, "G": 2.4, "K": 3.5, "M": 0.25, "Unknown": 2.0}
 
     # Teff -> bolometric correction (M_bol = M_band + BC_band, so M_band = M_bol - BC_band).
@@ -84,16 +36,10 @@ class RVData:
     _BC_J_GRID = np.array([2.30, 2.10, 1.90, 1.70, 1.55, 1.45, 1.35, 1.25, 1.00, 0.70], dtype=float)
     _BC_GRIDS = {"V": _BC_V_GRID, "J": _BC_J_GRID}
 
-    # Per-instrument presets. NIRPS observes in the NIR (band J): M dwarfs are bright there
-    # and their activity jitter is lower than in the optical, so NIRPS complements HARPS
-    # exactly where HARPS fails (faint, active M dwarfs).  Model them separately and take
-    # the per-planet best instrument; do NOT average their noise into one model.
-    # Constants calibrated to published small-planet campaigns:
-    #   HARPS-N TOI-1453 (Roy+2025): 100 RV points, median per-point sigma 1.56 m/s, masses 1-3 Me.
-    #   K2-136c (Mayo+2023): 93 points, 1.6 m/s.  NIRPS: ~1 m/s goal, ~48-70 spectra for a 3-sigma mass.
-    # phot_full_mag = faintest band-mag that still reaches sigma_phot_ref by adapting exposure time;
-    # beyond it the photon noise degrades.  This replaces the old fixed-exposure photon model that
-    # made every target fainter than the reference far too noisy.
+    # Per-instrument presets. NIRPS (J band) sees M dwarfs bright and less jittery, covering where
+    # HARPS fails; take the per-planet best instrument, don't average. Constants from published
+    # campaigns (e.g. HARPS-N TOI-1453: 100 points, 1.56 m/s). phot_full_mag = faintest mag that
+    # still reaches sigma_phot_ref with longer exposures; fainter stars get noisier.
     INSTRUMENT_PRESETS = {
         # HARPS jitter grounded to Bellotti & Korhonen (2021) Table 3 (visible domain);
         # see JITTER_BY_STYPE_MS above for the p2p->RMS conversion and caveats.
@@ -118,27 +64,17 @@ class RVData:
         sigma_instr_ms: Optional[float] = None,   # instrumental/long-term RV floor (m/s)
         sigma_phot_ref_ms: Optional[float] = None,# achievable photon-noise floor (well-exposed)
         phot_full_mag: Optional[float] = None,    # faintest band-mag still reaching the photon floor
-        # Let stars BRIGHTER than phot_full_mag integrate BELOW the nominal photon floor,
-        # down to sigma_phot_sys_floor.  Without this the noise is too FLAT vs brightness and
-        # the model under-credits the brightest nearby M dwarfs (Proxima J=5.2 was scored 4.7
-        # sigma vs its real ~20 sigma).  Validated in scripts/59: this lifts genuinely-easy
-        # (real >=5 sigma) planet recovery 79%->87% while barely touching the marginal ones
-        # (real <5 sigma: 57%->59%).  True = close-to-reality default; False = legacy clamp.
+        # Let stars brighter than phot_full_mag go below the photon floor, down to sigma_phot_sys_floor,
+        # so the brightest M dwarfs aren't under-credited (Proxima: 4.7 vs real ~20 sigma). Lifts easy-
+        # planet recovery 79% -> 87%. True = default; False = legacy clamp.
         photon_beats_floor: bool = True,
         sigma_phot_sys_floor: float = 0.15,       # irreducible photon/systematic floor (m/s)
         jitter_by_stype: Optional[dict] = None,
         n_obs: int = 100,                  # RV epochs (HARPS-N small-planet campaigns: ~93-100)
         jitter_red_frac: float = 0.0,      # fraction of stellar-activity jitter treated as
-                                           # CORRELATED (red) -> irreducible floor on K that
-                                           # does NOT average down with N epochs.
-                                           # CALIBRATION (2026-06-16): against 342 real small
-                                           # (R<=2.2) planets with published pl_rvamp, f=0 gives
-                                           # model median sigma_K=0.27 m/s (published 0.31) and
-                                           # recovers 57.6% at >=5 sigma -- matching the 58.5% that
-                                           # were actually published at >=5 sigma. f>0 double-counts
-                                           # activity (real teams GP-model it out) and rejects real
-                                           # detections (f=0.5 -> only 10.8% recovered). So default 0.
-                                           # Kept as a knob for sensitivity tests only.
+                                           # correlated (red): an irreducible floor on K. Default 0: on 342 real
+                                           # small planets f=0 recovers 57.6% at >=5 sigma (58.5% published),
+                                           # f=0.5 only 10.8%. Kept as a sensitivity knob.
         snr_threshold: float = 5.0,        # 5-sigma "secure mass" (analog of 7.1 MES)
         vmag_limit: float = 16.0,          # generous faint cutoff for follow-up feasibility
         # --- mass / signal options ---
@@ -299,12 +235,8 @@ class RVData:
     # ------------------------------------------------------------------
 
     def stellar_mass_msun(self) -> pd.Series:
-        """Stellar mass in solar units.
-
-        Prefer a supplied mass_s only when it is already in plausible solar units
-        (NASA st_mass).  P-Pop's mass_s is a constant 1 M_sun expressed in kg, so it
-        is detected as non-solar and replaced by a main-sequence radius estimate
-        (M/Msun ~ (R/Rsun)^exponent, exponent ~1 across the lower MS where M/K dwarfs live).
+        """Stellar mass in solar units. Uses mass_s only if already in solar units (NASA st_mass);
+        P-Pop's mass_s (1 M_sun in kg) is replaced by a main-sequence estimate from radius.
         """
         n = len(self.catalog)
         src = pd.Series("radius_estimate", index=self.catalog.index, dtype=object)
@@ -347,11 +279,7 @@ class RVData:
         return m_bol
 
     def apparent_vmag(self) -> pd.Series:
-        """Apparent V magnitude (always computed, for cross-instrument target cuts/labels).
-
-        Uses a catalog vmag/gaiamag when present, else builds it from luminosity and
-        distance with BC_V so cool stars are correctly faint in V.
-        """
+        """Apparent V magnitude, from catalog vmag/gaiamag or else luminosity, distance and BC_V."""
         v = pd.Series(np.nan, index=self.catalog.index)
         src = pd.Series("missing", index=self.catalog.index, dtype=object)
         if "vmag" in self.catalog.columns:
@@ -369,10 +297,8 @@ class RVData:
         return v
 
     def apparent_band_mag(self) -> pd.Series:
-        """Apparent magnitude in the instrument's band (V for HARPS, J for NIRPS).
-
-        This is the magnitude that drives RV photon noise and the brightness gate.
-        In J, cool stars are bright (BC_J > 0), so M dwarfs become RV-reachable for NIRPS.
+        """Apparent magnitude in the instrument band (V for HARPS, J for NIRPS); drives photon noise
+        and the brightness gate. Cool stars are bright in J, so NIRPS can reach M dwarfs.
         """
         v = self.apparent_vmag()  # ensures rv_vmag exists
         if self.band == "V":
@@ -440,18 +366,12 @@ class RVData:
         return k
 
     def calc_noise(self) -> pd.Series:
-        """Per-measurement RV precision sigma_rv (m/s): instrument (+) photon (+) jitter.
-
-        Photon noise uses the instrument's band magnitude, so NIRPS (band J) sees M dwarfs
-        as bright while HARPS (band V) sees them as faint.
+        """Per-measurement RV precision sigma_rv (m/s): instrument, photon and jitter in quadrature.
+        Photon noise uses the band magnitude, so NIRPS sees M dwarfs as bright and HARPS as faint.
         """
         mag = self.apparent_band_mag()
-        # Adaptive exposure: surveys integrate to the photon floor for any target brighter than
-        # phot_full_mag, so sigma_phot stays at the floor up to that limit and only degrades
-        # (~10^(0.2*excess)) for fainter stars. (excess = max(0, mag - phot_full_mag).)
-        # Stars BRIGHTER than phot_full_mag (negative excess) integrate BELOW the floor, down to
-        # an irreducible systematic floor sigma_phot_sys_floor -- lets the brightest nearby M dwarfs
-        # reach their real sub-0.1 m/s precision instead of being clamped at ~1 m/s.
+        # Adaptive exposure: photon noise stays at the floor down to phot_full_mag and grows as
+        # 10^(0.2*excess) for fainter stars; brighter stars go below it, to sigma_phot_sys_floor.
         excess = mag - self.phot_full_mag
         if not self.photon_beats_floor:
             excess = excess.clip(lower=0.0)
@@ -468,19 +388,9 @@ class RVData:
         return sigma_rv
 
     def calc_snr(self) -> pd.Series:
-        """rv_snr = K / sigma_K.
-
-        White noise (instrument + photon) averages down with the number of
-        epochs as sqrt(2/N_obs).  Stellar-activity jitter, however, is partly
-        CORRELATED (red): a fraction `jitter_red_frac` does NOT beat down with
-        more epochs and sets an irreducible activity floor on the recoverable
-        semi-amplitude.  So
-
-            sigma_K^2 = (2/N) * [sigma_instr^2 + sigma_phot^2 + ((1-f)*sigma_jit)^2]
-                        + (f * sigma_jit)^2
-
-        With f = jitter_red_frac = 0 this collapses to the optimistic all-white
-        sqrt(2/N_obs)*sigma_rv; f ~ 0.5 is a realistic, more conservative model.
+        """rv_snr = K / sigma_K, with sigma_K^2 = (2/N)[instr^2 + phot^2 + ((1-f) jit)^2] + (f jit)^2.
+        f = jitter_red_frac is the correlated jitter share that doesn't average down; f = 0 gives the
+        all-white sqrt(2/N_obs) * sigma_rv.
         """
         k = self.calc_semiamplitude()
         self.calc_noise()  # populates rv_sigma_ms / rv_sigma_phot_ms / rv_sigma_jitter_ms

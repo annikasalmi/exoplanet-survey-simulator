@@ -1,23 +1,6 @@
-"""
-kepler_data.py — dual P-Pop + NASA PSCompPars/KOI Kepler toy detector
-
-Safe replacement goal:
-1. P-Pop input still works:
-       KeplerData(PPopObj.catalog).determine_detectable()
-
-2. NASA PSCompPars input works:
-       KeplerData(df, source='pscomppars', ...).determine_detectable()
-
-3. Same simple detector remains:
-       detected = transiting and bright_enough_kepler and depth_good
-
-4. NASA-specific behavior is explicit:
-       - use tran_flag for observed transiting planets
-       - use observed transit depth if pl_trandep exists
-       - handle missing sy_kepmag without falsely killing thousands of NASA rows
-
-This is still a toy / Kepler-ish model. It does not yet use official DR25
-one-sigma-depth FITS files, window functions, or injection-recovery efficiency.
+"""Kepler toy transit detector for P-Pop catalogs and NASA PSCompPars/KOI tables, e.g.
+KeplerData(df, source='pscomppars').determine_detectable(). A planet is detected if it transits,
+is bright enough and passes the MES threshold. No DR25 one-sigma-depth maps or window functions.
 """
 
 from __future__ import annotations
@@ -51,14 +34,9 @@ class KeplerData:
     # KeplerPORTs uses this small factor so approximate MES better matches TPS MES.
     MES_CORRECTION = 1.003
 
-    # Empirical detection-efficiency calibration against the OFFICIAL Kepler DR25
-    # pipeline MES (koi_max_mult_ev).  Even with real per-target rrmscdpp* noise,
-    # the idealized boxcar formula (geometric depth x sqrt(N) / CDPP) runs hot:
-    # script 47 measured median toy/official MES ~ 1.19 (optimistic), so the toy
-    # detector crossed MES>=7.1 too readily and over-detected marginal planets.
-    # This factor (~1/1.19) folds in the matched-filter-vs-boxcar shape loss and
-    # limb-darkening reduction of the *effective* depth, bringing the median
-    # toy/official ratio to ~1.0.  Re-derive with important_plots/kepler_calibration.py.
+    # Calibration against official Kepler DR25 MES (koi_max_mult_ev): the boxcar MES runs ~1.19x
+    # high, so this ~1/1.19 factor brings the median model/official ratio to ~1.0.
+    # Re-derive with output/plots/mission_calibration/kepler_calibration.py.
     MES_OFFICIAL_CALIBRATION = 0.84
 
     # Earth-size planet across Sun-size star gives roughly 84 ppm.
@@ -86,15 +64,9 @@ class KeplerData:
         cdpp_kp_ref_mag: float = 12.0,
         cdpp_min_ppm: float = 20.0,
         cdpp_max_ppm: float = 2000.0,
-        # Intrinsic stellar variability + residual-systematics noise floor,
-        # added in QUADRATURE to the magnitude-scaled photon term. Photon noise
-        # keeps shrinking for bright stars, but a real light curve never drops
-        # below the star's own variability. Without this, nearby bright F/G
-        # dwarfs (Kp ~7-9 at 60 pc) get driven toward ~0 ppm noise and every
-        # transit is "detected", saturating the FGK detected-fraction panels.
-        # This is the main knob controlling bright-star detectability.
-        # 28 ppm = "between quiet and typical" FGK dwarf: above Kepler's best-case
-        # ~20 ppm quiet-G2V spec, below the ~40 ppm of a mildly active dwarf.
+        # Stellar-variability floor added in quadrature to photon noise, so bright nearby F/G dwarfs
+        # aren't treated as noiseless (which saturates FGK detections). Main knob for bright-star
+        # detectability; 28 ppm sits between a quiet (~20) and a mildly active (~40 ppm) FGK dwarf.
         cdpp_variability_ppm: float = 28.0,
 
         # NASA-specific switches. These are the keywords your NASA runner uses.
@@ -189,18 +161,8 @@ class KeplerData:
 
     @staticmethod
     def standardize_catalog_columns(df: pd.DataFrame, source: str = "auto") -> pd.DataFrame:
-        """
-        Convert NASA / KOI / P-Pop-ish columns into shared internal names.
-
-        Internal names used by the detector and plotting scripts:
-            mass_p       Earth masses
-            radius_p     Earth radii
-            flux_p       Earth insolation units
-            radius_s     Solar radii
-            semimajor_p  AU
-            p_orb        days
-            inc_p        degrees if available
-            kepmag       Kepler magnitude if available
+        """Rename NASA / KOI / P-Pop columns to the shared internal names: mass_p, radius_p [Earth],
+        flux_p [Earth insolation], radius_s [Sun], semimajor_p [AU], p_orb [d], inc_p [deg], kepmag.
         """
         df = df.copy()
         source = str(source).lower().strip()
@@ -361,12 +323,7 @@ class KeplerData:
         return "Unknown"
 
     def _estimate_missing_semimajor_axis_if_possible(self) -> None:
-        """
-        Estimate semi-major axis from period and stellar mass when semimajor_p is missing.
-
-        Kepler's third law in Solar units:
-            a_AU ≈ (M_star * P_year^2)^(1/3)
-        """
+        """Fill missing semimajor_p from period and stellar mass: a_AU = (M_star * P_yr^2)^(1/3)."""
         if "semimajor_p" not in self.catalog.columns:
             self.catalog["semimajor_p"] = np.nan
 
@@ -450,12 +407,8 @@ class KeplerData:
         return self.calc_transit_depth_ppm_model()
 
     def calc_transiting_from_inclination(self):
-        """
-        For P-Pop:
-            use geometric inclination.
-
-        For NASA PSCompPars/KOI:
-            if requested and tran_flag exists, use tran_flag because the dataset is already observed transiting planets.
+        """P-Pop: use geometric inclination. NASA PSCompPars/KOI: optionally use tran_flag,
+        since those planets are already observed to transit.
         """
         if self._is_nasa_like() and self.use_observed_transit_flag_for_nasa and "tran_flag" in self.catalog.columns:
             tran_flag = pd.to_numeric(self.catalog["tran_flag"], errors="coerce").fillna(0)
@@ -502,11 +455,8 @@ class KeplerData:
         return star_flux_proxy, approx_mbol
 
     def calc_bright_enough_kepler(self):
-        """
-        Prefer 8 <= kepmag <= 16.
-
-        For NASA rows with missing sy_kepmag, optionally assume bright enough, because otherwise
-        missing metadata would masquerade as a failed Kepler detection.
+        """Require 8 <= kepmag <= 16. NASA rows missing sy_kepmag can optionally pass, so missing
+        metadata isn't counted as a failed detection.
         """
         if "kepmag" in self.catalog.columns:
             mag = pd.to_numeric(self.catalog["kepmag"], errors="coerce")
@@ -585,16 +535,8 @@ class KeplerData:
         return labels
 
     def estimate_cdpp_from_kepler_mag(self):
-        """
-        Minimal photon-noise-like CDPP fallback.
-
-        Real Kepler rows should use rrmscdppXXpX columns when available.
-        For P-Pop/Gaia rows with no real CDPP columns, this makes faint
-        stars noisier instead of using one flat fallback CDPP for everything.
-
-        The scaling is intentionally simple:
-            CDPP(Kp) = fallback_cdpp_ppm * 10**(0.2 * (Kp - cdpp_kp_ref_mag))
-        because photon noise grows approximately with sqrt(1/flux).
+        """Photon-noise CDPP fallback for rows without real rrmscdpp columns (e.g. P-Pop/Gaia):
+        CDPP(Kp) = fallback_cdpp_ppm * 10**(0.2 * (Kp - cdpp_kp_ref_mag)), so faint stars are noisier.
         """
         if not self.use_kepmag_cdpp_fallback:
             return pd.Series(float(self.fallback_cdpp_ppm), index=self.catalog.index)
@@ -611,12 +553,8 @@ class KeplerData:
         cdpp_photon = self.fallback_cdpp_ppm * 10 ** (0.2 * (mag - self.cdpp_kp_ref_mag))
         cdpp_photon = cdpp_photon.replace([np.inf, -np.inf], np.nan).fillna(self.fallback_cdpp_ppm)
 
-        # Add the stellar-variability / residual-systematics floor in QUADRATURE.
-        # Photon noise -> 0 for very bright stars, but a real light curve never
-        # drops below the star's own variability. This stops nearby bright F/G
-        # dwarfs (Kp ~7-9 at 60 pc) from becoming effectively noiseless and
-        # making every transit detectable. M dwarfs (Kp ~13, CDPP ~200 ppm) are
-        # essentially unchanged, so the M-dwarf science is unaffected.
+        # Add the stellar-variability floor in quadrature so bright F/G dwarfs (Kp ~7-9 at 60 pc) don't
+        # become noiseless. M dwarfs (Kp ~13, CDPP ~200 ppm) are essentially unchanged.
         cdpp = np.sqrt(cdpp_photon ** 2 + self.cdpp_variability_ppm ** 2)
         return cdpp.clip(lower=self.cdpp_min_ppm, upper=self.cdpp_max_ppm)
 
@@ -744,11 +682,8 @@ class KeplerData:
 
         detected = transiting & bright_enough_kepler & depth_good
 
-        # Detection probability weight — NOT a Bernoulli draw.
-        # kepler_p_detect is 0/1 for threshold; smooth logistic for sigmoid.
-        # Gated by transiting, bright, and enough-transits so the MES-based
-        # probability only applies to planets that pass all upstream gates.
-        # Usage: expected_detected_in_bin = kepler_p_detect[mask].sum()
+        # Detection probability weight, not a Bernoulli draw: 0/1 for threshold, logistic for sigmoid,
+        # zeroed unless transiting, bright and enough transits. Use kepler_p_detect[mask].sum().
         mes_col = pd.to_numeric(self.catalog["kepler_mes"], errors="coerce").fillna(0.0)
         enough = self.catalog["kepler_enough_transits"].astype(bool)
         all_gates = transiting.astype(bool) & bright_enough_kepler.astype(bool) & enough
@@ -782,15 +717,9 @@ class KeplerData:
 # Future upgrades: keep commented for later
 # ============================================================
 
-# FUTURE UPGRADE 1:
-# Replace CDPP * sqrt(N_transits) with official DR25 one-sigma depth FITS products.
-# KeplerPORTs idea:
-#     MES = transit_depth_ppm / one_sigma_depth_ppm * 1.003
-# This is better because one-sigma depth includes period-dependent missing data and target-specific noise.
+# FUTURE UPGRADE 1: replace CDPP * sqrt(N_transits) with the official DR25 one-sigma depth maps
+# (KeplerPORTs: MES = depth_ppm / one_sigma_depth_ppm * 1.003), which include period-dependent gaps.
 
-# UPGRADE 2 (implemented):
-# Probabilistic detection efficiency via detection_model='sigmoid'.
-# kepler_p_detect = logistic(sigmoid_steepness * (MES - mes_threshold))
-# Used as a weight (sum(p_i) per bin), not a Bernoulli draw.
-# For a fuller treatment: replace with KeplerPORTs DEMod.final_detEffs(MES, period),
-# which is period-dependent and accounts for window function probability.
+# UPGRADE 2 (implemented): detection_model='sigmoid' gives
+# kepler_p_detect = logistic(sigmoid_steepness * (MES - mes_threshold)), used as a weight.
+# Fuller option: KeplerPORTs DEMod.final_detEffs(MES, period).

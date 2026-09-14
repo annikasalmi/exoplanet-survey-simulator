@@ -1,25 +1,6 @@
-"""
-flat_rocky_mr_vs_nasa.py — which published ROCKY mass-radius relation, imposed on the
-uniform-parameter universe, best reproduces NASA's puffy fraction?
-
-2x4 grid.  Columns = four rocky/small-planet R = C·M^β relations (post-2016; Bashi 2017 excluded
-because it has no distinct rocky branch — Chen's Terran branch used instead):
-    Chen & Kipping 2017  ·  Otegi et al. 2020  ·  Edmondson et al. 2023  ·  Müller et al. 2024
-Each is used as a deterministic "mean MR" (mass from radius) + a common log-normal mass scatter, so the
-only thing that changes across columns is the relation itself.
-
-Rows (both show flat A AND flat B):
-    1. mass-radius scatter — flat A points + the planets flat A drops (rocky, true M>2, "B only") + NASA.
-    2. puffy-fraction bells — flat A vs flat B vs NASA.
-flat A = drops rocky planets with TRUE mass > 2 M⊕ ("no rocky super-Earths"); flat B = keeps all.
-Detection + measurement noise + the NASA method (precision cut + per-planet perturbation) come from
-script 72.
-
-Outputs: one 2x4 per cut (all | insol<50 | Cold Rocky Desert), plus the paper's 2x2
-(Otegi only, before/after the cold super-Earth cut) saved to paper/figures.
-
-Run:
-    python important_plots/flat_rocky_mr_vs_nasa.py
+"""Which rocky M-R relation (Chen & Kipping 2017, Otegi 2020, Edmondson 2023, Müller 2024), imposed
+on the flat universe, best matches NASA's volatile ("puffy") fraction? Makes the 2x4 grids and the
+paper's Otegi panels. Run: python output/plots/scripts/analysis/multi/flat_rocky_mr_vs_nasa.py
 """
 
 from __future__ import annotations
@@ -93,18 +74,9 @@ def otegi_volatile_radius(mass):
 
 
 def build_arrays(rel_kw, m_sil, r_sil, two_populations=False, rng=None):
-    """Detected flat-universe pool for one mass-radius relation.
-
-    With two_populations, every planet keeps its mass but gets a new radius
-    from one of two normals, with no cut:
-      * sub-Neptunes (all planets except the rocky super-Earths under the base
-        relation): around Otegi's volatile-rich relation;
-      * super-Earths (true rocky, true M > 2 under the base relation): around
-        the silicate line.
-    Widths (fractional): SUB_NEPTUNE_FRAC_SD and SUPER_EARTH_FRAC_SD. Redrawn
-    planets outside the radius box (0.5-2.2 R_earth, as for NASA) are dropped,
-    and `puffy` is recomputed from the new radii. Detection runs on the
-    redrawn radii.
+    """Detected flat-universe pool for one mass-radius relation. With two_populations, radii are
+    redrawn: sub-Neptunes around Otegi's volatile-rich relation, rocky super-Earths (M > 2) around the
+    silicate line (SUB_NEPTUNE_FRAC_SD / SUPER_EARTH_FRAC_SD); planets leaving 0.5-2.2 R_earth drop.
     """
     cat = generate_flat_catalog(FLAT_N, seed=SEED, mass_model="powerlaw",
                                 mass_scatter_dex=MR_SCATTER_DEX, **rel_kw)
@@ -262,14 +234,9 @@ N_SURVEY_ORANGE = 100
 
 
 def mc_universe_blue_cut(arrays, drop, cut, m_sil, r_sil, rng):
-    """Volatile-fraction MC for the 1x2's two universes, built from one pool.
-
-    Each of the S72.N_REPEATS draws is a fresh survey of exactly N_SURVEY_BLUE
-    (drop=True, blue) or N_SURVEY_ORANGE (drop=False, orange) measured planets:
-    detected planets are picked at random from the pool, given measurement
-    noise, and the first that pass the cut on their measured values are kept.
-    Blue picks only from planets truly above the silicate line, orange from the
-    whole pool; noise can still scatter blue planets below the line.
+    """Volatile-fraction Monte Carlo for the 1x2's two universes from one pool: each of S72.N_REPEATS
+    surveys draws N_SURVEY_BLUE (blue: truly above the silicate line) or N_SURVEY_ORANGE (orange: whole
+    pool) planets that pass the cut after measurement noise.
     """
     mass, radius, flux, puffy, det = arrays
     n = N_SURVEY_BLUE if drop else N_SURVEY_ORANGE
@@ -424,16 +391,9 @@ def _draw_density_1x2(ax, arr, cut, nasa, m_sil, r_sil, rng, tag=""):
 
 
 def make_otegi_1x2(nasa, m_sil, r_sil, rng):
-    """Side-by-side panel pair: the Otegi mass-radius draw (left) and its
-    volatile-fraction count histograms (right), under the cold super-Earth cut.
-
-    One pool (build_arrays' two-population redraw) feeds both universes.
-    Orange, "Sub-Neptunes and super-Earths", is the whole pool; blue,
-    "Sub-Neptunes only", is the pool with every planet truly on or below the
-    silicate line removed (in the left panel, the orange dots are the planets
-    blue removes). The left panel shows true masses and radii with the
-    simulated errors as bars; the histograms use the noise-perturbed
-    ("measured") values, so noise can put some sub-Neptunes below the line.
+    """Otegi mass-radius draw (left) beside its volatile-fraction histograms (right), cold cut.
+    Orange = whole pool; blue = pool minus planets truly on/below the silicate line. Left shows true
+    values with simulated error bars; histograms use noisy values, so some blue can fall below the line.
     """
     print("\n--> Otegi 1x2 (cold super-Earth cut; two-population radii):")
     cut_label, cut = OTEGI_2X2_CUTS[1]

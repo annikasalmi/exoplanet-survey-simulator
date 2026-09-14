@@ -1,23 +1,6 @@
-"""
-08_generator_comparison.py — compare the three planet generators on
-(a) generation time, and (b/c) their per-parameter distributions:
-
-    old P-Pop   = SAG13 (Kopparapu 2018) for FGK   -- Annika's distribution
-    new P-Pop   = Bergsten2022 for FGK             -- ours
-    Flat        = uniform_generator (fully-flat box, no occurrence/mass priors)
-
-Figure (2x3):
-    (A) time        (B) radius        (C) host T_eff
-    (D) mass        (E) luminosity    (F) insolation
-
-In the Flat generator radius / mass / T_eff are drawn FLAT (or flat-in-log) and
-independent; luminosity is DERIVED from (T_eff, R_star) and insolation is DERIVED
-as L_star / a^2, then rejection-filtered to [1e-2, 1e4] S_earth -- so the derived
-panels (E, F) are not flat even though the sampled ones (B, C, D) are.
-
-Run:
-    python scripts/08_generator_comparison.py            (uses cached .npz)
-    python scripts/08_generator_comparison.py --rebuild  (re-times P-Pop)
+"""Compare the three planet generators (old P-Pop SAG13, new P-Pop Bergsten2022, flat universe) on
+generation time and per-parameter distributions (three_generators_comparison.png).
+Run: python output/plots/scripts/calibration/generator_comparison.py [--rebuild to re-time P-Pop]
 """
 import os
 import sys

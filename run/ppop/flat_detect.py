@@ -1,10 +1,5 @@
-"""
-flat_detect.py — run Kepler / TESS / RV detectors on a flat catalogue.
-
-Loads the three detector modules by file path (so the heavy lifesim package
-__init__, which pulls in a Qt GUI dependency, is never triggered — their own
-`from lifesim.core.data import Data` is wrapped in try/except). Mirrors the
-importlib pattern already used in plot/script plots/57_rv_mr_detection.py.
+"""Run the Kepler / TESS / RV detectors on a flat catalog. Loads the detector modules by file
+path so the lifesim package __init__ (which needs Qt) is never imported.
 """
 
 from __future__ import annotations
@@ -45,14 +40,8 @@ def run_rv(catalog: pd.DataFrame, instrument: str = "HARPS") -> pd.DataFrame:
 
 
 def run_rv_best(catalog: pd.DataFrame, mag_target: float = 12.0) -> pd.DataFrame:
-    """Per-planet BEST of HARPS (optical V) and NIRPS (NIR J) — the realistic
-    'pick the right spectrograph per target' case used in the 3x4 reference figure.
-
-    Returns the HARPS frame with:
-        detected  = HARPS_detected OR NIRPS_detected
-        rv_is_target = host reachable (band-mag <= mag_target) in EITHER band
-    so callers can use rv_is_target as the RV denominator (matches the
-    'band-mag <= 12' RV-target cut in script 50 / the 3x4 figure).
+    """Per-planet best of HARPS (V band) and NIRPS (J band). Returns the HARPS frame with detected =
+    either instrument, and rv_is_target = host bright enough in either band (the RV denominator).
     """
     h = run_rv(catalog, "HARPS")
     n = run_rv(catalog, "NIRPS")

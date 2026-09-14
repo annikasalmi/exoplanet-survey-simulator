@@ -1,42 +1,6 @@
-"""
-tess_data.py — concise TESS detector with tess-point + TIC/MAST + SPOC RMS CDPP support.
-
-Main science use:
-    P-Pop planets keep their generated mass/radius labels.
-    TESSData only decides whether TESS would detect the transit.
-
-Detection rule (hard threshold):
-    detected = observed_by_tess AND transiting AND bright_enough
-               AND enough_transits AND SNR >= snr_threshold
-
-Detection probability weight (tess_p_detect):
-    Always populated; used as weight for expected-detection analyses.
-    For detection_model='threshold': 0.0 or 1.0 (same as hard cut).
-    For detection_model='sigmoid':  logistic(sigmoid_steepness * (SNR - snr_threshold)).
-    Used as sum(p_i) per bin — NOT as a Bernoulli draw — so results are fully reproducible.
-    Rationale: even with exact synthetic parameters, a real telescope sees one noise
-    realization per target; near-threshold planets are stochastically detected or missed.
-    The logistic weight is the analytic stand-in for that photon-noise draw.
-    All upstream gates (observed, transiting, bright, enough transits) zero out tess_p_detect
-    before the SNR term even applies.
-
-High-impact upgrades applied:
-    1. CVZ tagging: ecliptic latitude computed; fallback n_sectors bumped for CVZ stars.
-    2. FFI cadence: smooth CDPP fallback scaled by sqrt(cadence_min/2) for non-SPOC targets.
-    3. Sigmoid detection: logistic probability weight (see above) for near-threshold planets.
-    4. Impact parameter: model duration shortened by sqrt(1-b^2) for inclined orbits.
-    5. M-dwarf Tmag proxy: Teff-based color correction for Gaia and mbol proxy magnitudes.
-
-Noise priority:
-    1. Official SPOC robust RMS CDPP tables, matched by TIC ID + sector + duration.
-    2. Empirical median CDPP from those tables, binned by Tmag + duration.
-    3. Smooth Tmag noise fallback (optionally scaled for FFI cadence).
-
-Expected local CDPP files:
-    cdpp_dir/*.csv with columns like:
-        ticid, tmag, rrmscdpp00p5, rrmscdpp01p0, ..., rrmscdpp15p0
-    Sector is read from a column named sector if present, otherwise from filenames
-    containing patterns like s0001 or -s0001-s0001-.
+"""TESS toy transit detector for P-Pop and NASA tables. detected = observed by TESS, transiting,
+bright enough, enough transits and SNR >= snr_threshold; tess_p_detect is a threshold or sigmoid
+weight. Noise: SPOC CDPP tables by TIC, then binned median CDPP, then a smooth Tmag fallback.
 """
 
 from __future__ import annotations
@@ -71,17 +35,9 @@ class TESSData:
         10.5: "rrmscdpp10p5", 12.5: "rrmscdpp12p5", 15.0: "rrmscdpp15p0",
     }
 
-    # Empirical detection-efficiency calibration against the OFFICIAL SPOC pipeline
-    # SNR (ExoFOP TOI "Planet SNR").  The idealized boxcar SNR (depth x sqrt(sum
-    # N_i/CDPP_i^2)) runs hot: script 48 measures the toy/official ratio rising
-    # toward the detection cut -- ~1.52 in the SNR 7.1-20 bins (median 1.41
-    # overall) -- so the toy crossed SNR>=7.1 too readily and over-detected
-    # marginal planets.  This factor is anchored at the threshold region
-    # (~1/1.52) so the calibrated ratio is ~1.0 exactly where the SNR>=7.1 cut
-    # is decided; it folds in the matched-filter-vs-boxcar shape loss and
-    # limb-darkening reduction of the *effective* depth.  Re-derive with
-    # important_plots/tess_calibration.py (requires the "TESS Mag"->tmag fix so
-    # the smooth-CDPP fallback is not corrupted by a missing magnitude).
+    # Calibration against official SPOC SNR (ExoFOP TOI): the boxcar SNR runs ~1.52x high near the
+    # 7.1 cut, so this ~1/1.52 factor makes model/official ~1.0 where detection is decided.
+    # Re-derive with output/plots/mission_calibration/tess_calibration.py.
     SNR_OFFICIAL_CALIBRATION = 0.66
 
     # Teff grid for proxy Tmag color corrections (upgrade #5).
@@ -128,11 +84,9 @@ class TESSData:
         # None = calibrated as-is (matches SPOC 2-min targets).
         # Set to 30.0 for primary-mission FFI stars or 10.0 for extended-mission FFI stars.
         ffi_cadence_min: Optional[float] = None,
-        # upgrade #3: detection efficiency model.
-        # 'threshold' = hard SNR step at snr_threshold (default; backward-compatible).
-        # 'sigmoid'   = logistic probability weight used for expected-detection analysis.
-        #   Use as: expected_count = tess_p_detect.sum()  (NOT as a Bernoulli draw)
-        #   Calibration note: sigmoid_steepness should ideally be fit to TESS injection-recovery.
+        # detection_model: 'threshold' = hard SNR cut (default); 'sigmoid' = logistic weight for
+        # expected counts (tess_p_detect.sum(), not a Bernoulli draw). Steepness should ideally
+        # be fit to TESS injection-recovery.
         detection_model: str = "threshold",
         sigmoid_steepness: float = 1.5,
         validate_for_detection: bool = True,
@@ -301,13 +255,8 @@ class TESSData:
             self.catalog["temp_s"] = self.catalog["teff_s"]
 
     def _fill_tmag_proxy(self) -> None:
-        """Populate tess_tmag from catalog value or proxy, with Teff-based color correction
-        for Gaia G and mbol proxies (upgrade #5).
-
-        TESS bandpass peaks at ~780 nm, redder than V or bolometric. M dwarfs emit strongly
-        in this band, so raw Gaia G or mbol overestimates Tmag (makes the star look fainter
-        than it really is to TESS). The correction uses a Teff → color-term lookup table
-        derived from TIC (Stassun+2019) and Sullivan+2015.
+        """Set tess_tmag from the catalog or a proxy. Gaia G and mbol proxies get a Teff-based color
+        correction (TIC, Stassun+2019; Sullivan+2015), since M dwarfs are brighter in the TESS band.
         """
         tmag = self._num(self.catalog.get("tmag", pd.Series(np.nan, index=self.catalog.index)))
         src = pd.Series("tmag_catalog", index=self.catalog.index, dtype=object)
@@ -504,11 +453,8 @@ class TESSData:
         self.catalog["tess_observed_days"] = n_sec * self.sector_days * self.dutycycle
 
     def _tag_cvz(self) -> None:
-        """Tag stars in TESS Continuous Viewing Zones (|ecliptic latitude| > cvz_ecliptic_lat_deg).
-
-        Uses mean obliquity ε = 23.439°. CVZ stars near the ecliptic poles are observed
-        every TESS cycle (~13 sectors/year), yielding much longer baselines and higher SNR.
-        Stored in tess_ecliptic_lat (degrees) and tess_in_cvz (bool).
+        """Tag stars in the TESS continuous viewing zones (|ecliptic latitude| > cvz_ecliptic_lat_deg),
+        which get ~13 sectors a year. Sets tess_ecliptic_lat (deg) and tess_in_cvz.
         """
         if not {"ra", "dec"}.issubset(self.catalog.columns):
             self.catalog["tess_ecliptic_lat"] = np.nan
@@ -626,13 +572,8 @@ class TESSData:
         return self._smooth_cdpp(duration_hr, tmag), nearest, "smooth_tmag_fallback"
 
     def _smooth_cdpp(self, duration_hr, tmag):
-        """Smooth photon-noise CDPP fallback.
-
-        Upgrade #2: if ffi_cadence_min is set, scale by sqrt(cadence_min / 2) to account
-        for the coarser time sampling of FFI targets vs 2-min SPOC cadence. For 30-min primary
-        FFI this factor is ~sqrt(15) ≈ 3.87; for 10-min extended FFI it is ~sqrt(5) ≈ 2.24.
-        SPOC-matched rows (official_spoc_cdpp*) are already at 2-min resolution and are not
-        passed through this function.
+        """Smooth photon-noise CDPP fallback. With ffi_cadence_min set, scales by sqrt(cadence_min / 2)
+        for FFI targets (~3.87 at 30 min, ~2.24 at 10 min). SPOC-matched rows don't use this.
         """
         if pd.isna(tmag):
             return 5000.0
@@ -679,13 +620,8 @@ class TESSData:
         return depth
 
     def duration_hr(self) -> pd.Series:
-        """Transit duration in hours; use observed duration when available, else circular-orbit model.
-
-        Upgrade #3: when apply_b_to_duration=True and tess_impact_parameter_toy is available,
-        the central-chord duration T0 = (P/π)(Rs/a) is multiplied by sqrt(1 - b^2) to account
-        for the shorter chord length of inclined transits. This shortens duration for high-b
-        planets, which reduces transit counts and SNR — particularly important near the detection
-        limit. Only applied to modelled durations; observed durations from NASA are used as-is.
+        """Transit duration (h): the observed value when available, else a circular-orbit model,
+        shortened by sqrt(1 - b^2) when apply_b_to_duration is set.
         """
         observed = self._num(self.catalog.get("observed_duration_hr", pd.Series(np.nan, index=self.catalog.index)))
         p = self._num(self.catalog["p_orb"])
@@ -809,11 +745,8 @@ class TESSData:
         depth_pass = snr_col >= self.snr_threshold
         self.catalog["tess_depth_pass"] = depth_pass
 
-        # upgrade #3: detection probability weight — NOT a Bernoulli draw.
-        # tess_p_detect is 0/1 for threshold mode; smooth logistic for sigmoid mode.
-        # Gated by all upstream conditions so non-observed / non-transiting planets
-        # get weight 0 even if their SNR formula would give a non-zero value.
-        # Usage: expected_detected_in_bin = tess_p_detect[mask].sum()
+        # Detection probability weight, not a Bernoulli draw: 0/1 for threshold, logistic for sigmoid,
+        # zero unless observed and transiting. Use tess_p_detect[mask].sum().
         all_gates = (
             self.catalog["tess_observed"].astype(bool)
             & self.catalog["tess_transiting_geometric"].astype(bool)

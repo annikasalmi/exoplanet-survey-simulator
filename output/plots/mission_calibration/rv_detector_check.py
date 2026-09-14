@@ -1,31 +1,6 @@
-"""
-rv_detector_check.py
-
-RV detector verification & calibration — the RV sibling of:
-  * script 33  (toy TESS SNR vs official SPOC/TCE MES calibration), and
-  * scripts 45/46  (P-Pop pipeline stage checks).
-
-K is the RV model's "MES": every detection decision flows from
-    K  ->  sigma_RV (instr + photon + jitter)  ->  K/sigma_K  ->  threshold.
-
-FIGURE 1 — K calibration against PUBLISHED semi-amplitudes (script-33 mirror)
-    Downloads NASA PSCompPars planets with a published pl_rvamp (the K actually
-    measured by RV instruments) and compares the model K computed from the same
-    planet's (M sin i, P, e, M_star):
-      A. model K vs published K, log-log with 1:1 line (colored by stype)
-      B. RVData pass fraction vs published-K bin (recovery rises with signal)
-      C. calibration ratio K_model / K_published per bin (1 = perfect physics)
-
-FIGURE 2 — pipeline stage check on P-Pop (45/46 mirror)
-      A. K distribution, detected vs missed, with the effective K floor band
-      B. recovery fraction vs K/sigma_K bin (threshold marked)
-      C. sigma_RV decomposition by spectral type (instr / photon / jitter)
-      D. loss budget: reason categories overall + by stype
-      E. band magnitude vs sigma_RV, detected vs missed (the brightness wall)
-
-Run from repo root:
-    python output/plots/mission_calibration/rv_detector_check.py
-    python output/plots/mission_calibration/rv_detector_check.py --instrument NIRPS --n-catalogs 80
+"""RV detector calibration against published semi-amplitudes (PSCompPars pl_rvamp): model K vs
+published K, recovery per K bin, K ratio; plus P-Pop stage checks (noise budget, losses).
+Run: python output/plots/mission_calibration/rv_detector_check.py [--instrument NIRPS]
 """
 
 from __future__ import annotations
@@ -120,10 +95,8 @@ def stype_from_teff(t):
 
 
 def model_k_from_published(df: pd.DataFrame) -> pd.Series:
-    """K from the canonical formula using the planet's own published parameters.
-
-    Uses M sin i directly when present (it already includes the projection RV saw);
-    falls back to best mass (most of those are transiting, i ~ 90 deg).
+    """K from the planet's published parameters, using M sin i when present
+    (else best mass; most of those planets transit, so i ~ 90 deg).
     """
     msini = df["pl_msinie"].where(df["pl_msinie"].notna(), df["pl_bmasse"])
     m_jup = msini / 317.828
@@ -229,27 +202,9 @@ def plot_k_calibration(df: pd.DataFrame, args) -> dict:
 
 
 def plot_sigmak_validation(df: pd.DataFrame, args) -> None:
-    """Noise-side calibration: model sigma_K (sqrt(2/N)*sigma_RV) vs the PUBLISHED
-    K uncertainty, plus a signal-to-noise calibration that folds K and sigma_K.
-
-    The model predicts the BEST-CASE achievable precision of a single uniform
-    modern campaign (fixed N_obs, one instrument, per-stype jitter floor).  The
-    published pl_rvamperr, by contrast, records the actual precision of hugely
-    heterogeneous historical campaigns (N ~ 10-1000, ELODIE -> ESPRESSO eras,
-    quiet -> active hosts).  So model <= published (ratio < 1) is the EXPECTED,
-    correct relationship, not "too optimistic": a best-case floor should sit
-    below real achieved error bars.  A raw 1:1 is the wrong target because
-    pl_rvamperr mixes populations the model was never meant to reproduce.
-
-    Three panels:
-      A. FLOOR test — fraction with model sigma_K <= published sigma_K (a valid
-         lower bound should hold for nearly all planets).
-      B. sigma_K ratio per K bin, highlighting the CALIBRATION SET (small,
-         near-threshold planets with a real RV M sin i mass) where it should hug 1.
-      C. S/N calibration — model K/sigma_K vs published pl_rvamp/pl_rvamperr.
-         This is the decision-relevant quantity (detection = S/N > threshold);
-         because K spans orders of magnitude it does NOT collapse into the flat
-         band that pure sigma_K-vs-sigma_K does.
+    """Noise-side calibration: model sigma_K vs published K uncertainty, plus K/sigma_K S/N.
+    The model is a best-case single campaign, so model <= published is expected. Panels: A floor
+    test, B sigma_K ratio per K bin (calibration set should sit near 1), C model vs published S/N.
     """
     # Calibration set: small near-threshold semi-amplitude (K small) + a real RV
     # M sin i mass (pl_msinie present) -- the modern small-planet programmes the

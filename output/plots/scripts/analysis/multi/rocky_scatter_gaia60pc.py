@@ -1,35 +1,6 @@
-"""
-rocky_scatter_gaia60pc.py
-
-New-universe version of script 44. Reads the P-Pop catalogs generated from the
-Gaia-60pc star catalog, stacking up to N_UNIVERSES seeded universes per mission
-to smooth the (locally sparse) F/G/K detection background:
-    Kepler : run/kepler/data/Gaia/kepler_catalog_{0..N-1}.csv
-    TESS   : run/tess/data/Gaia/tess_catalog_{0..N-1}.csv
-Files are addressed by explicit index (0..N_UNIVERSES-1), NOT globbed, so stale
-higher-numbered catalogs left in the same folder by older runs are ignored.
-Each universe shares the same fixed star catalog with a different RNG seed, so
-stacking is a valid Monte-Carlo bootstrap that raises planets-per-bin without
-distorting the underlying occurrence statistics.
-
-Combines the Kepler (script 35) and TESS (script 36) rocky-threshold FGKM
-detection-fraction panels into a single 2x4 figure:
-
-    Row 0 (top)    : Kepler P-Pop detected-fraction background  (F G K M)
-    Row 1 (bottom) : TESS   P-Pop detected-fraction background  (F G K M)
-
-The same set of NASA PSCompPars "rocky" planets (radius <= rocky threshold,
-anchored at LHS 1140 b) is overlaid on every panel.  Each real planet is
-drawn with two-sided radius error bars and colored by the telescope / mission
-that discovered it (disc_facility).  A shared legend lists every facility that
-contributed more than 2 rocky planets inside the plotted science window;
-everything else is collapsed into a single "Other" entry.
-
-Rocky threshold anchor (Cadieux et al. 2024, JWST era):
-    LHS 1140 b:  M_p = 5.60 M_earth,  R_p = 1.730 R_earth
-
-Run from repo root:
-    python scripts/rocky_scatter_gaia60pc.py
+"""Rocky-planet figures: FGKM detection-fraction maps from stacked Gaia-60pc Kepler/TESS catalogs
+with NASA rocky planets overlaid, plus the paper's rocky_mr_insolation_3panel / rocky_scatter_standalone.
+Run: python output/plots/scripts/analysis/multi/rocky_scatter_gaia60pc.py
 """
 
 from __future__ import annotations
@@ -74,28 +45,17 @@ except Exception:
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
-# Gaia-60pc P-Pop universes. Each seeded run i writes <stem>_<i>.csv. We stack
-# the first N_UNIVERSES of them to smooth the (locally sparse) FGK detection
-# background. We build the file list explicitly from indices 0..N-1 rather than
-# globbing, so any stale higher-numbered catalogs left in the folder from older
-# multi-universe runs are ignored.
+# Stack the first N_UNIVERSES seeded Gaia-60pc universes (<stem>_<i>.csv) to smooth the sparse
+# FGK background. Files are listed by index, not globbed, so stale higher-numbered runs are ignored.
 N_UNIVERSES = 10
-
-# Top-up universes produced by run/generate_gk_8000.py are numbered from here.
-# They are single-spectral-type (G-only or K-only) Gaia-60pc / Bergsten2022
-# universes generated to push the (locally sparse) G and K detection background
-# past ~3000 transiting planets so the per-type panels smooth out. They are
-# stacked IN ADDITION to the original universes 0..N_UNIVERSES-1; because each
-# only contains one spectral type, it adds counts solely to that type's panel.
-EXTRA_START_INDEX = 8001
 
 KEPLER_PPOP_DIR = Path(KEPLER_DATA_DIR) / "Gaia"
 TESS_PPOP_DIR   = Path(TESS_DATA_DIR) / "Gaia"
 
 
 def _ppop_files(directory: Path, stem: str) -> list[Path]:
-    """Return <stem>_<i>.csv for i in 0..N_UNIVERSES-1 PLUS any top-up universes
-    with index >= EXTRA_START_INDEX, in order. Falls back to local CSV if DOWNLOAD_NASA_DATA=False."""
+    """Return <stem>_<i>.csv for i in 0..N_UNIVERSES-1, in order.
+    Falls back to local CSV if DOWNLOAD_NASA_DATA=False."""
     wanted = [directory / f"{stem}_{i}.csv" for i in range(N_UNIVERSES)]
     present = [f for f in wanted if f.exists()]
     if not present:
@@ -113,32 +73,14 @@ def _ppop_files(directory: Path, stem: str) -> list[Path]:
     if missing:
         print(f"  [warn] {len(missing)} expected universe(s) missing, "
               f"stacking {len(present)}: missing {missing}")
-
-    # Additively stack any top-up (G/K-only) universes numbered >= EXTRA_START_INDEX.
-    extra = []
-    for f in directory.glob(f"{stem}_*.csv"):
-        try:
-            idx = int(f.stem.rsplit("_", 1)[1])
-        except ValueError:
-            continue
-        if idx >= EXTRA_START_INDEX:
-            extra.append((idx, f))
-    extra.sort()
-    if extra:
-        print(f"  + stacking {len(extra)} top-up universe(s) "
-              f"(idx >= {EXTRA_START_INDEX}) for stem '{stem}'")
-    return present + [f for _, f in extra]
+    return present
 
 # Pure-rock reference curve (kept as the BLACK comparison line in the M-R
 # diagnostic only; it no longer defines the threshold).
 REF_CURVE_PATH = Path(KEPLER_REF_CURVE)
 
-# Rocky / silicate mass-radius curve supplied by the professor (silicon_curve.ddat).
-# Column 0 = mass [M_earth], column 1 = radius [R_earth]; the rest are unused
-# interior-model outputs. THIS curve defines the RED rocky threshold used to
-# filter out puffy (non-rocky) planets everywhere in this script. The loader
-# reads cols 0,1 and the threshold is anchored to LHS 1140 b via an automatic
-# (here ~0) vertical shift.
+# Silicate mass-radius curve (silicon_curve.ddat; cols 0,1 = mass, radius in Earth units).
+# It is the rocky threshold that separates rocky from puffy planets throughout this script.
 ROCKY_CURVE_PATH  = Path(SILICON_CURVE)
 ROCKY_CURVE_LABEL = "silicate rocky curve"
 
@@ -262,10 +204,8 @@ def restrict_science_window(df: pd.DataFrame) -> pd.DataFrame:
 # ── Rocky threshold ───────────────────────────────────────────────────────────
 
 def load_rocky_reference_curve():
-    """Load the rocky-threshold curve (professor's silicate curve, silicon_curve.ddat).
-
-    Returns (mass, radius) sorted by mass. This curve defines the red rocky
-    threshold used to separate rocky from puffy planets.
+    """Load the silicate curve (silicon_curve.ddat) as (mass, radius) sorted by mass.
+    It is the rocky threshold separating rocky from puffy planets.
     """
     if not ROCKY_CURVE_PATH.exists():
         print(f"WARNING: {ROCKY_CURVE_PATH} not found — using toy power-law rocky curve.")
@@ -287,13 +227,8 @@ def compute_anchor_shift(m_ref: np.ndarray, r_ref: np.ndarray) -> float:
 
 
 def compute_rocky_threshold_shift(m_ref: np.ndarray, r_ref: np.ndarray) -> float:
-    """Operational rocky/puffy cutoff shift.
-
-    We now use the UNSHIFTED silicate curve (silicon_curve.ddat) as the rocky
-    cutoff, so this returns 0.0. The LHS 1140 b anchor offset is only reported
-    for reference (it is ~0 because the silicate curve already passes through
-    LHS 1140 b). The anchored curves are still drawn in the comparison figure
-    via compute_anchor_shift().
+    """Rocky/puffy cutoff shift: 0.0, since the unshifted silicate curve is the cutoff.
+    The LHS 1140 b anchor offset (~0) is only reported; compute_anchor_shift() still draws it.
     """
     r_at_lhs = float(np.interp(LHS1140B_MASS_MEARTH, m_ref, r_ref))
     anchor = compute_anchor_shift(m_ref, r_ref)
@@ -631,11 +566,7 @@ RADIUS_TICKS = [0.6, 0.8, 1.0, 1.2, 1.5, 2.0]
 
 
 def _format_radius_axis(ax):
-    """Label the log radius axis with plain numbers (0.6, 1, 2 …).
-
-    Forces the numeric labels to show even on shared-y inner panels so the
-    radius values are readable on every subplot.
-    """
+    """Label the log radius axis with plain numbers (0.6, 1, 2), even on shared-y panels."""
     ticks = [t for t in RADIUS_TICKS if RADIUS_LIMITS[0] <= t <= RADIUS_LIMITS[1]]
     ax.set_yticks(ticks)
     ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
@@ -660,13 +591,8 @@ def _setup_axis(ax, title: str, show_xlabel: bool = True, show_ylabel: bool = Tr
 # ── 90% upper-bound fit ───────────────────────────────────────────────────────
 
 def fit_90pct_line(flux: np.ndarray, radius: np.ndarray, quantile: float = 0.90):
-    """
-    Fit the q-quantile line through the NASA planets in log-log (flux, radius)
-    space via quantile (pinball-loss) regression, i.e. the straight line that
-    best follows the data while keeping ~`quantile` of the points below it.
-
-    Returns (slope, intercept) in log10 space, or None if too few points.
-    Falls back to an OLS-slope + percentile-offset line if the optimizer fails.
+    """Fit the q-quantile line through NASA planets in log(flux)-log(radius) by quantile regression.
+    Returns (slope, intercept) in log10, or None if too few points; falls back to OLS + percentile offset.
     """
     log_f = np.log10(np.asarray(flux, dtype=float))
     log_r = np.log10(np.asarray(radius, dtype=float))
@@ -703,10 +629,8 @@ def line_radius(slope: float, intercept: float, flux) -> np.ndarray:
 
 def draw_90pct_line(ax, flux, radius, color="black", lw=2.0, label=None,
                     x_extent=None):
-    """Fit and draw the 90% line.  Returns (slope, intercept) or None.
-
-    x_extent=(lo, hi) overrides the flux range over which the line is drawn
-    (default: the data's own flux extent).
+    """Fit and draw the 90% line; returns (slope, intercept) or None.
+    x_extent=(lo, hi) sets the flux range drawn (default: the data's range).
     """
     fit = fit_90pct_line(flux, radius)
     if fit is None:
@@ -730,10 +654,8 @@ COLD_INSOLATION = 10.0  # "I < 10" cold boundary
 
 
 def false_negative_prob(ppop_panel: pd.DataFrame, slope: float, intercept: float):
-    """
-    P-Pop false-negative probability in the region {I < 10  AND  radius above
-    the 90% line}: the fraction of transiting P-Pop planets there that the
-    survey fails to detect.  Returns (fn_prob, n_denominator, n_missed).
+    """P-Pop false-negative probability for I < 10 and radius above the 90% line: the fraction of
+    transiting P-Pop planets there the survey misses. Returns (fn_prob, n_denominator, n_missed).
     """
     f = pd.to_numeric(ppop_panel["flux_p"], errors="coerce")
     rr = pd.to_numeric(ppop_panel["radius_p"], errors="coerce")
@@ -754,11 +676,8 @@ def false_negative_prob(ppop_panel: pd.DataFrame, slope: float, intercept: float
 
 FACILITY_PALETTE = list(plt.get_cmap("tab10").colors) + list(plt.get_cmap("Set2").colors)
 
-# Fixed colors for facilities whose default palette color blends into the
-# viridis pass-fraction background (TESS blue, K2 green). Magenta and brown
-# have no counterpart anywhere in viridis and stay distinct from the other
-# facility colors (Kepler orange, Multiple red, La Silla purple, gray Other).
-# Applied only when a figure opts in (viridis-background figures, e.g. script 21).
+# Fixed colors for facilities whose default color blends into the viridis background (TESS blue,
+# K2 green): magenta and brown stay distinct. Used only by figures that opt in.
 FACILITY_COLOR_OVERRIDES = {
     "TESS": "#ff00ff",
     "K2": "#8b4513",
@@ -766,10 +685,8 @@ FACILITY_COLOR_OVERRIDES = {
 
 
 def build_facility_styles(rocky_win: pd.DataFrame, contrast_overrides: bool = False):
-    """
-    Assign a distinct color to every discovery facility that contributed more
-    than FACILITY_MIN_COUNT rocky planets inside the plotted window.  Returns
-    (color_map, major_facilities_in_order, counts_series).
+    """Color each discovery facility with more than FACILITY_MIN_COUNT rocky planets in the window.
+    Returns (color_map, major_facilities_in_order, counts_series).
     """
     counts = rocky_win["discovery_facility"].fillna("Unknown").value_counts()
     major = [f for f, c in counts.items() if c > FACILITY_MIN_COUNT]
@@ -986,10 +903,8 @@ def plot_mr_diagnostic(m_ref, r_ref, shift: float,
                        red_shift: float | None = None,
                        title: str | None = None,
                        out_name: str = "rocky_threshold_diagnostic_mass_radius.png") -> Path:
-    """Mass-radius diagnostic — only planets inside the context window.
-
-    Rocky planets are colored by discovery facility (same colors as the 2x4
-    figure), with thin, cap-less two-sided mass/radius error bars.
+    """Mass-radius diagnostic for planets in the context window, colored by discovery
+    facility with two-sided error bars.
     """
     XLIM = (0.0, 12.0)
     YLIM = (RADIUS_LIMITS[0] - 0.05, RADIUS_LIMITS[1])
@@ -1071,11 +986,8 @@ def plot_mr_diagnostic(m_ref, r_ref, shift: float,
 
 
 def plot_threshold_curve_comparison(m_ref, r_ref, nasa_win: pd.DataFrame) -> Path:
-    """Overlay the three candidate rocky thresholds as thin solid curves so the
-    differences are directly visible:
-        1. pure-rock reference (ref.ddat) shifted UP to LHS 1140 b  (the old threshold)
-        2. silicate curve (silicon_curve.ddat), unshifted
-        3. silicate curve shifted to LHS 1140 b                     (the current threshold)
+    """Overlay the three candidate rocky thresholds: pure-rock ref.ddat shifted to LHS 1140 b (old),
+    the unshifted silicate curve, and the silicate curve shifted to LHS 1140 b (current).
     """
     XLIM = (0.0, 12.0)
     YLIM = (RADIUS_LIMITS[0] - 0.05, RADIUS_LIMITS[1])
@@ -1153,13 +1065,8 @@ def draw_cold_corner_band(ax, m_line, r_curve):
 
 def plot_mr_insolation_panels(m_ref, r_ref, nasa_win: pd.DataFrame,
                               color_map: dict, major: list[str], counts) -> Path:
-    """1x3 mass-radius panels split by insolation (I<10, I<50, I>50).
-
-    Recreates the professor's figure with our PSCompPars sample: points colored
-    by discovery facility (not insolation), two-sided mass/radius error bars, the
-    silicate rocky curve as the black dashed line, and the Cold Corner
-    (radius > 1.4 R_earth, I < 50) marked as a light pink band under the
-    silicate curve on the cold panels.
+    """1x3 mass-radius panels by insolation (I<10, I<50, I>50) for the PSCompPars sample, colored by
+    discovery facility, with the silicate curve and the cold corner (R > 1.4, I < 50) shaded.
     """
     XLIM = (0.0, 12.0)
     YLIM = (RADIUS_LIMITS[0], RADIUS_LIMITS[1])

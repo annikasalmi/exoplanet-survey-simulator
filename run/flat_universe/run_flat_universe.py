@@ -1,10 +1,5 @@
-"""
-run_flat_universe.py — flat A/B synthetic planet detection pipeline.
-
-Generates fully-flat (parameter-independent) synthetic catalogs (A=drop rocky
-M>2, B=all rocky) and runs Kepler/TESS/RV detection for detector sensitivity analysis.
-
-Caches results by seed/size to enable fast reruns of plots.
+"""Flat A/B pipeline: generates flat catalogs (A drops rocky M > 2, B keeps all), runs
+Kepler/TESS/RV detection, and caches by seed and size so plots rerun fast.
 """
 
 from __future__ import annotations
@@ -32,18 +27,12 @@ HONGYI_CONFIGS = {
     'flat_transit_rv_3x3_G': {'seed': 75, 'n_planets': 3_000_000},
     'flat_transit_rv_3x3_K': {'seed': 76, 'n_planets': 2_500_000},
     'flat_transit_rv_3x3_M': {'seed': 77, 'n_planets': 1_500_000},
-    'two_universe_puffy_overlap': {'seed': 0, 'n_planets': 300_000},
     'likelihood_ratio_catalog': {'seed': 0, 'n_planets': 1_000_000},
-    'mc_mr_density_priors': {'seed': 1},
 }
 
 
 def _get_or_generate_universe(seed=0, n_planets=150000, universe_type='A'):
-    """
-    Get cached or generate flat universe.
-
-    universe_type: 'A' (drop rocky M>2) or 'B' (all rocky)
-    """
+    """Load the cached flat universe or generate it. universe_type: 'A' (drop rocky M>2) or 'B' (all)."""
     cache_file = FLAT_CACHE_DIR / f"flat_universe_{universe_type}_seed{seed}_n{n_planets}.csv"
 
     if cache_file.exists():
@@ -78,20 +67,9 @@ def main(
     star_catalog=None,
     run_anew=True,
 ):
-    """
-    Flat-universe (A and B) detection pipeline.
-
-    Args:
-        seed: Random seed for catalog generation
-        n_planets: Number of planets per universe
-        run_anew: If True, always regenerate (ignore cache)
-        parallel, nruns, star_catalog: unused. The flat universe draws its own
-            stars, so there is no catalog to pick; accepted so run_sim can call
-            this the same way it calls the telescope pipelines.
-
-    Returns:
-        DataFrame with A and B concatenated, columns: all planet properties +
-        kepler_detected, tess_detected, rv_detected, universe_type, run
+    """Flat-universe (A and B) detection pipeline; returns both concatenated with kepler_/tess_/rv_detected,
+    universe_type and run columns. run_anew=True ignores the cache. parallel, nruns and star_catalog are
+    unused, accepted so run_sim can call this like the telescope pipelines.
     """
     start = time.time()
     print(f"Flat universe: seed={seed}, n_planets={n_planets:,}")

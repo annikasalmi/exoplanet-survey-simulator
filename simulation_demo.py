@@ -16,8 +16,8 @@ NRUNS = 1
 STAR_CATALOG = 'Gaia'        # or 'ExoCat_1'
 SIM_NAME = 'flat_universe'   # 'flat_universe', 'kepler', 'tess', 'rv', 'hwo', 'lifesim'
 
-# flat_universe draws its own stars and takes about a minute. The others build a
-# P-Pop universe per run, which takes hours -- raise NRUNS only if you mean it.
+# flat_universe draws its own stars and takes under a minute. The others build a
+# P-Pop universe per run, which takes about 30 minutes each.
 sim_funcs = {
     'flat_universe': main_flat_universe,
     'hwo': main_hwo,

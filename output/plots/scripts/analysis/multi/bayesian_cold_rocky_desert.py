@@ -1,29 +1,6 @@
-"""
-bayesian_cold_rocky_desert.py — three-universe Bayesian model comparison in the
-cold rocky desert, resolved over three insolation panels (paper Figure 1 format).
-
-Object (per-cell Bayes, single detected planet at location theta=(M,R) in insolation bin b):
-    P(theta | detected, U_k) = l_b(theta) * pi_k(theta) / Z_{k,b}
-      likelihood  l_b(theta)  = joint transit+RV detection fraction AMONG TRANSITING on the
-                                MR plane, measured on the uniform-parameter universe.
-      prior       pi_k(theta) = the universe's TRUE planet density (one of three).
-      evidence    Z_{k,b}     = sum_theta pi_k l_b  (from the model, NOT from NASA).
-    NASA is the DATA, not the marginal. All figures consider TRANSITING planets only
-    (the detector's geometric transit flag); NASA's sample is transiting-confirmed.
-
-Three universes (priors), all built on the uniform-parameter universe:
-    rocky_formation  Otegi rocky R=1.03 M^0.29 (0.15 dex), ALL planets kept
-    escape_only      same pool MINUS rocky (below silicate) & true mass>2
-    uniform          mass INDEPENDENT of radius (log-uniform M x uniform R)
-
-Model comparison (normalization-free; "mixture, not count"):
-    per insolation bin, among DETECTED planets the volatile fraction conditions out absolute
-    occurrence and survey effort. NASA gives k_b volatile of n_b detected; universe k predicts
-    p_{k,b}. L_k = prol_b Binomial(k_b; n_b, p_{k,b}); posterior P(U_k|NASA), equal 1/2 prior;
-    pairwise Bayes factors. Headline = the I<50 cold rocky desert (mass>2).
-
-Run:
-    python scripts/statistical_analysis/bayesian_cold_rocky_desert.py
+"""Three-universe Bayesian comparison in the cold rocky desert over three insolation panels. Priors:
+rocky_formation (Otegi rocky, all kept), escape_only (minus rocky M>2), uniform (M independent of R);
+likelihood = transit+RV detection fraction. Scores NASA's volatile fraction per bin (binomial).
 """
 
 from __future__ import annotations
@@ -129,11 +106,8 @@ def is_volatile(mass, radius, m_sil, r_sil):
 
 
 def nasa_frac_sigma(nasa, lo, hi, mass_min, m_sil, r_sil, rng, n_rep=N_FRAC_REP):
-    """Standard deviation of the observed volatile fraction v/n from NASA's own measurement
-    error alone: redraw each planet's mass/radius within its own published asymmetric error
-    bars (no resampling of which planets are in the set), reapply the mass cut on the redrawn
-    mass so boundary planets can flip in/out, and take the spread over n_rep redraws (same
-    per-planet-error method as the main paper's NASA Monte Carlo bells)."""
+    """Std of NASA's observed volatile fraction v/n from measurement error alone: redraw each planet
+    within its published errors, reapply the mass cut, and take the spread over n_rep redraws."""
     sel = (nasa["ins"] >= lo) & (nasa["ins"] < hi)
     m, r = nasa["m"][sel], nasa["r"][sel]
     me1, me2, re1, re2 = nasa["me1"][sel], nasa["me2"][sel], nasa["re1"][sel], nasa["re2"][sel]
@@ -516,11 +490,9 @@ def fig_model_odds(rows):
 
 
 def fig_model_stats(rows):
-    """Companion to the odds bars, and the direct answer to 'why does O saturate when the maps
-    look alike': (top) the two universes' predicted volatile fractions f_k with the observed
-    NASA v/n marked, showing how close the fractions sit; (bottom) the binomial likelihoods L_k
-    on a log axis, showing the same small f gap turn into orders of magnitude in L. Every plotted
-    quantity is labelled on its bar/marker; the derived odds (O_esc, BF) live in the note's table."""
+    """Companion to the odds bars: (top) each universe's predicted volatile fraction f_k with NASA's
+    v/n marked; (bottom) the binomial likelihoods L_k on a log axis, showing how a small f gap becomes
+    orders of magnitude in L."""
     esc, prim = "escape_only", "rocky_formation"
     labels = [r["label"] for r in rows]
     x = np.arange(len(labels))

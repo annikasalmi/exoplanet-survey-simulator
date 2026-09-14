@@ -1,14 +1,6 @@
-"""
-puffy_cuts_flat.py — puffy-fraction "which universe does NASA imply?" under four cuts,
-with the FLAT and P-Pop universes separated into two rows so each panel holds only 2 models + NASA.
-
-Same machinery as script 70 (transit+RV detected, NASA-like measurement error propagated), but:
-  * puffy fraction only (density dropped, per request),
-  * 2 rows x 4 columns:  row 1 = FLAT (flat A, flat B),  row 2 = P-Pop (P-Pop A, P-Pop B),
-  * columns = cuts:  all | mass>2 M_earth | insolation<50 I_earth | mass>2 & insol<50.
-
-Run:
-    python scripts/puffy_cuts_flat.py
+"""Puffy fraction of flat and P-Pop universes (A/B each) vs NASA under four cuts: all, M > 2,
+I < 50, both. Detection is transit+RV with NASA-like measurement error. Also loaded by
+flat_rocky_mr_vs_nasa.py. Run: python output/plots/scripts/analysis/multi/puffy_cuts_flat.py
 """
 
 from __future__ import annotations

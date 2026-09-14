@@ -1,24 +1,6 @@
-"""
-flat_transit_rv_3x3.py — the paper's selection-operator map (Figure 2).
-
-3x3 grid on the insolation-radius plane:
-    rows    = Transit test (TESS) | RV mass test (best of HARPS/NIRPS) | Transit + RV joint
-    columns = G, K, M hosts (F dropped — too few NASA rocky planets, mostly blind)
-
-Background = ROCKY flat-control planets (below the unshifted silicate curve,
-silicon_curve.ddat). The flat universe draws radius/orbit/star flat, and masses
-follow the Otegi et al. 2020 rocky relation R = 1.03 M^0.29 with 0.15 dex mass
-scatter (the paper's default relation, per script 77). Pass fractions are among
-TRANSITING rocky planets; both detectors run with their default calibrations
-(Kepler x0.84 is unused here; TESS x0.66; RV needs none).
-
-Sampling is stratified per spectral type with large N and per-column insolation
-ranges (M capped at 1e3 I_earth, its physical short-period limit) so that no
-plotted bin is left empty. Periods extend down to 0.2 d to reach the
-ultra-short-period corner.
-
-Run:
-    python important_plots/flat_transit_rv_3x3.py
+"""Paper selection map (flat_transit_rv_3x3_otegi.png): rows = TESS transit, RV mass (best of
+HARPS/NIRPS), both; columns = G, K, M hosts. Background = rocky flat-universe planets (Otegi masses).
+Run: python output/plots/scripts/analysis/multi/flat_transit_rv_3x3.py
 """
 
 from __future__ import annotations

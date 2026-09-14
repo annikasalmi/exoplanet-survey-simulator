@@ -1,16 +1,5 @@
-"""
-universe_metrics.py — population-comparison metrics for the rocky/puffy universe test.
-
-Pure numpy / scipy / sklearn (NO detector or Qt imports), so it is safe to import anywhere.
-All metrics take planet mass M [M_earth] and radius R [R_earth] arrays (+ the silicate curve
-for the curve-dependent ones).
-
-Groups:
-  curve-DEPENDENT scalars   : puffy_fraction, mean_distance_to_curve
-  curve-FREE scalars        : median_density, mr_scatter (slope/intercept/sigma_int),
-                              logdensity_scatter, density_bimodality (BC + GMM dBIC)
-  distribution distances    : energy_distance (+ permutation p-value)  [2-sample, in logM-logR]
-  likelihood / Bayes        : kde_mean_loglik (mean log-likelihood of data under a model KDE)
+"""Metrics comparing planet populations in mass-radius (puffy fraction, density, scatter, energy
+distance, KDE likelihood). Pure numpy/scipy/sklearn, so safe to import anywhere.
 """
 
 from __future__ import annotations

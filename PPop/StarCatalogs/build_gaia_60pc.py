@@ -1,23 +1,6 @@
-"""
-# =============================================================================
-# Build a volume-limited Gaia DR3 star catalog within 60 pc.
-# =============================================================================
-
-Run ONCE (needs internet) to (re)create `gaia_within_60pc.csv`:
-
-    python PPop/StarCatalogs/build_gaia_60pc.py
-
-Why a custom export instead of the old 20 pc file:
-- The old `gaia_within_20pc.csv` + loader required teff_gspphot, radius_gspphot
-  AND mass_flame for every star.  Those Gaia astrophysical products are missing
-  for most faint M dwarfs, so the old sample dropped ~83% of nearby stars and was
-  badly M-dwarf-incomplete.
-- Here we pull only the always-present astrometry/photometry (parallax, G, BP-RP)
-  plus the GSP-Phot / FLAME parameters WHEN available.  The loader (gaia.py) then
-  fills any missing Teff / radius / mass from BP-RP main-sequence relations, so no
-  star is dropped for lacking a derived parameter.
-
-Distance limit: parallax > 16.667 mas  <=>  d < 60 pc.
+"""Build the Gaia DR3 star catalog within 60 pc (gaia_within_60pc.csv); run once, needs internet.
+Pulls only always-present columns; gaia.py derives missing Teff/R/M from BP-RP, so faint M dwarfs
+are kept (the old 20 pc file required those values and lost ~83% of nearby stars).
 """
 
 import os
@@ -34,14 +17,9 @@ Gaia.ROW_LIMIT = -1
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "gaia_within_60pc.csv")
 
-# parallax > 1000/60 mas = 60 pc.  parallax_over_error > 5 keeps distances trustworthy
-# without throwing away faint M dwarfs.  ruwe < 1.4 keeps well-behaved single-star
-# astrometry.  We require a BP-RP colour so the loader can always derive Teff/R/M.
-# We deliberately pull only columns that always exist in gaiadr3.gaia_source.
-# Teff / radius / mass are NOT requested: the GSP-Phot / FLAME astrophysical
-# products live in a separate table and are missing for most faint M dwarfs, so
-# relying on them is exactly what made the old 20 pc sample M-dwarf-incomplete.
-# gaia.py derives Teff/radius/mass from BP-RP + absolute G instead, for every star.
+# parallax > 1000/60 mas (d < 60 pc); parallax_over_error > 5 for trustworthy distances without
+# losing faint M dwarfs; ruwe < 1.4 for clean single-star astrometry. Only columns that always
+# exist in gaia_source are pulled; gaia.py derives Teff/R/M from BP-RP and absolute G.
 ADQL = """
 SELECT source_id, ra, dec, parallax, parallax_error,
        phot_g_mean_mag, bp_rp, ruwe

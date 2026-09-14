@@ -31,14 +31,13 @@ import sys
 import importlib.util
 from pathlib import Path
 
-from tools.paths import LIFESIM_OUTER_DIR, ANALYSIS_DIR, PAPER_FIGURES_DIR, KEPLER_REF_CURVE
+from tools.paths import LIFESIM_OUTER_DIR, ANALYSIS_DIR, PAPER_FIGURES_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import numpy as np
 import pandas as pd
-from scipy.stats import truncnorm
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -85,16 +84,8 @@ RELATIONS = [
 
 
 OTEGI_VOLATILE = dict(mr_C=0.70, mr_beta=0.63)   # Otegi et al. 2020 volatile-rich branch
-SUB_NEPTUNE_FRAC_SD = 0.20       # fractional radius width of the sub-Neptune normal
-SUPER_EARTH_FRAC_SD = 0.05       # ... and of each super-Earth normal
-
-
-def load_earthlike_curve():
-    """Earth-like composition curve (ref.ddat: 32% Fe core), sorted by mass."""
-    ref = np.loadtxt(KEPLER_REF_CURVE, comments="#")
-    ref = ref[ref[:, 0] > 0]
-    o = np.argsort(ref[:, 0])
-    return ref[o, 0], ref[o, 1]
+SUB_NEPTUNE_FRAC_SD = 0.20       # fractional radius width around the volatile-rich curve
+SUPER_EARTH_FRAC_SD = 0.20       # ... and around the silicate line
 
 
 def otegi_volatile_radius(mass):
@@ -104,20 +95,16 @@ def otegi_volatile_radius(mass):
 def build_arrays(rel_kw, m_sil, r_sil, two_populations=False, rng=None):
     """Detected flat-universe pool for one mass-radius relation.
 
-    With two_populations, every planet keeps its mass but gets a new radius:
-      * sub-Neptunes (all planets except the rocky super-Earths): a normal
-        around Otegi's volatile-rich relation, truncated to stay above the
-        silicate line;
-      * rocky super-Earths (true rocky, true M > 2 under the base relation; the
-        planets only universe B keeps): half from a normal around the same
-        volatile-rich relation, half from a normal around the Earth-like
-        curve, with no cut.
-    Widths (fractional): SUB_NEPTUNE_FRAC_SD for the sub-Neptunes (wide enough
-    that some reach below 2.2 R_earth at 8-10 M_earth) and SUPER_EARTH_FRAC_SD
-    for each super-Earth normal. Redrawn planets outside the
-    radius box (0.5-2.2 R_earth, as for NASA) are dropped. The returned `puffy`
-    flags the sub-Neptunes, so the A/B split is by population, not by where a
-    planet landed. Detection runs on the redrawn radii.
+    With two_populations, every planet keeps its mass but gets a new radius
+    from one of two normals, with no cut:
+      * sub-Neptunes (all planets except the rocky super-Earths under the base
+        relation): around Otegi's volatile-rich relation;
+      * super-Earths (true rocky, true M > 2 under the base relation): around
+        the silicate line.
+    Widths (fractional): SUB_NEPTUNE_FRAC_SD and SUPER_EARTH_FRAC_SD. Redrawn
+    planets outside the radius box (0.5-2.2 R_earth, as for NASA) are dropped,
+    and `puffy` is recomputed from the new radii. Detection runs on the
+    redrawn radii.
     """
     cat = generate_flat_catalog(FLAT_N, seed=SEED, mass_model="powerlaw",
                                 mass_scatter_dex=MR_SCATTER_DEX, **rel_kw)
@@ -133,21 +120,14 @@ def build_arrays(rel_kw, m_sil, r_sil, two_populations=False, rng=None):
     puffy = radius > np.interp(mass, m_sil, r_sil)
     if two_populations:
         se = (~puffy) & (mass > S72.MASS_THRESHOLD)
-        sn = ~se
-        # Sub-Neptunes: normal around the volatile-rich curve, kept above the silicate line.
-        mu = otegi_volatile_radius(mass[sn])
-        sd = SUB_NEPTUNE_FRAC_SD * mu
-        a = (np.interp(mass[sn], m_sil, r_sil) - mu) / sd
-        radius[sn] = truncnorm.rvs(a, np.inf, loc=mu, scale=sd, random_state=rng)
-        # Super-Earths: 50/50 mix of the volatile-rich and Earth-like normals, no cut.
-        m_se = mass[se]
-        centre = np.where(rng.random(m_se.size) < 0.5, otegi_volatile_radius(m_se),
-                          np.interp(m_se, *load_earthlike_curve()))
-        radius[se] = centre * (1.0 + SUPER_EARTH_FRAC_SD * rng.standard_normal(m_se.size))
+        mu = np.where(se, np.interp(mass, m_sil, r_sil), otegi_volatile_radius(mass))
+        frac_sd = np.where(se, SUPER_EARTH_FRAC_SD, SUB_NEPTUNE_FRAC_SD)
+        radius = mu * (1.0 + frac_sd * rng.standard_normal(mass.size))
         in_box = (radius >= S72.BOX["r_lo"]) & (radius <= S72.BOX["r_hi"])
         cat["radius_p"] = radius
         cat = cat[in_box].copy()
-        mass, radius, flux, puffy = mass[in_box], radius[in_box], flux[in_box], sn[in_box]
+        mass, radius, flux = mass[in_box], radius[in_box], flux[in_box]
+        puffy = radius > np.interp(mass, m_sil, r_sil)
     td = run_kepler(cat)["detected"].to_numpy(bool)
     rd = run_rv_best(cat, mag_target=S72.RV_MAG_TARGET)["detected"].to_numpy(bool)
     return mass, radius, flux, puffy, td & rd
@@ -195,22 +175,22 @@ def nasa_cut(nasa, cut):
     return m, r, me1, me2, re1, re2
 
 
-def true_scatter_AB(arrays, cut, n_plot, rng):
-    """Detected planets at their TRUE masses and radii, with the cut applied to
-    true values; split into flat-A-kept vs dropped-by-A. Sub-Neptunes on or
-    below the silicate line are removed, as in the volatile-fraction MC."""
+def true_sample(arrays, cut, n, rng, above_line_only=False):
+    """n detected planets at their TRUE masses and radii, with the cut applied to
+    true values. above_line_only keeps only planets truly above the silicate
+    line (universe A's cut)."""
     mass, radius, flux, puffy, det = arrays
     keep = det.copy()
     if cut.get("insol_max"):
         keep &= flux < cut["insol_max"]
     if cut.get("mass_min"):
         keep &= mass > cut["mass_min"]
-    dropped = (~puffy) & (mass > S72.MASS_THRESHOLD)
-    keep &= dropped | (radius > np.interp(mass, *S72.load_silicate()))
+    if above_line_only:
+        keep &= puffy
     idx = np.flatnonzero(keep)
-    if idx.size > n_plot:
-        idx = rng.choice(idx, n_plot, replace=False)
-    return mass[idx], radius[idx], dropped[idx]
+    if idx.size > n:
+        idx = rng.choice(idx, n, replace=False)
+    return mass[idx], radius[idx]
 
 
 def _frac_err_bars(x, frac_sd):
@@ -221,21 +201,39 @@ def _frac_err_bars(x, frac_sd):
 SCATTER_LABELS = ("Escape-only (kept)", "Primordial-rocky: rocky super-Earths (M>2)")
 
 
+def extend_silicate(m_sil, r_sil, m_lo, m_hi, n=400):
+    """The silicate curve on [m_lo, m_hi], continued past its tabulated ends
+    as power laws with the slopes of its first and last segments."""
+    m = np.linspace(m_lo, m_hi, n)
+    lm, lr = np.log(m_sil), np.log(r_sil)
+    r = np.exp(np.interp(np.log(m), lm, lr))
+    lo, hi = m < m_sil[0], m > m_sil[-1]
+    s_lo = (lr[1] - lr[0]) / (lm[1] - lm[0])
+    s_hi = (lr[-1] - lr[-2]) / (lm[-1] - lm[-2])
+    r[lo] = r_sil[0] * (m[lo] / m_sil[0]) ** s_lo
+    r[hi] = r_sil[-1] * (m[hi] / m_sil[-1]) ** s_hi
+    return m, r
+
+
 def _draw_scatter(ax, arr, cut, nasa, m_sil, r_sil, rng, title,
-                  labels=SCATTER_LABELS, true_values=False):
+                  labels=SCATTER_LABELS, true_values=False, sil_range=None):
     """Top-row panel: one detected, noise-perturbed mass-radius draw. With
     true_values, the planets are drawn at their true masses and radii with the
     simulated measurement errors as error bars instead."""
     nmc, nrc, nme1, nme2, nre1, nre2 = nasa_cut(nasa, cut)
-    ax.fill_between(m_sil, r_sil, 2.6, color="0.965", zorder=0)
-    ax.plot(m_sil, r_sil, "k-", lw=1.2, zorder=6, label="silicate line")
+    # sil_range=(lo, hi) draws the curve across that whole mass range.
+    m_c, r_c = extend_silicate(m_sil, r_sil, *sil_range) if sil_range else (m_sil, r_sil)
+    ax.fill_between(m_c, r_c, 2.6, color="0.965", zorder=0)
+    ax.plot(m_c, r_c, "k-", lw=1.2, zorder=6, label="silicate line")
     if true_values:
-        mt, rt, dropped = true_scatter_AB(arr, cut, 150, rng)
-        for sel, colour, lbl, z in [(~dropped, "tab:blue", labels[0], 3),
-                                    (dropped, "tab:orange", labels[1], 4)]:
-            ax.errorbar(mt[sel], rt[sel],
-                        xerr=_frac_err_bars(mt[sel], S72.MASS_FRAC_ERR),
-                        yerr=_frac_err_bars(rt[sel], S72.RAD_FRAC_ERR),
+        # One illustrative survey per universe: blue (A) from the planets that
+        # survive its cut, orange (B) from every planet.
+        for above_only, n, colour, lbl, z in [
+                (True, N_SURVEY_BLUE, "tab:blue", labels[0], 4),
+                (False, N_SURVEY_ORANGE, "tab:orange", labels[1], 3)]:
+            mt, rt = true_sample(arr, cut, n, rng, above_line_only=above_only)
+            ax.errorbar(mt, rt, xerr=_frac_err_bars(mt, S72.MASS_FRAC_ERR),
+                        yerr=_frac_err_bars(rt, S72.RAD_FRAC_ERR),
                         fmt="o", ms=4, color=colour, alpha=0.6, elinewidth=0.6,
                         capsize=0, zorder=z, label=lbl)
     else:
@@ -257,29 +255,51 @@ def _draw_scatter(ax, arr, cut, nasa, m_sil, r_sil, rng, title,
     ax.set_ylabel(r"planet radius [$R_\oplus$]")
 
 
-def mc_universe_true_sub_neptunes(arrays, drop, cut, m_sil, r_sil, rng):
-    """S72.mc_universe on a pool without the planets that are truly on or below the
-    silicate line but are not rocky super-Earths (the rocky planets under 2
-    M_earth), so the non-super-Earth population is genuinely all sub-Neptunes.
-    Measurement noise can still scatter some of them below the line."""
+# Planets per simulated survey in the 1x2: blue ("Sub-Neptunes only") and orange
+# ("Sub-Neptunes and super-Earths"). The left panel shows one survey of each size.
+N_SURVEY_BLUE = 50
+N_SURVEY_ORANGE = 100
+
+
+def mc_universe_blue_cut(arrays, drop, cut, m_sil, r_sil, rng):
+    """Volatile-fraction MC for the 1x2's two universes, built from one pool.
+
+    Each of the S72.N_REPEATS draws is a fresh survey of exactly N_SURVEY_BLUE
+    (drop=True, blue) or N_SURVEY_ORANGE (drop=False, orange) measured planets:
+    detected planets are picked at random from the pool, given measurement
+    noise, and the first that pass the cut on their measured values are kept.
+    Blue picks only from planets truly above the silicate line, orange from the
+    whole pool; noise can still scatter blue planets below the line.
+    """
     mass, radius, flux, puffy, det = arrays
-    keep = puffy | (mass > S72.MASS_THRESHOLD)
-    return S72.mc_universe(tuple(a[keep] for a in arrays), drop, cut, m_sil, r_sil, rng)
+    n = N_SURVEY_BLUE if drop else N_SURVEY_ORANGE
+    pool = det.copy()
+    if cut.get("insol_max"):
+        pool &= flux < cut["insol_max"]
+    if drop:
+        pool &= puffy
+    idx = np.flatnonzero(pool)
+    mass_min = cut.get("mass_min") or 0.0
+    out = np.full(S72.N_REPEATS, np.nan)
+    for i in range(S72.N_REPEATS):
+        m_obs, r_obs = np.empty(0), np.empty(0)
+        while m_obs.size < n:
+            s = rng.choice(idx, 4 * n)
+            mo = mass[s] * np.exp(rng.normal(0, S72.MASS_FRAC_ERR, s.size))
+            ro = radius[s] * np.exp(rng.normal(0, S72.RAD_FRAC_ERR, s.size))
+            k = mo > mass_min
+            m_obs, r_obs = np.append(m_obs, mo[k]), np.append(r_obs, ro[k])
+        out[i] = S72.puffy_frac(m_obs[:n], r_obs[:n], m_sil, r_sil)
+    return out, float(n)
 
 
-BELL_STYLE = (("Escape-only", "tab:orange"), ("Primordial-rocky", "tab:blue"))
-
-
-def _draw_bells(ax, arr, cut, nasa, m_sil, r_sil, rng, tag="", style=BELL_STYLE,
-                mc=None):
+def _draw_bells(ax, arr, cut, nasa, m_sil, r_sil, rng, tag=""):
     """Bottom-row panel: COUNT histograms of the volatile fraction over the MC draws.
-    y = number of the N_REPEATS draws that landed in each bin; N_p = mean planets/draw.
-    style gives (label, colour) for universe A then universe B."""
-    mc = mc or S72.mc_universe
+    y = number of the N_REPEATS draws that landed in each bin; N_p = mean planets/draw."""
     nv, n_nasa = S72.mc_nasa(nasa, cut, m_sil, r_sil, rng)
     n_mu, n_sd = nv.mean(), nv.std()
-    sA, nA = mc(arr, True, cut, m_sil, r_sil, rng)
-    sB, nB = mc(arr, False, cut, m_sil, r_sil, rng)
+    sA, nA = S72.mc_universe(arr, True, cut, m_sil, r_sil, rng)
+    sB, nB = S72.mc_universe(arr, False, cut, m_sil, r_sil, rng)
     all_bell = [b for b in (nv, sA, sB) if b.size]
     cat = np.concatenate(all_bell)
     lo, hi = cat.min(), cat.max(); pad = 0.05 * (hi - lo)
@@ -288,8 +308,11 @@ def _draw_bells(ax, arr, cut, nasa, m_sil, r_sil, rng, tag="", style=BELL_STYLE,
     # fraction is discrete (same ~25 planets each draw), finer data-driven bins alias it
     edges = np.arange(-0.02, 1.02 + 1e-9, 0.04)
     bw = edges[1] - edges[0]
-    y_max = max(np.histogram(b, bins=edges)[0].max() for b in all_bell)
-    for (lbl, colour), s, ne in zip(style, (sA, sB), (nA, nB)):
+    # Taller of the bars and the fitted curves, so no curve runs off the top.
+    y_max = max(max(np.histogram(b, bins=edges)[0].max(),
+                    S72.gauss(b.mean(), b.mean(), b.std()) * b.size * bw) for b in all_bell)
+    for lbl, s, ne, colour in [("Escape-only", sA, nA, "tab:orange"),
+                               ("Primordial-rocky", sB, nB, "tab:blue")]:
         if s.size == 0:
             continue
         tens = abs(s.mean() - n_mu) / np.sqrt(s.std() ** 2 + n_sd ** 2)
@@ -362,13 +385,53 @@ def make_otegi_2x1(arr, nasa, m_sil, r_sil, rng):
     print(f"--> Saved paper copy: {PAPER_FIG_DIR / 'flat_otegi_2x1_cold_cut.png'}")
 
 
+def _draw_density_1x2(ax, arr, cut, nasa, m_sil, r_sil, rng, tag=""):
+    """Right panel of the Otegi 1x2: probability densities of the volatile
+    fraction. Blue / orange: histograms of the 50- / 100-planet surveys with
+    their fitted normals. NASA: its fitted normal only, filled (its 27 planets
+    are the same in every draw, so only its mean and spread matter)."""
+    nv, _ = S72.mc_nasa(nasa, cut, m_sil, r_sil, rng)
+    n_mu, n_sd = nv.mean(), nv.std()
+    sA, _ = mc_universe_blue_cut(arr, True, cut, m_sil, r_sil, rng)
+    sB, _ = mc_universe_blue_cut(arr, False, cut, m_sil, r_sil, rng)
+    cat = np.concatenate([nv, sA, sB])
+    lo, hi = cat.min(), cat.max(); pad = 0.05 * (hi - lo)
+    gx = np.linspace(lo - pad, hi + pad, 400)
+    # Surveys of 50 / 100 planets give fractions on a 0.02 / 0.01 grid, so 0.02 is
+    # the narrowest bin that leaves no blue bar empty; edges at half-hundredths
+    # keep every grid value off a bin edge.
+    edges = np.arange(-0.005, 1.02 + 1e-9, 0.02)
+    y_max = 0.0
+    for lbl, s, colour in [("Sub-Neptunes only", sA, "tab:blue"),
+                           ("Sub-Neptunes and super-Earths", sB, "tab:orange")]:
+        heights, _, _ = ax.hist(s, bins=edges, density=True, color=colour, alpha=0.30)
+        pdf = S72.gauss(gx, s.mean(), s.std())
+        ax.plot(gx, pdf, color=colour, lw=2.0,
+                label=f"{lbl}: $\\mu$={s.mean():.2f} $\\sigma$={s.std():.3f}")
+        y_max = max(y_max, heights.max(), pdf.max())
+        tens = abs(s.mean() - n_mu) / np.sqrt(s.std() ** 2 + n_sd ** 2)
+        print(f"    {tag} {lbl}: mu={s.mean():.3f} sd={s.std():.3f} "
+              f"tension={tens:.1f}sigma N_draws={s.size}")
+    pdf = S72.gauss(gx, n_mu, n_sd)
+    ax.fill_between(gx, pdf, color="tab:green", alpha=0.30, lw=0)
+    ax.plot(gx, pdf, color="tab:green", lw=2.4,
+            label=f"Measured exoplanets: $\\mu$={n_mu:.2f} $\\sigma$={n_sd:.3f}")
+    y_max = max(y_max, pdf.max())
+    ax.set_xlim(gx[0], gx[-1]); ax.set_ylim(0, y_max * 1.4)   # headroom for the legend
+    ax.legend(fontsize=16, loc="upper left")
+    ax.set_xlabel("Volatile fraction")
+    ax.set_ylabel("Probability density")
+
+
 def make_otegi_1x2(nasa, m_sil, r_sil, rng):
     """Side-by-side panel pair: the Otegi mass-radius draw (left) and its
     volatile-fraction count histograms (right), under the cold super-Earth cut.
 
-    Blue = "Sub-Neptunes only" (universe A), orange = "Sub-Neptunes and
-    super-Earths" (universe B) in both panels; radii come from build_arrays'
-    two-population redraw. The left panel shows true masses and radii with the
+    One pool (build_arrays' two-population redraw) feeds both universes.
+    Orange, "Sub-Neptunes and super-Earths", is the whole pool; blue,
+    "Sub-Neptunes only", is the pool with every planet truly on or below the
+    silicate line removed (in the left panel, the orange dots are the planets
+    blue removes). The left panel shows true masses and radii with the
     simulated errors as bars; the histograms use the noise-perturbed
     ("measured") values, so noise can put some sub-Neptunes below the line.
     """
@@ -377,22 +440,36 @@ def make_otegi_1x2(nasa, m_sil, r_sil, rng):
     otegi_kw = next(kw for name, eq, applies, kw in RELATIONS if "Otegi" in name)
     arr = build_arrays(otegi_kw, m_sil, r_sil, two_populations=True,
                        rng=np.random.default_rng(SEED + 1))
-    fig, axes = plt.subplots(1, 2, figsize=(13.0, 5.4))
-    _draw_scatter(axes[0], arr, cut, nasa, m_sil, r_sil, rng, "",
+    fig, axes = plt.subplots(1, 2, figsize=(17.0, 7.5))
+    ax_hist, ax_mr = axes      # histograms on the left, the illustration on the right
+    # The mass-radius draw runs first so the histogram draws use the same random
+    # stream as before the panels were swapped.
+    _draw_scatter(ax_mr, arr, cut, nasa, m_sil, r_sil, rng, "",
                   labels=("Sub-Neptunes only", "Sub-Neptunes and super-Earths"),
-                  true_values=True)
-    m_line = np.linspace(0.2, 12, 300)
-    axes[0].plot(m_line, otegi_volatile_radius(m_line), color="tab:blue", lw=1.2, ls="--",
-                 zorder=6, label=r"Otegi volatile-rich ($R=0.70\,M^{0.63}$)")
-    axes[0].plot(*load_earthlike_curve(), color="0.5", lw=1.4, zorder=6,
-                 label="Earth-like rocky curve")
-    axes[0].legend(fontsize=9, loc="lower right", framealpha=0.9)
-    axes[0].set_xlim(0, 12)
-    _draw_bells(axes[1], arr, cut, nasa, m_sil, r_sil, rng, tag=f"[1x2] {cut_label}",
-                style=(("Sub-Neptunes only", "tab:blue"),
-                       ("Sub-Neptunes and super-Earths", "tab:orange")),
-                mc=mc_universe_true_sub_neptunes)
+                  true_values=True, sil_range=(1e-3, 12.0))
+    ax_mr.set_xlim(0, 12)
+    _draw_density_1x2(ax_hist, arr, cut, nasa, m_sil, r_sil, rng, tag=f"[1x2] {cut_label}")
+    # Pared-down styling for this figure: no grid, no VOLATILE/ROCKY labels, and
+    # no sample count on NASA.
+    ax_mr.set_xlabel(r"Planet mass [$M_\oplus$]")
+    ax_mr.set_ylabel(r"Planet radius [$R_\oplus$]")
+    for ax in axes:
+        ax.grid(False)
+        ax.xaxis.label.set_size(24)
+        ax.yaxis.label.set_size(24)
+        ax.tick_params(labelsize=20)
+    for text in [t for t in ax_mr.texts if t.get_text() in ("VOLATILE (above)", "ROCKY (below)")]:
+        text.remove()
+    h, lbl = ax_mr.get_legend_handles_labels()
+    relabel = {"silicate line": r"Pure MgSiO$_3$ mass-radius relation"}
+    ax_mr.legend(h, ["Measured exoplanets" if x.startswith("NASA") else relabel.get(x, x)
+                     for x in lbl],
+                 fontsize=18, loc="lower right", framealpha=0.9)
     fig.tight_layout()
+    # Figure-wide title over both panels (placed above the axes; the tight
+    # bounding box on save keeps it).
+    fig.suptitle(r"Simulated Planet Detections at $I < 50\,I_\oplus$ and $M > 2\,M_\oplus$",
+                 fontsize=26, y=1.01, va="bottom")
     fname = "flat_otegi_1x2_cold_cut.png"
     out_png = os.path.join(OUT_DIR, fname)
     fig.savefig(out_png, dpi=170, bbox_inches="tight")

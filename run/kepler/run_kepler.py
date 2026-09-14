@@ -11,6 +11,7 @@ from PPop.StarCatalogs import CrossfieldBrightSample, ExoCat_1, LTC_2, LTC_3, ga
 from telescopes.kepler.detection_model import KeplerData
 from run.ppop.ppop_generator import PPop
 from tools.paths import KEPLER_DATA_DIR, PSCOMPPARS_CSV
+from tools.exoplanet_catalog import read_nasa_csv
 
 # Each universe peaks at 2-2.5 GB, so more workers than this swaps on 16 GB.
 MAX_WORKERS = 5
@@ -82,11 +83,11 @@ def run_nasa_pscomppars(input_csv=NASA_INPUT_CSV, output_csv=NASA_OUTPUT_CSV):
     if not input_csv.exists():
         raise FileNotFoundError(
             f"Could not find NASA input CSV:\n{input_csv}\n\n"
-            "Download it with output/plots/mission_calibration or the archive TAP service."
+            "Download it with plotting/mission_calibration or the archive TAP service."
         )
 
     print(f"Loading NASA PSCompPars: {input_csv}")
-    df = pd.read_csv(input_csv, comment="#", low_memory=False)
+    df = read_nasa_csv(input_csv)
     print(f"Raw NASA rows: {len(df):,}")
 
     # The pipeline wants transiting, confirmed planets with a measured (not

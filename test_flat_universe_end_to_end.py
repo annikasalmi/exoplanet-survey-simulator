@@ -4,7 +4,7 @@
 import pandas as pd
 
 from run.flat_universe.run_flat_universe import main as run_flat, HONGYI_CONFIGS
-from output.plots.plot_flat_universe import plot_flat_universe
+from plotting.plot_flat_universe import plot_flat_universe
 
 cfg = HONGYI_CONFIGS["likelihood_ratio_catalog"]
 

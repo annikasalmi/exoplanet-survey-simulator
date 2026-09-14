@@ -9,7 +9,7 @@ import logging
 # Add the project root to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from tools.paths import LOGGING, LIFESIM_OUTER_DIR, EXOPLANET_CSV_DIR
+from tools.paths import LOGGING, LIFESIM_OUTER_DIR, EXOPLANETS_2026_CSV
 from telescopes.hwo.detection_model import HWOData
 from telescopes.kepler.detection_model import KeplerData #added by Hongyi
 from telescopes.tess.detection_model import TESSData
@@ -22,8 +22,8 @@ from run.tess.run_tess import main as main_tess
 from run.rv.run_rv import main as main_rv
 from run.flat_universe.run_flat_universe import main as main_flat_universe
 
-from output.plots.plot import plot_all
-from output.plots.plot_flat_universe import plot_flat_universe
+from plotting.plot import plot_all
+from plotting.plot_flat_universe import plot_flat_universe
 from tools.exoplanet_catalog import load_and_filter_exoplanets
 
 def run_with_progress(func, name, estimated_minutes=12, *args, **kwargs):
@@ -95,7 +95,7 @@ def run_sim(func=main_hwo, name='hwo', parallel=True, nruns=500, star_catalog='G
 def run_exoplanet_plotting(name='HWO_exoplanets', star_catalog='exoplanet_catalog', plot=True):
     print("Loading exoplanets data for plotting...")
 
-    exo_path = os.path.join(EXOPLANET_CSV_DIR, 'exoplanets_2026.csv')
+    exo_path = EXOPLANETS_2026_CSV
     name_lower = name.lower()
 
     telescope_map = {

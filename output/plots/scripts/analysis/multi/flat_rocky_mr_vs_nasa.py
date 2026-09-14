@@ -118,9 +118,8 @@ def build_arrays(rel_kw, m_sil, r_sil, super_earths_on_silicate=False, rng=None)
     return mass, radius, flux, puffy, td & rd
 
 
-def noised_scatter_AB(arrays, cut, rng, n_plot=400, drop_blue_below=False):
-    """One detected + noised draw (with the cut applied); split into flat-A-kept vs dropped-by-A.
-    drop_blue_below removes the flat-A-kept planets that land on or below the silicate line."""
+def noised_scatter_AB(arrays, cut, rng, n_plot=400):
+    """One detected + noised draw (with the cut applied); split into flat-A-kept vs dropped-by-A."""
     mass, radius, flux, puffy, det = arrays
     keep = det.copy()
     if cut.get("insol_max"):
@@ -133,9 +132,6 @@ def noised_scatter_AB(arrays, cut, rng, n_plot=400, drop_blue_below=False):
         k = mo > cut["mass_min"]
         mo, ro, tmass, tpuffy = mo[k], ro[k], tmass[k], tpuffy[k]
     dropped = (~tpuffy) & (tmass > S72.MASS_THRESHOLD)          # A drops these (true rocky, true M>2)
-    if drop_blue_below:
-        k = dropped | (ro > np.interp(mo, *S72.load_silicate()))
-        mo, ro, dropped = mo[k], ro[k], dropped[k]
     if mo.size > n_plot:
         j = rng.choice(mo.size, n_plot, replace=False)
         mo, ro, dropped = mo[j], ro[j], dropped[j]
@@ -191,7 +187,7 @@ SCATTER_LABELS = ("Escape-only (kept)", "Primordial-rocky: rocky super-Earths (M
 
 
 def _draw_scatter(ax, arr, cut, nasa, m_sil, r_sil, rng, title,
-                  labels=SCATTER_LABELS, drop_blue_below=False, true_values=False):
+                  labels=SCATTER_LABELS, true_values=False):
     """Top-row panel: one detected, noise-perturbed mass-radius draw. With
     true_values, the planets are drawn at their true masses and radii with the
     simulated measurement errors as error bars instead."""
@@ -208,7 +204,7 @@ def _draw_scatter(ax, arr, cut, nasa, m_sil, r_sil, rng, title,
                         fmt="o", ms=4, color=colour, alpha=0.6, elinewidth=0.6,
                         capsize=0, zorder=z, label=lbl)
     else:
-        mo, ro, dropped = noised_scatter_AB(arr, cut, rng, drop_blue_below=drop_blue_below)
+        mo, ro, dropped = noised_scatter_AB(arr, cut, rng)
         ax.scatter(mo[~dropped], ro[~dropped], s=15, color="tab:blue", alpha=0.45, lw=0,
                    zorder=3, label=labels[0])
         ax.scatter(mo[dropped], ro[dropped], s=15, color="tab:orange", alpha=0.5, lw=0,
@@ -226,38 +222,14 @@ def _draw_scatter(ax, arr, cut, nasa, m_sil, r_sil, rng, title,
     ax.set_ylabel(r"planet radius [$R_\oplus$]")
 
 
-def mc_universe_drop_blue_below(arrays, drop, cut, m_sil, r_sil, rng):
-    """S72.mc_universe, except that in every draw the planets that are not rocky
-    super-Earths (the sub-Neptunes) and land on or below the silicate line are
-    removed from the sample before the volatile fraction is taken."""
+def mc_universe_true_sub_neptunes(arrays, drop, cut, m_sil, r_sil, rng):
+    """S72.mc_universe on a pool without the planets that are truly on or below the
+    silicate line but are not rocky super-Earths (the rocky planets under 2
+    M_earth), so the non-super-Earth population is genuinely all sub-Neptunes.
+    Measurement noise can still scatter some of them below the line."""
     mass, radius, flux, puffy, det = arrays
-    super_earth = (~puffy) & (mass > S72.MASS_THRESHOLD)
-    keep = ~super_earth if drop else np.ones(len(mass), bool)
-    if cut.get("insol_max"):
-        keep = keep & (flux < cut["insol_max"])
-    idx = np.flatnonzero(keep)
-    mass_min = cut.get("mass_min")
-    out = np.full(S72.N_REPEATS, np.nan); cnt = np.zeros(S72.N_REPEATS)
-    if idx.size:
-        m_u, r_u, det_u, se_u = mass[idx], radius[idx], det[idx], super_earth[idx]
-        L = idx.size
-        for i in range(S72.N_REPEATS):
-            s = rng.integers(0, L, S72.N_SAMPLE)
-            sel = s[det_u[s]]
-            if sel.size == 0:
-                continue
-            m_obs = m_u[sel] * np.exp(rng.normal(0, S72.MASS_FRAC_ERR, sel.size))
-            r_obs = r_u[sel] * np.exp(rng.normal(0, S72.RAD_FRAC_ERR, sel.size))
-            se = se_u[sel]
-            if mass_min:
-                k = m_obs > mass_min
-                m_obs, r_obs, se = m_obs[k], r_obs[k], se[k]
-            k = se | (r_obs > np.interp(m_obs, m_sil, r_sil))
-            m_obs, r_obs = m_obs[k], r_obs[k]
-            if m_obs.size < 5:
-                continue
-            out[i] = S72.puffy_frac(m_obs, r_obs, m_sil, r_sil); cnt[i] = m_obs.size
-    return out[np.isfinite(out)], float(np.nanmean(cnt[cnt > 0])) if (cnt > 0).any() else 0.0
+    keep = puffy | (mass > S72.MASS_THRESHOLD)
+    return S72.mc_universe(tuple(a[keep] for a in arrays), drop, cut, m_sil, r_sil, rng)
 
 
 BELL_STYLE = (("Escape-only", "tab:orange"), ("Primordial-rocky", "tab:blue"))
@@ -361,10 +333,11 @@ def make_otegi_1x2(nasa, m_sil, r_sil, rng):
 
     Blue = "Sub-Neptunes only" (universe A), orange = "Sub-Neptunes and
     super-Earths" (universe B) in both panels. The rocky super-Earths are
-    redrawn as a normal around the silicate line, and any sub-Neptune that
-    lands on or below the silicate line is removed from each sample. The left
-    panel shows true masses and radii with the simulated errors as bars; the
-    histograms use the noise-perturbed ("measured") values.
+    redrawn as a normal around the silicate line, and planets that are truly
+    below the line but are not super-Earths are left out, so the blue
+    population is all sub-Neptunes. The left panel shows true masses and radii
+    with the simulated errors as bars; the histograms use the noise-perturbed
+    ("measured") values, so noise can put some sub-Neptunes below the line.
     """
     print("\n--> Otegi 1x2 (cold super-Earth cut; super-Earths on the silicate line):")
     cut_label, cut = OTEGI_2X2_CUTS[1]
@@ -375,10 +348,11 @@ def make_otegi_1x2(nasa, m_sil, r_sil, rng):
     _draw_scatter(axes[0], arr, cut, nasa, m_sil, r_sil, rng, "",
                   labels=("Sub-Neptunes only", "Sub-Neptunes and super-Earths"),
                   true_values=True)
+    axes[0].set_xlim(0, 12)
     _draw_bells(axes[1], arr, cut, nasa, m_sil, r_sil, rng, tag=f"[1x2] {cut_label}",
                 style=(("Sub-Neptunes only", "tab:blue"),
                        ("Sub-Neptunes and super-Earths", "tab:orange")),
-                mc=mc_universe_drop_blue_below)
+                mc=mc_universe_true_sub_neptunes)
     fig.tight_layout()
     fname = "flat_otegi_1x2_cold_cut.png"
     out_png = os.path.join(OUT_DIR, fname)

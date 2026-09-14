@@ -1,24 +1,6 @@
-"""
-mc_comparison_statistic.py — Monte Carlo distribution of the comparison statistic on the
-ROOT scale, sqrt(x_k) = |f_k - f_obs| / sigma_obs, built on bayesian_cold_rocky_desert.py's
-machinery (Kepler transit + RV, precision-cut NASA sample, M > 2 M_earth).
-
-Panels: I<10, I<50, I>50 (all M>2). Default matplotlib colors:
-  C0 blue   = rocky_formation  ("Sub-Neptune + Super-Earth")
-  C1 orange = escape_only      ("Sub-Neptune")
-  C2 green  = NASA vs itself   (half-normal with unit sigma on this axis)
-Histograms: per-draw |f_k^(t) - f_obs| / sigma_obs, where f_k^(t) carries only the model's own
-MC noise and f_obs = v/n is the raw observed fraction (fixed). Dashed vertical lines = the point
-value |mean f_k - f_obs| / sigma_obs. sigma_obs is the std of v/n over N_DRAWS redraws of the
-bin's own NASA planets with lognormal noise at the precision-cut limits (M +-25%, R +-8%), the
-M>2 cut reapplied per draw.
-
-The pool is trimmed to 2M planets for speed (script 41 uses 10M) and cached in this script's
-own output directory, so it never collides with script 41's cache.
-
-Run:
-    python output/plots/scripts/analysis/multi/mc_comparison_statistic.py
-    N_DRAWS=500 python output/plots/scripts/analysis/multi/mc_comparison_statistic.py
+"""Paper MC figure (mc_comparison_statistic_<N_DRAWS>.png): distribution of sqrt(x_k) = |f_k - f_obs| /
+sigma_obs for I<10, I<50, I>50 (M>2), using bayesian_cold_rocky_desert.py's machinery.
+Run: [N_DRAWS=500] python output/plots/scripts/analysis/multi/mc_comparison_statistic.py
 """
 
 import importlib.util

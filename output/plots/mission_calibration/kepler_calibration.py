@@ -1,23 +1,6 @@
-"""
-kepler_calibration.py
-
-Kepler toy-vs-official 3-in-1 calibration figure with improved CDPP.
-
-The core fix over script 28:
-  - Fetches rrmscdpp01p5 … rrmscdpp15p0 columns from the Kepler stellar
-    table (q1_q17_dr25_stellar) by JOINing with the KOI cumulative table.
-  - KeplerData then uses the real per-target CDPP instead of the
-    magnitude-based fallback (100 ppm at Kp=12), which was the primary
-    cause of the flat ~0.6x under-estimate in toy MES.
-
-Outputs (single combined figure):
-    results/figures/analysis/kepler_calibration/
-        kepler_3in1_calibration.png   — scatter | recovery | ratio
-        koi_stellar_cached.csv        — downloaded / cached KOI+stellar data
-        summary.txt                   — key calibration numbers
-
-Run from repo root:
-    python output/plots/mission_calibration/kepler_calibration.py
+"""Kepler detector calibration: model MES vs official DR25 KOI MES (kepler_3in1_calibration.png).
+Uses real per-target CDPP (rrmscdpp*) from the KOI stellar table instead of the magnitude fallback.
+Run from repo root: python output/plots/mission_calibration/kepler_calibration.py
 """
 
 from __future__ import annotations
@@ -93,11 +76,8 @@ def nasa_tap_url(query: str) -> str:
 
 
 def load_or_download(redownload: bool = False) -> pd.DataFrame:
-    """KOI cumulative + stellar CDPP.
-
-    Reads the copy in data/ by default. Only downloads when DOWNLOAD_NASA_DATA is
-    True (or redownload is passed), and writes what it fetches back to data/ so
-    the next run is offline.
+    """KOI cumulative + stellar CDPP. Reads the copy in data/; downloads only when
+    DOWNLOAD_NASA_DATA (or redownload) is set, and saves what it fetches back to data/.
     """
     local = Path(KOI_CUMULATIVE_CSV)
     if local.exists() and not (DOWNLOAD_NASA_DATA or redownload):

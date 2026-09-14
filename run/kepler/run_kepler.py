@@ -78,11 +78,7 @@ def run_kepler_import_catalog(i, star_catalog):
 
 
 def run_nasa_pscomppars(input_csv=NASA_INPUT_CSV, output_csv=NASA_OUTPUT_CSV):
-    """
-    Run Kepler detection on real NASA exoplanet data (PSCompPars).
-
-    Returns DataFrame with detection results.
-    """
+    """Run Kepler detection on NASA PSCompPars planets; returns a DataFrame of results."""
     if not input_csv.exists():
         raise FileNotFoundError(
             f"Could not find NASA input CSV:\n{input_csv}\n\n"

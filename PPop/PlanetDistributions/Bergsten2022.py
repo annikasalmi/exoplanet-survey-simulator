@@ -339,23 +339,14 @@ class PlanetDistribution():
         a, b, c = np.log(1.0), np.log(Rval), np.log(3.5)
         return (Porb / Pbrk)**beta2 * self.G_more(Porb, Pcen, s, chi1, chi2) * (c - b) / ((b - a) + self.G_more(Porb, Pcen, s, chi1, chi2) * (c - b) - self.G_more(Porb, Pcen, s, chi1, chi2) * (b - a))
     
-    # -------------------------------------------------------------------------
-    # Fast inverse-CDF sampling (added optimization).
-    #
-    # The original draw() created scipy rv_continuous objects per planet and
-    # numerically inverted their CDFs on every .rvs() call (~165 ms/planet). The
-    # helpers below precompute, once per stellar-mass bin:
-    #   * component-selection probabilities,
-    #   * radius bounds for the *analytic* inverse of dN/dR ~ 1/R, and
-    #   * a numerical inverse-CDF (Porb vs u) per period component.
-    # draw() then samples with vectorised array ops from the identical pdfs.
-    # -------------------------------------------------------------------------
+    # Fast inverse-CDF sampling (added for speed). The original draw() built scipy
+    # rv_continuous objects per planet (~165 ms/planet). These helpers precompute, per stellar-mass
+    # bin, the component probabilities, analytic radius bounds (dN/dR ~ 1/R) and a numerical period
+    # inverse-CDF, so draw() samples the same pdfs with vectorised array ops.
 
-    # Component layout (index -> radius interval, period interval):
-    #   0 lessless : R in [Rp_lo, Rval]   P in [P_lo, Pbrk]   (dNdP_lessless)
-    #   1 lessmore : R in [Rval, Rp_hi]    P in [P_lo, Pbrk]   (dNdP_lessmore)
-    #   2 moreless : R in [Rp_lo, Rval]    P in [Pbrk, P_hi]   (dNdP_moreless)
-    #   3 moremore : R in [Rval, Rp_hi]    P in [Pbrk, P_hi]   (dNdP_moremore)
+    # Components (index name: R interval x P interval; period pdf is dNdP_<name>):
+    #   0 lessless: [Rp_lo, Rval] x [P_lo, Pbrk]    1 lessmore: [Rval, Rp_hi] x [P_lo, Pbrk]
+    #   2 moreless: [Rp_lo, Rval] x [Pbrk, P_hi]    3 moremore: [Rval, Rp_hi] x [Pbrk, P_hi]
 
     def _build_samplers(self, ngrid=4000):
         nbins = len(self.F0)

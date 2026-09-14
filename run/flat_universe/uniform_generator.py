@@ -1,41 +1,6 @@
-"""
-uniform_generator.py — fully-FLAT synthetic planet catalogue for detector tests.
-
-Every parameter is drawn FLAT and INDEPENDENT within P-Pop-style bounds. This is
-NOT P-Pop: it does not use the Gaia star catalogue, the SAG13/Dressing/Bergsten
-occurrence rates, the Chen2017 mass-from-radius relation, or any P-Pop orbit
-model. The point is a control population with no astrophysical prior baked in, so
-when you run KeplerData / TESSData / RVData on it you read off the detector's
-sensitivity edge directly instead of the occurrence-rate distribution.
-
-What is drawn flat (independently):
-    radius_p   U[0.5, 2.2]   R_earth        (linear; small range)
-    mass_p     logU[0.1, 12] M_earth        (independent of radius -> M-R scatter)
-    p_orb      logU[0.5, 20000] d           (period; P-Pop SAG13 range)
-    ecc_p      U[0, 0.9]
-    inc        isotropic (cos i ~ U[0,1])   -> realistic transit geometry
-    teff_s     U[2300, 9700] K              (flat -> equal A..M, unlike real Gaia)
-    distance_s U[1, 60] pc                  (P-Pop distance range)
-
-Derived (fundamental physics the detectors themselves assume — NOT P-Pop priors):
-    radius_s, mass_s  from teff_s via a main-sequence interpolation (so the host
-                      stars are physical rather than impossible R/T/M combos)
-    l_sun  = radius_s^2 * (teff_s/5772)^4
-    a (semimajor_p) = (mass_s * (p_orb/yr)^2)^(1/3)            [Kepler's third law]
-    flux_p (insolation) = l_sun / a^2                          [coupled to orbit]
-
-Insolation is COUPLED to the orbit (as requested): it is derived from period +
-star, then the sample is rejection-filtered to the bound [1e-2, 1e4] I_earth, so
-hotter/closer planets genuinely transit more — the radius-insolation and
-mass-radius maps then show real detector structure rather than a flat field.
-
-Apparent magnitudes are not drawn directly; each detector derives its band
-magnitude from l_sun + distance_s + teff_s, so brightness is consistent across
-Kepler / TESS V / RV V / RV J(NIRPS).
-
-Usage:
-    from run.flat_universe import generate_flat_catalog, get_or_build_catalog
-    df = generate_flat_catalog(n_planets=200000, seed=0)
+"""Fully flat synthetic planet catalog for detector tests (not P-Pop: no occurrence rates or M-R prior).
+Radius, log mass, log period, eccentricity, Teff and distance are drawn flat and independent; star
+R/M come from Teff, insolation from the orbit (kept within 1e-2..1e4 I_earth). See generate_flat_catalog.
 """
 
 from __future__ import annotations
@@ -93,11 +58,9 @@ def _logU(rng, lo, hi, n):
     return 10.0 ** rng.uniform(np.log10(lo), np.log10(hi), n)
 
 
-# --- mass-radius relations (optional; the default flat universe keeps M independent of R) ---
-# "independent": mass drawn log-uniform, decoupled from radius (the prior-free control).
-# "mean":  mass from radius via the MEAN Chen2017/Forecaster broken power law (average of the
-#          shipped posterior) + tunable log-normal scatter -> a physical R-M relation.
-# "ppop":  mass from radius via P-Pop's full Chen2017/Forecaster (native probabilistic scatter).
+# Mass-radius options (default "independent": log-uniform mass, decoupled from radius).
+# "mean": mass from the mean Chen2017/Forecaster relation + log-normal scatter.
+# "ppop": mass from P-Pop's full probabilistic Chen2017/Forecaster.
 _MEAN_MR_CURVE = None       # cached (R_grid, M_grid) for the mean-relation inverse R->M
 
 
@@ -165,12 +128,9 @@ def generate_flat_catalog(
     mr_C: float = 1.0,
     mr_beta: float = 0.28,
 ) -> pd.DataFrame:
-    """
-    Build a fully-flat synthetic planet catalogue (see module docstring).
-
-    Returns a DataFrame with the detector-ready columns:
-        radius_p, mass_p, p_orb, ecc_p, inc_p, semimajor_p, flux_p,
-        radius_s, mass_s, teff_s, temp_s, l_sun, distance_s, ra, dec, stype, nstar, id
+    """Build a fully flat synthetic planet catalog (see module docstring). Returns a DataFrame with
+    radius_p, mass_p, p_orb, ecc_p, inc_p, semimajor_p, flux_p, radius_s, mass_s, teff_s, temp_s,
+    l_sun, distance_s, ra, dec, stype, nstar, id.
     """
     rng = np.random.default_rng(seed)
     keep_R, keep_M, keep_P, keep_E, keep_I = [], [], [], [], []

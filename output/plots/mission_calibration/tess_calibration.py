@@ -1,34 +1,6 @@
-"""
-tess_calibration.py
-
-TESS toy-vs-official 3-in-1 calibration figure with improved smooth CDPP.
-
-The core fix over the old TESS calibration script:
-  smooth_noise_ref_ppm_1hr  : 60 -> 30   (photon-noise floor for Tmag=10)
-  smooth_noise_floor_ppm_1hr: 30 -> 10   (systematic-noise floor)
-
-This brings the smooth CDPP fallback closer to real SPOC CDPP statistics:
-  Tmag=9  old ~48 ppm/hr  ->  new ~21 ppm/hr  (SPOC: ~15-20 ppm/hr)
-  Tmag=12 old ~154 ppm/hr ->  new ~76 ppm/hr  (SPOC: ~40-60 ppm/hr)
-
-A residual ~0.7x systematic remains at low MES from matched-filter vs
-boxcar differences in the SPOC pipeline (expected, not a formula error).
-
-Data source: ExoFOP TESS TOI catalog (SNR column = SPOC pipeline MES).
-Dispositions are grouped into three classes (same colours/legend as the Kepler
-figure, script 47):
-  Confirmed       = CP (Confirmed Planet)  + KP (Known Planet)
-  Candidate       = PC (Planet Candidate)  + APC (Ambiguous Planet Candidate)
-  False Positive  = FP (False Positive)    + FA (False Alarm)
-
-Outputs:
-    results/figures/analysis/tess_calibration/
-        tess_3in1_calibration.png
-        toi_cached.csv
-        summary.txt
-
-Run from repo root:
-    python output/plots/mission_calibration/tess_calibration.py
+"""TESS detector calibration: model SNR vs ExoFOP/SPOC SNR (tess_3in1_calibration.png).
+Smooth-CDPP fallback floors lowered (ref 60->30, floor 30->10 ppm/hr) toward real SPOC CDPP.
+Run from repo root: python output/plots/mission_calibration/tess_calibration.py
 """
 
 from __future__ import annotations
@@ -109,11 +81,8 @@ EXOFOP_TOI_URL = "https://exofop.ipac.caltech.edu/tess/download_toi.php?sort=toi
 
 
 def load_or_download(redownload: bool = False) -> pd.DataFrame:
-    """ExoFOP TOI table.
-
-    Reads the copy in data/ by default. Only downloads when DOWNLOAD_NASA_DATA is
-    True (or redownload is passed), and writes what it fetches back to data/ so
-    the next run is offline.
+    """ExoFOP TOI table. Reads the copy in data/; downloads only when DOWNLOAD_NASA_DATA
+    (or redownload) is set, and saves what it fetches back to data/.
     """
     local = Path(EXOFOP_TOI_CSV)
     if local.exists() and not (DOWNLOAD_NASA_DATA or redownload):
@@ -146,12 +115,8 @@ def load_or_download(redownload: bool = False) -> pd.DataFrame:
 
 
 def prepare(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Map ExoFOP TOI columns to internal standard names expected by TESSData.
-    ExoFOP TOI CSV columns (relevant subset):
-        TIC ID, TOI, Period (days), Duration (hours), Depth (ppm),
-        Stellar Radius (R_Sun), Stellar Eff Temp (K), TESS Mag,
-        RA, Dec, TFOPWG Disposition, SNR
+    """Rename ExoFOP TOI columns (TIC ID, Period, Duration, Depth, Stellar Radius/Teff,
+    TESS Mag, TFOPWG Disposition, SNR, ...) to the internal names TESSData expects.
     """
     df = df.copy()
     # Normalise column names.

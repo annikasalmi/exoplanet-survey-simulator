@@ -1,48 +1,6 @@
-"""
-likelihood_ratio_catalog.py — TEST LR (plan 5): full-catalog likelihood ratio
-via a classifier density ratio (the SBI likelihood-ratio trick, Cranmer/Brehmer/Louppe).
-
-Two simulated universes that differ ONLY in the cold super-Earth corner:
-    B = flat universe, everything kept            ("cold large rocky planets exist, flat rate")
-    A = flat universe minus the TRUE corner       ("cold large rocky planets do not exist")
-        corner = rocky (below silicate line) & mass > 2 M_earth & insolation < 50 I_earth
-Both pass through the SAME repo detectors (Kepler transit AND best-of-HARPS/NIRPS RV, as in
-script 79) and the SAME observation noise, so every difference the classifier can find is the
-corner and nothing else. The classifier output s(x) gives the per-planet density ratio
-r(x) = p_B(x)/p_A(x); since A = B off-corner, log r ~ 0 away from the corner — hot planets
-are spectators, the statistic surgically weighs the corner region.
-
-STEP 1  FORWARD SIM   flat pool -> joint Kepler+RV detection (cached) -> NASA-resampled
-                      observation noise -> observed-box cut. A-detected = B-detected minus
-                      TRUE-corner members (planets are independent, so this is exact).
-STEP 2  FEATURES      x = (log10 M_obs, log10 R_obs, log10 I_obs, Teff)
-STEP 3  CLASSIFIERS   HistGradientBoosting (sklearn; same GBT family as the plan's XGBoost,
-                      already installed): clf_full on all 4 features and clf_loc on location
-                      only (log I, Teff).  l_full = logit(s) - log(N_B/N_A);
-                      l_cond = l_full - l_loc  = log ratio of p(M,R | I,Teff)  — composition
-                      at fixed location; location-targeting effort cancels here the same way
-                      the rocky SHARE cancelled it in TEST A.
-STEP 4  STATISTIC     T = sum_i l(x_i) over the N observed planets, CONDITIONAL on N.
-                      The plan's Poisson count term (Lambda_B - Lambda_A) is dropped on
-                      purpose: TEST A proved absolute corner counts are follow-up-poisoned
-                      (rocky 1.8x, puffy 6.3x above expectation), and the flat universe has
-                      no absolute rate to calibrate it with anyway.
-STEP 5  CALIBRATION   exact-frequentist: 10^4 catalogs of size N resampled from the held-out
-                      A pool (null) and B pool (power). p(reject B) = P(T_B <= T_obs);
-                      compatibility with A two-sided; power at alpha = 0.05.
-                      HEADLINE variant: null catalogs LOCATION-MATCHED to NASA — planet i's
-                      null l is drawn from held-out sim planets at NASA planet i's own
-                      (log I, Teff) location (k-nearest neighbors). This conditions on the
-                      observed location set, so NASA's cold-heavy targeting cannot leak into
-                      the calibration either (pool-mix nulls have the flat location mix and
-                      would let it leak — both are reported so the gap is visible).
-
-Validity guardrails (printed): held-out AUC + reliability table (classifier calibration),
-permutation feature importances (should scream mass-radius-insolation, not Teff),
-train/calib split so null catalogs never reuse training rows.
-
-Run:
-    python scripts/likelihood_ratio_catalog.py
+"""TEST LR: does NASA's catalog look like flat universe A (cold rocky M>2 corner removed) or B (kept)?
+Both pass the same Kepler+RV detectors and noise; a classifier learns p_B/p_A per planet, and
+NASA's summed log-ratio is compared to resampled A and B catalogs. Run via simulation_demo.py.
 """
 
 from __future__ import annotations

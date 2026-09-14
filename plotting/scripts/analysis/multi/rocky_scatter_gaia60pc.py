@@ -13,7 +13,7 @@ import sys
 import numpy as np
 import pandas as pd
 
-from tools.paths import SILICON_CURVE, ANALYSIS_DIR, PAPER_FIGURES_DIR, KEPLER_DATA_DIR, TESS_DATA_DIR, KEPLER_REF_CURVE
+from tools.paths import SILICON_CURVE, ANALYSIS_DIR, PAPER_FIGURES_DIR, KEPLER_DATA_DIR, TESS_DATA_DIR, KEPLER_REF_CURVE, EXOPLANETS_2026_CSV
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -61,7 +61,7 @@ def _ppop_files(directory: Path, stem: str) -> list[Path]:
     if not present:
         # Fallback to local CSV when run/ catalogs don't exist
         if not DOWNLOAD_NASA_DATA:
-            local_csv = ROOT / "data" / "exoplanet_csv" / "exoplanets_2026.csv"
+            local_csv = Path(EXOPLANETS_2026_CSV)
             if local_csv.exists():
                 print(f"No P-Pop catalogs in {directory}, using local CSV: {local_csv}")
                 return [local_csv]

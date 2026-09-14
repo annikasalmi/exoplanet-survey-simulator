@@ -1,13 +1,8 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-import os
+from tools.paths import EXOPLANETS_ALL_2025_CSV
 
-# Determine the correct path to the CSV
-csv_path = "exoplanets_all_2025.csv"
-if not os.path.exists(csv_path):
-    csv_path = "../exoplanets_all_2025.csv"
-
-df = pd.read_csv(csv_path)
+df = pd.read_csv(EXOPLANETS_ALL_2025_CSV)
 
 # Filter for planets with R < 2.6 R_earth and stellar temperature < 4000K
 filtered = df[(df['pl_rade'] < 2.6) & (df['st_teff'] < 4000)]

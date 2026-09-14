@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import os
 import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from tools.paths import LIFESIM_OUTER_DIR
+from tools.paths import LIFESIM_OUTER_DIR, EXOPLANETS_2026_CSV
 import tools.physics_constants as const
 
 def blackbody_flux(wavelength_m, temperature_K):
@@ -33,8 +33,7 @@ def plot_planetary_vs_stellar_flux():
     Stellar flux = Rs^2 * B(Ts)
     """
     # Load exoplanets data
-    exo_path = os.path.join(LIFESIM_OUTER_DIR, 'exoplanets_2026.csv')
-    df = pd.read_csv(exo_path)
+    df = pd.read_csv(EXOPLANETS_2026_CSV, comment="#", low_memory=False)
     
     # Filter for valid data
     df = df[
@@ -185,8 +184,7 @@ def plot_flux_ratio_vs_wavelength():
     
     # Add first 100 planets from exoplanet CSV
     print("Loading exoplanet data for wavelength analysis...")
-    exo_path = os.path.join(LIFESIM_OUTER_DIR, 'exoplanets_2026.csv')
-    df_exo = pd.read_csv(exo_path)
+    df_exo = pd.read_csv(EXOPLANETS_2026_CSV, comment="#", low_memory=False)
     
     # Filter for valid data (first 100 planets)
     df_exo = df_exo[

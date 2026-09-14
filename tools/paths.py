@@ -36,6 +36,8 @@ DEMO_DIR = os.path.join(RESULTS_DIR, "demo")  # hwo_demo / lifesim_demo
 
 SILICON_CURVE = os.path.join(DATA_DIR, "silicon_curve.ddat")
 EXOPLANET_CSV_DIR = os.path.join(DATA_DIR, "exoplanet_csv")
+EXOPLANETS_2026_CSV = os.path.join(EXOPLANET_CSV_DIR, "exoplanets_2026.csv")
+EXOPLANETS_ALL_2025_CSV = os.path.join(EXOPLANET_CSV_DIR, "exoplanets_all_2025.csv")
 KOI_CUMULATIVE_CSV = os.path.join(EXOPLANET_CSV_DIR, "koi_cumulative_stellar.csv")
 EXOFOP_TOI_CSV = os.path.join(EXOPLANET_CSV_DIR, "exofop_toi.csv")
 PSCOMPPARS_CSV = os.path.join(EXOPLANET_CSV_DIR, "pscomppars_2026.csv")

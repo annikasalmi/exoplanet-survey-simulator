@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
 
-import os
-
 from tools.exoplanet_catalog import load_and_filter_exoplanets
+from tools.paths import EXOPLANETS_2026_CSV
 from telescopes.hwo.detection_model import HWOData
 
 # Load and process data
 print("Loading exoplanet data...")
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-df = load_and_filter_exoplanets(
-    os.path.join(REPO_ROOT, 'data/exoplanet_csv', 'exoplanets_2026.csv'))
+df = load_and_filter_exoplanets(EXOPLANETS_2026_CSV)
 
 print(f"\nBefore HWO processing:")
 print(f"  Total planets: {len(df)}")

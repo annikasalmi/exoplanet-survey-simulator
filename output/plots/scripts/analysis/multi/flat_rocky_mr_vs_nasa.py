@@ -85,7 +85,8 @@ RELATIONS = [
 
 
 OTEGI_VOLATILE = dict(mr_C=0.70, mr_beta=0.63)   # Otegi et al. 2020 volatile-rich branch
-TWO_POP_FRAC_SD = 0.10                            # fractional radius width of every normal
+SUB_NEPTUNE_FRAC_SD = 0.20       # fractional radius width of the sub-Neptune normal
+SUPER_EARTH_FRAC_SD = 0.05       # ... and of each super-Earth normal
 
 
 def load_earthlike_curve():
@@ -111,7 +112,9 @@ def build_arrays(rel_kw, m_sil, r_sil, two_populations=False, rng=None):
         planets only universe B keeps): half from a normal around the same
         volatile-rich relation, half from a normal around the Earth-like
         curve, with no cut.
-    Every normal is TWO_POP_FRAC_SD wide (fractional). Redrawn planets outside the
+    Widths (fractional): SUB_NEPTUNE_FRAC_SD for the sub-Neptunes (wide enough
+    that some reach below 2.2 R_earth at 8-10 M_earth) and SUPER_EARTH_FRAC_SD
+    for each super-Earth normal. Redrawn planets outside the
     radius box (0.5-2.2 R_earth, as for NASA) are dropped. The returned `puffy`
     flags the sub-Neptunes, so the A/B split is by population, not by where a
     planet landed. Detection runs on the redrawn radii.
@@ -133,14 +136,14 @@ def build_arrays(rel_kw, m_sil, r_sil, two_populations=False, rng=None):
         sn = ~se
         # Sub-Neptunes: normal around the volatile-rich curve, kept above the silicate line.
         mu = otegi_volatile_radius(mass[sn])
-        sd = TWO_POP_FRAC_SD * mu
+        sd = SUB_NEPTUNE_FRAC_SD * mu
         a = (np.interp(mass[sn], m_sil, r_sil) - mu) / sd
         radius[sn] = truncnorm.rvs(a, np.inf, loc=mu, scale=sd, random_state=rng)
         # Super-Earths: 50/50 mix of the volatile-rich and Earth-like normals, no cut.
         m_se = mass[se]
         centre = np.where(rng.random(m_se.size) < 0.5, otegi_volatile_radius(m_se),
                           np.interp(m_se, *load_earthlike_curve()))
-        radius[se] = centre * (1.0 + TWO_POP_FRAC_SD * rng.standard_normal(m_se.size))
+        radius[se] = centre * (1.0 + SUPER_EARTH_FRAC_SD * rng.standard_normal(m_se.size))
         in_box = (radius >= S72.BOX["r_lo"]) & (radius <= S72.BOX["r_hi"])
         cat["radius_p"] = radius
         cat = cat[in_box].copy()

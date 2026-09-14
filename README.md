@@ -5,6 +5,7 @@ These simulations include LIFE, forked from [LIFEsim](https://github.com/fdanner
 Additional simulations written for this repo are HWO, TESS, Kepler, HARPS, and NIRPS.
 
 Simulated planets are generated from a modified copy of [P-Pop](https://github.com/kammerje/P-pop) and [chenjj2/forecaster](https://github.com/chenjj2/forecaster).
+Occurrence rates are Bergsten et al. (2022) for FGK stars and Dressing & Charbonneau (2015) for M dwarfs.
 
 ## Install
 

@@ -9,7 +9,10 @@ It is copied in rather than pip-installed because upstream P-pop cannot be impor
 
 - Seeded random numbers instead of np.random.
 - Output DataFrames instead of .txt. No need to save files locally when PPop reruns frequently. Saving to .txt is optional.
-- Added new files: `StarCatalogs/gaia.py`, `StarCatalogs/build_gaia_60pc.py` and `PlanetDistributions/SAG13_extrap.py`.
+- Added new files: `StarCatalogs/gaia.py` and `StarCatalogs/build_gaia_60pc.py`.
+- Copied from newer upstream: `PlanetDistributions/Bergsten2022.py`, `EarthTwin.py`, `SAG13_rv.py` and
+  `SAG13_extrap.py` (upstream `SAG13Extrap.py`). `Bergsten2022.draw()` is rewritten as a faster vectorised
+  sampler of the same distributions.
 - Cleaned up names for consistency: renamed some files/functions to follow snake_case; added a tools.paths file.
   Star catalogs and exozodi models are found through it, so PPop runs from any working directory.
 

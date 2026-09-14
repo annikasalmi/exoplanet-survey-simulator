@@ -1,5 +1,6 @@
-"""Paper MC figure (mc_comparison_statistic_<N_DRAWS>.png): distribution of sqrt(x_k) = |f_k - f_obs| /
-sigma_obs for I<10, I<50, I>50 (M>2), using bayesian_cold_rocky_desert.py's machinery.
+"""Paper MC figure (mc_comparison_statistic_<N_DRAWS>.png): distribution of x_k = (f_k - f_obs)^2 /
+sigma_obs^2 for I<10, I<50, I>50 (M>2), each draw a NASA-sized (7/27/75) mock survey with the
+sample's 25%/8% errors, using bayesian_cold_rocky_desert.py's machinery.
 Run: [N_DRAWS=500] python output/plots/scripts/analysis/multi/mc_comparison_statistic.py
 """
 
@@ -32,22 +33,26 @@ LABELS = {"rocky_formation": "Sub-Neptune + Super-Earth",
 
 # precision-cut ceilings AS the noise model: every planet in the sample passed
 # M +-25% / R +-8%, so use those limits as a uniform fractional error — no
-# per-planet published bars needed, only the N planets per insolation bin.
+# per-planet published bars needed, only the N planets per insolation bin. The
+# same errors are applied to the simulated planets, so both sides are measured alike.
 MASS_CUT_ERR, RAD_CUT_ERR = 0.25, 0.08
 
 
-def frac_draws(u, lo, hi, rng, m_sil, r_sil, n_rep=N_DRAWS):
-    """Per-draw detected volatile fractions f_k^(t) (script 41 predicted_frac, array form)."""
+def frac_draws(u, lo, hi, rng, m_sil, r_sil, n_obs, n_rep=N_DRAWS):
+    """Per-draw volatile fractions f_k^(t) of a mock survey the size of NASA's: noise the bin's
+    detected planets with the NASA sample's 25%/8% errors, apply M>2 to the noisy masses, then
+    keep a random n_obs of the survivors, so the spread is what an n_obs-planet sample would see."""
     sel = u["det"] & (u["flux"] >= lo) & (u["flux"] < hi)
     m0, r0 = u["mass"][sel], u["radius"][sel]
     out = []
     for _ in range(n_rep):
-        mo = m0 * np.exp(rng.normal(0.0, S41.MASS_FRAC_ERR, m0.size))
-        ro = r0 * np.exp(rng.normal(0.0, S41.RAD_FRAC_ERR, r0.size))
-        k = mo > S41.MASS_MIN
-        if k.sum() < 5:
+        mo = m0 * np.exp(rng.normal(0.0, MASS_CUT_ERR, m0.size))
+        ro = r0 * np.exp(rng.normal(0.0, RAD_CUT_ERR, r0.size))
+        k = np.flatnonzero(mo > S41.MASS_MIN)
+        if k.size < n_obs:
             continue
-        out.append(float(S41.is_volatile(mo[k], ro[k], m_sil, r_sil).mean()))
+        pick = rng.choice(k, n_obs, replace=False)
+        out.append(float(S41.is_volatile(mo[pick], ro[pick], m_sil, r_sil).mean()))
     return np.array(out)
 
 
@@ -80,8 +85,10 @@ def main():
             "escape_only": {k: (v[keep] if isinstance(v, np.ndarray) else v)
                             for k, v in otegi.items()}}
 
+    plt.rcParams.update({"font.size": 24, "axes.titlesize": 28, "axes.labelsize": 28,
+                         "xtick.labelsize": 24, "ytick.labelsize": 24, "legend.fontsize": 21})
     rng = np.random.default_rng(0)
-    fig, axes = plt.subplots(1, 3, figsize=(19, 5.4))
+    fig, axes = plt.subplots(1, 3, figsize=(24, 7.5), layout="constrained")
     for ax, (blabel, lo, hi) in zip(axes, S41.INSOL_BINS):
         k_obs, n_obs = S41.nasa_bin(nasa, lo, hi, S41.MASS_MIN, m_sil, r_sil)
         f_obs = k_obs / n_obs
@@ -90,43 +97,36 @@ def main():
         print(f"[{blabel}] NASA v/n = {k_obs}/{n_obs} = {f_obs:.3f} +- {sig_obs:.3f}")
         stats, points = {}, {}
         for key in ("rocky_formation", "escape_only"):
-            fk = frac_draws(univ[key], lo, hi, rng, m_sil, r_sil)
-            stats[key] = np.abs(fk - f_obs) / sig_obs   # vs the raw observed number
-            points[key] = abs(fk.mean() - f_obs) / sig_obs
-        xmax = max(s.max() for s in stats.values()) * 1.06
-        edges = np.linspace(0.0, xmax, 60)
-        bw = edges[1] - edges[0]
+            fk = frac_draws(univ[key], lo, hi, rng, m_sil, r_sil, n_obs)
+            stats[key] = ((fk - f_obs) / sig_obs) ** 2   # vs the raw observed number
+            points[key] = ((fk.mean() - f_obs) / sig_obs) ** 2
+        # an n_obs-planet survey can only give sqrt(x_k) = m * step for integer m. Put edges
+        # halfway between allowed values (so no bin is empty), merging neighbours until each
+        # bin is >= 1/20 of the range (so the narrow cells near 0 don't spike the density).
+        step = 1.0 / (n_obs * sig_obs)
+        m_max = int(np.ceil(np.sqrt(max(s.max() for s in stats.values())) / step)) + 1
+        lattice = ((np.arange(m_max) + 0.5) * step) ** 2
+        min_width = lattice[-1] / 20
+        edges = [0.0]
+        for e in lattice:
+            if e - edges[-1] >= min_width:
+                edges.append(e)
+        if edges[-1] < lattice[-1]:
+            edges[-1] = lattice[-1]
         for key in ("rocky_formation", "escape_only"):
             c = "C0" if key == "rocky_formation" else "C1"
-            ax.hist(stats[key], bins=edges, color=c, alpha=0.45)
-            ax.axvline(points[key], color=c, ls="--", lw=2,
-                       label=f"{LABELS[key]}: $\\sqrt{{x_k}}$={points[key]:.2f}")
-            print(f"    {key:<16} sqrt(x_k) point = {points[key]:.2f}  "
+            ax.hist(stats[key], bins=edges, color=c, alpha=0.45, density=True)
+            ax.axvline(points[key], color=c, ls="--", lw=2, label=LABELS[key])
+            print(f"    {key:<16} x_k point = {points[key]:.2f}  "
                   f"(draws: {stats[key].mean():.2f} +- {stats[key].std():.2f})")
-        # NASA vs itself: redraw NASA within its own error bars -> |f^(t)-f_obs|/sigma_obs is
-        # half-normal with unit sigma ON THIS AXIS (the axis is in units of sigma_obs); the
-        # insolation dependence is sigma_obs itself, quoted in the legend per panel.
-        xs = np.linspace(0.0, xmax, 400)
-        ax.plot(xs, 2.0 * N_DRAWS * bw * np.exp(-0.5 * xs**2) / np.sqrt(2 * np.pi),
-                color="C2", lw=2.5,
-                label=f"NASA vs itself: half-normal, $\\hat\\sigma_{{\\rm obs}}$={sig_obs:.3f}")
         ax.set_xlim(left=-0.05)
-        ax.set_title(f"{blabel} (M>2) $I_\\oplus$", fontsize=13)
-        ax.set_xlabel(r"$\sqrt{x_k} = |f_k - f_{\rm obs}|\,/\,\hat\sigma_{\rm obs}$")
-        ax.set_ylabel(f"number of MC draws (of {N_DRAWS:,})")
-        ax.legend(fontsize=9)
+        ax.set_title(f"{blabel} (M>2) $I_\\oplus$")
+        ax.set_xlabel(r"$x_k = (f_k - f_{\rm obs})^2\,/\,\hat\sigma_{\rm obs}^2$")
+        ax.set_ylabel("Probability density")
+        ax.legend(loc="upper right")
         ax.grid(alpha=0.15)
 
-    fig.suptitle(
-        "Monte Carlo distribution of the comparison statistic on the ROOT scale, "
-        r"$\sqrt{x_k}$ — Kepler transit + RV, precision-cut sample, $M>2\,M_\oplus$"
-        "\nhistograms: per-draw $|f_k^{(t)} - f_{\\rm obs}|/\\hat\\sigma_{\\rm obs}$ against the "
-        "raw observed fraction;  "
-        "dashed: the point value;  green: NASA against itself — half-normal, "
-        "$\\hat\\sigma_{\\rm obs}$ from the precision-cut limits ($M\\pm25\\%$, $R\\pm8\\%$) "
-        "on each bin's own N planets",
-        fontsize=12)
-    fig.tight_layout(rect=[0, 0, 1, 0.92])
+    fig.suptitle("MCMC runs of distribution compared to observed exoplanets", fontsize=30)
     out = os.path.join(OUT_DIR, f"mc_comparison_statistic_{N_DRAWS}.png")
     fig.savefig(out, dpi=150, bbox_inches="tight")
     print(f"--> Saved: {out}  ({time.time()-t0:.0f}s)")

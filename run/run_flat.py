@@ -58,7 +58,7 @@ def main():
         run_cmd(gen_cmd, "Generating flat universe configurations")
 
     if not args.skip_plots:
-        # Run Tier 3 plot scripts
+        # Plot scripts that read the flat universes
         plots = [
             ("plotting/scripts/analysis/multi/flat_rocky_mr_vs_nasa.py", "Flat rocky M-R vs NASA"),
             ("plotting/scripts/analysis/multi/flat_transit_rv_3x3.py", "Flat transit/RV selection map"),

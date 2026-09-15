@@ -42,16 +42,16 @@ NASA_FILE = Path(PSCOMPPARS_CSV)
 OUT_DIR = os.path.join(ANALYSIS_DIR, "likelihood_ratio_catalog")
 
 FLAT_N_POOL = 1_000_000
-RNG_SEED = 0                      # same flat universe family as script 79
+RNG_SEED = 0
 RV_MAG_TARGET = 12.0
 MASS_MIN = 2.0
 COLD_MAX = 50.0
 NASA_MASS_PREC = 0.25
 NASA_RAD_PREC = 0.08
 BOX = dict(r_lo=0.5, r_hi=2.2, m_lo=0.1, m_hi=12.0, f_lo=1e-2, f_hi=1e4)
-TEFF_STRATA = (0.0, 7500.0)       # FGK/M window, matches scripts 79/80/81
+TEFF_STRATA = (0.0, 7500.0)       # FGK/M window
 
-SIGMA_LOGM_FLOOR = 0.02           # dex; conventions from script 81
+SIGMA_LOGM_FLOOR = 0.02           # dex
 SIGMA_LOGM_MISSING = 0.20
 SIGMA_LOGR_FLOOR = 0.01
 SIGMA_LOGI_FLOOR = 0.02
@@ -464,8 +464,8 @@ def make_figure(cfg_prec, cfg_full, m_sil, r_sil):
 
 
 # ------------------------------------------------- explainer figures (MRI-space bridge)
-# Same axes and conventions as the mass-radius / radius-insolation detection figures the
-# audience already knows (scripts 44/53/75/79); one pipeline concept per figure.
+# Same axes and conventions as the mass-radius / radius-insolation detection figures;
+# one pipeline concept per figure.
 EXPL_SUB = 900
 
 
@@ -568,7 +568,7 @@ def explainer_scores(cfg, m_sil, r_sil):
     ax.set_title("(c) every NASA planet scored, in the familiar\n"
                  "(insolation, radius) plane — size = |score|", fontsize=10)
     fig.suptitle("What the classifier actually learned — scores drawn in the same planes as "
-                 "the detection-fraction maps (script 79)\n"
+                 "the detection-fraction maps\n"
                  "sum of the scores in (c) is the whole test statistic T", fontsize=12)
     out = os.path.join(OUT_DIR, "explainer_2_score_maps.png")
     fig.savefig(out, dpi=170, bbox_inches="tight"); plt.close(fig)

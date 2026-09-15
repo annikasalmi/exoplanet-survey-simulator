@@ -37,7 +37,7 @@ class TESSData:
 
     # Calibration against official SPOC SNR (ExoFOP TOI): the boxcar SNR runs ~1.52x high near the
     # 7.1 cut, so this ~1/1.52 factor makes model/official ~1.0 where detection is decided.
-    # Re-derive with plotting/mission_calibration/tess_calibration.py.
+    # Re-derive with plotting/scripts/calibration/tess_calibration.py.
     SNR_OFFICIAL_CALIBRATION = 0.66
 
     # Teff grid for proxy Tmag color corrections (upgrade #5).
@@ -61,7 +61,7 @@ class TESSData:
         # Multiplicative calibration of toy SNR to the official SPOC pipeline SNR.
         # Default = SNR_OFFICIAL_CALIBRATION (~1/1.52 at threshold). Pass 1.0 to recover the
         # raw, uncalibrated (optimistic) boxcar SNR, e.g. for the before/after
-        # comparison in important_plots/tess_calibration.py.
+        # comparison in plotting/scripts/calibration/tess_calibration.py.
         snr_calibration: Optional[float] = None,
         tmag_limit: float = 16.0,
         phase_mode: str = "random",  # random or expected
@@ -726,14 +726,12 @@ class TESSData:
         reason[detected.to_numpy()] = "detected"
         self.catalog["tess_reason_category"] = reason
         self.catalog["reason_category"] = reason
-        self.catalog["miss_reason"] = reason
         return self.catalog["tess_reason_category"]
 
     def determine_detectable(self) -> pd.DataFrame:
-        """Run the full TESS detector and add backward-compatible plotting columns."""
+        """Run the full TESS detector and add the shared detected/detected_best/detected_worst columns."""
         self._validate()
         self.catalog["tess_transiting_geometric"] = self.transiting()
-        self.catalog["transiting_geometric"] = self.catalog["tess_transiting_geometric"]
         # upgrade #3: duration_hr() reads tess_impact_parameter_toy set by transiting() above
         self.catalog["tess_transit_duration_hr"] = self.duration_hr()
         self.catalog["tess_transit_depth_ppm"] = self.depth_ppm()
@@ -768,12 +766,9 @@ class TESSData:
         )
         self.catalog["tess_detected"] = detected
 
-        # compatibility with old plotters
+        # TESS has one scenario; the shared plotters read best/worst (real for HWO and LIFEsim).
         self.catalog["detected"] = detected
         self.catalog["detected_best"] = detected
         self.catalog["detected_worst"] = detected
-        self.catalog["transit_depth_ppm"] = self.catalog["tess_transit_depth_ppm"]
-        self.catalog["tess_depth_pass_best"] = self.catalog["tess_depth_pass"]
-        self.catalog["tess_depth_pass_worst"] = self.catalog["tess_depth_pass"]
         self.classify_reasons()
         return self.catalog

@@ -83,7 +83,7 @@ def run_nasa_pscomppars(input_csv=NASA_INPUT_CSV, output_csv=NASA_OUTPUT_CSV):
     if not input_csv.exists():
         raise FileNotFoundError(
             f"Could not find NASA input CSV:\n{input_csv}\n\n"
-            "Download it with plotting/mission_calibration or the archive TAP service."
+            "It ships in data/exoplanet_csv/; otherwise export the pscomppars table from the NASA Exoplanet Archive."
         )
 
     print(f"Loading NASA PSCompPars: {input_csv}")

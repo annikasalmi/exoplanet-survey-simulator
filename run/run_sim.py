@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from tools.paths import LOGGING, LIFESIM_OUTER_DIR, EXOPLANETS_2026_CSV
 from telescopes.hwo.detection_model import HWOData
-from telescopes.kepler.detection_model import KeplerData #added by Hongyi
+from telescopes.kepler.detection_model import KeplerData
 from telescopes.tess.detection_model import TESSData
 
 
@@ -215,7 +215,7 @@ if __name__ == "__main__":
     # sparse from a single universe. Stacking N seeded universes (same fixed
     # star catalog, different RNG seed = independent Monte-Carlo realizations)
     # multiplies planets-per-bin by N and smooths the FGK detection background.
-    # 10 universes on 5 workers = 2 batches (~10 h overnight on this box).
+    # 10 universes on 5 workers = 2 batches (~10 h).
     NRUNS = np.arange(10)
 
     # Run exoplanet plotting

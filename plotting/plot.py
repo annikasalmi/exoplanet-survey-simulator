@@ -116,10 +116,3 @@ def _run_sequential(plotting_tasks, df, nruns, star_catalog, sim_name):
                                 star_catalog=star_catalog, **kwargs)
         plotter.plot_all()
         print(f"{plotter_class.__name__} completed successfully")
-
-
-def plot_all_sequential(df, nruns=1, star_catalog='Gaia', sim_name='HWO'):
-    """
-    Original sequential plotting function for backward compatibility.
-    """
-    return plot_all(df, nruns, star_catalog, sim_name, use_multiprocessing=False)

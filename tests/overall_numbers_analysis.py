@@ -12,9 +12,7 @@ import threading
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from run.hwo.hwo_run_multiple import main as main_hwo
-
-# Define LOGGING directory
-LOGGING = os.path.join(os.path.dirname(__file__), '..', 'logs')
+from tools.paths import LOGGING
 
 def run_with_progress(func, name, estimated_minutes=12, *args, **kwargs):
     estimated_seconds = estimated_minutes * 60

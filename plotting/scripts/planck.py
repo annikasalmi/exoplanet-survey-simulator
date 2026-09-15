@@ -1,11 +1,12 @@
+"""Emitted and reflected spectra of an Earth around an M dwarf and around the Sun.
+Run: python plotting/scripts/planck.py  -> results/figures/other/planet_spectra_separate.png
+"""
 import numpy as np
 import os
-import sys
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from tools import physics_constants as const
-from tools.paths import PLOTS_DIR
+from tools.paths import OTHER_FIGURES_DIR
 from lifesim.util.habitable import single_habitable_zone
 
 plt.rcParams.update({'font.size': 16})
@@ -185,7 +186,10 @@ def main():
     # system_info = f'M dwarf: T={params["mdwarf"]["T_star"]}K, R={params["mdwarf"]["R_star"]}R☉ at {D_mdwarf:.4f} AU | Sun-like: T={const.temp_sun}K, R={params["sun"]["R_star"]}R☉ at {D_sun:.1f} AU'
     # fig.text(0.5, 0.92, system_info, fontsize=14, horizontalalignment='center')
     plt.subplots_adjust(top=0.9, bottom=0.1, left=0.1, right=0.95)
-    plt.savefig(os.path.join(PLOTS_DIR, 'other_useful', 'planet_spectra_separate.png'), dpi=150, bbox_inches='tight')
+    os.makedirs(OTHER_FIGURES_DIR, exist_ok=True)
+    out = os.path.join(OTHER_FIGURES_DIR, 'planet_spectra_separate.png')
+    plt.savefig(out, dpi=150, bbox_inches='tight')
+    print(f"Plot saved to {out}")
 
 if __name__ == "__main__":
     main() 

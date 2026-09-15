@@ -9,7 +9,6 @@ import os
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 
 import sys
-import importlib.util
 from pathlib import Path
 
 from tools.paths import LIFESIM_OUTER_DIR, ANALYSIS_DIR, PAPER_FIGURES_DIR
@@ -31,18 +30,9 @@ except Exception:
 
 from run.flat_universe.uniform_generator import generate_flat_catalog
 from run.ppop.flat_detect import run_kepler, run_rv_best
+from plotting.scripts.analysis.multi import puffy_cuts_flat as puffy_cuts
 
-
-def _load(name, path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[name] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-S72 = _load("s72", str(ROOT / "plotting" / "scripts" / "analysis" / "multi" / "puffy_cuts_flat.py"))
-S72.N_REPEATS = 4000
+puffy_cuts.N_REPEATS = 4000
 
 OUT_DIR = os.path.join(ANALYSIS_DIR, "flat_rocky_mr_vs_nasa")
 PAPER_FIG_DIR = Path(PAPER_FIGURES_DIR)
@@ -83,25 +73,25 @@ def build_arrays(rel_kw, m_sil, r_sil, two_populations=False, rng=None):
     r = pd.to_numeric(cat["radius_p"], errors="coerce")
     m = pd.to_numeric(cat["mass_p"], errors="coerce")
     f = pd.to_numeric(cat["flux_p"], errors="coerce")
-    keep = (r.between(S72.BOX["r_lo"], S72.BOX["r_hi"]) & m.between(S72.BOX["m_lo"], S72.BOX["m_hi"])
-            & (f.isna() | f.between(S72.BOX["f_lo"], S72.BOX["f_hi"])))
+    keep = (r.between(puffy_cuts.BOX["r_lo"], puffy_cuts.BOX["r_hi"]) & m.between(puffy_cuts.BOX["m_lo"], puffy_cuts.BOX["m_hi"])
+            & (f.isna() | f.between(puffy_cuts.BOX["f_lo"], puffy_cuts.BOX["f_hi"])))
     cat = cat[keep].copy()
     mass = pd.to_numeric(cat["mass_p"], errors="coerce").to_numpy(float)
     radius = pd.to_numeric(cat["radius_p"], errors="coerce").to_numpy(float).copy()
     flux = pd.to_numeric(cat["flux_p"], errors="coerce").to_numpy(float)
     puffy = radius > np.interp(mass, m_sil, r_sil)
     if two_populations:
-        se = (~puffy) & (mass > S72.MASS_THRESHOLD)
+        se = (~puffy) & (mass > puffy_cuts.MASS_THRESHOLD)
         mu = np.where(se, np.interp(mass, m_sil, r_sil), otegi_volatile_radius(mass))
         frac_sd = np.where(se, SUPER_EARTH_FRAC_SD, SUB_NEPTUNE_FRAC_SD)
         radius = mu * (1.0 + frac_sd * rng.standard_normal(mass.size))
-        in_box = (radius >= S72.BOX["r_lo"]) & (radius <= S72.BOX["r_hi"])
+        in_box = (radius >= puffy_cuts.BOX["r_lo"]) & (radius <= puffy_cuts.BOX["r_hi"])
         cat["radius_p"] = radius
         cat = cat[in_box].copy()
         mass, radius, flux = mass[in_box], radius[in_box], flux[in_box]
         puffy = radius > np.interp(mass, m_sil, r_sil)
     td = run_kepler(cat)["detected"].to_numpy(bool)
-    rd = run_rv_best(cat, mag_target=S72.RV_MAG_TARGET)["detected"].to_numpy(bool)
+    rd = run_rv_best(cat, mag_target=puffy_cuts.RV_MAG_TARGET)["detected"].to_numpy(bool)
     return mass, radius, flux, puffy, td & rd
 
 
@@ -112,13 +102,13 @@ def noised_scatter_AB(arrays, cut, rng, n_plot=400):
     if cut.get("insol_max"):
         keep = keep & (flux < cut["insol_max"])
     idx = np.flatnonzero(keep)
-    mo = mass[idx] * np.exp(rng.normal(0, S72.MASS_FRAC_ERR, idx.size))
-    ro = radius[idx] * np.exp(rng.normal(0, S72.RAD_FRAC_ERR, idx.size))
+    mo = mass[idx] * np.exp(rng.normal(0, puffy_cuts.MASS_FRAC_ERR, idx.size))
+    ro = radius[idx] * np.exp(rng.normal(0, puffy_cuts.RAD_FRAC_ERR, idx.size))
     tmass, tpuffy = mass[idx], puffy[idx]
     if cut.get("mass_min"):
         k = mo > cut["mass_min"]
         mo, ro, tmass, tpuffy = mo[k], ro[k], tmass[k], tpuffy[k]
-    dropped = (~tpuffy) & (tmass > S72.MASS_THRESHOLD)          # A drops these (true rocky, true M>2)
+    dropped = (~tpuffy) & (tmass > puffy_cuts.MASS_THRESHOLD)          # A drops these (true rocky, true M>2)
     if mo.size > n_plot:
         j = rng.choice(mo.size, n_plot, replace=False)
         mo, ro, dropped = mo[j], ro[j], dropped[j]
@@ -204,8 +194,8 @@ def _draw_scatter(ax, arr, cut, nasa, m_sil, r_sil, rng, title,
                 (True, N_SURVEY_BLUE, "tab:blue", labels[0], 4),
                 (False, N_SURVEY_ORANGE, "tab:orange", labels[1], 3)]:
             mt, rt = true_sample(arr, cut, n, rng, above_line_only=above_only)
-            ax.errorbar(mt, rt, xerr=_frac_err_bars(mt, S72.MASS_FRAC_ERR),
-                        yerr=_frac_err_bars(rt, S72.RAD_FRAC_ERR),
+            ax.errorbar(mt, rt, xerr=_frac_err_bars(mt, puffy_cuts.MASS_FRAC_ERR),
+                        yerr=_frac_err_bars(rt, puffy_cuts.RAD_FRAC_ERR),
                         fmt="o", ms=4, color=colour, alpha=0.6, elinewidth=0.6,
                         capsize=0, zorder=z, label=lbl)
     else:
@@ -234,7 +224,7 @@ N_SURVEY_ORANGE = 100
 
 
 def mc_universe_blue_cut(arrays, drop, cut, m_sil, r_sil, rng):
-    """Volatile-fraction Monte Carlo for the 1x2's two universes from one pool: each of S72.N_REPEATS
+    """Volatile-fraction Monte Carlo for the 1x2's two universes from one pool: each of puffy_cuts.N_REPEATS
     surveys draws N_SURVEY_BLUE (blue: truly above the silicate line) or N_SURVEY_ORANGE (orange: whole
     pool) planets that pass the cut after measurement noise.
     """
@@ -247,26 +237,26 @@ def mc_universe_blue_cut(arrays, drop, cut, m_sil, r_sil, rng):
         pool &= puffy
     idx = np.flatnonzero(pool)
     mass_min = cut.get("mass_min") or 0.0
-    out = np.full(S72.N_REPEATS, np.nan)
-    for i in range(S72.N_REPEATS):
+    out = np.full(puffy_cuts.N_REPEATS, np.nan)
+    for i in range(puffy_cuts.N_REPEATS):
         m_obs, r_obs = np.empty(0), np.empty(0)
         while m_obs.size < n:
             s = rng.choice(idx, 4 * n)
-            mo = mass[s] * np.exp(rng.normal(0, S72.MASS_FRAC_ERR, s.size))
-            ro = radius[s] * np.exp(rng.normal(0, S72.RAD_FRAC_ERR, s.size))
+            mo = mass[s] * np.exp(rng.normal(0, puffy_cuts.MASS_FRAC_ERR, s.size))
+            ro = radius[s] * np.exp(rng.normal(0, puffy_cuts.RAD_FRAC_ERR, s.size))
             k = mo > mass_min
             m_obs, r_obs = np.append(m_obs, mo[k]), np.append(r_obs, ro[k])
-        out[i] = S72.puffy_frac(m_obs[:n], r_obs[:n], m_sil, r_sil)
+        out[i] = puffy_cuts.puffy_frac(m_obs[:n], r_obs[:n], m_sil, r_sil)
     return out, float(n)
 
 
 def _draw_bells(ax, arr, cut, nasa, m_sil, r_sil, rng, tag=""):
     """Bottom-row panel: COUNT histograms of the volatile fraction over the MC draws.
     y = number of the N_REPEATS draws that landed in each bin; N_p = mean planets/draw."""
-    nv, n_nasa = S72.mc_nasa(nasa, cut, m_sil, r_sil, rng)
+    nv, n_nasa = puffy_cuts.mc_nasa(nasa, cut, m_sil, r_sil, rng)
     n_mu, n_sd = nv.mean(), nv.std()
-    sA, nA = S72.mc_universe(arr, True, cut, m_sil, r_sil, rng)
-    sB, nB = S72.mc_universe(arr, False, cut, m_sil, r_sil, rng)
+    sA, nA = puffy_cuts.mc_universe(arr, True, cut, m_sil, r_sil, rng)
+    sB, nB = puffy_cuts.mc_universe(arr, False, cut, m_sil, r_sil, rng)
     all_bell = [b for b in (nv, sA, sB) if b.size]
     cat = np.concatenate(all_bell)
     lo, hi = cat.min(), cat.max(); pad = 0.05 * (hi - lo)
@@ -277,26 +267,26 @@ def _draw_bells(ax, arr, cut, nasa, m_sil, r_sil, rng, tag=""):
     bw = edges[1] - edges[0]
     # Taller of the bars and the fitted curves, so no curve runs off the top.
     y_max = max(max(np.histogram(b, bins=edges)[0].max(),
-                    S72.gauss(b.mean(), b.mean(), b.std()) * b.size * bw) for b in all_bell)
+                    puffy_cuts.gauss(b.mean(), b.mean(), b.std()) * b.size * bw) for b in all_bell)
     for lbl, s, ne, colour in [("Escape-only", sA, nA, "tab:orange"),
                                ("Primordial-rocky", sB, nB, "tab:blue")]:
         if s.size == 0:
             continue
         tens = abs(s.mean() - n_mu) / np.sqrt(s.std() ** 2 + n_sd ** 2)
         ax.hist(s, bins=edges, color=colour, alpha=0.30)
-        ax.plot(gx, S72.gauss(gx, s.mean(), s.std()) * s.size * bw, color=colour, lw=2.0,
+        ax.plot(gx, puffy_cuts.gauss(gx, s.mean(), s.std()) * s.size * bw, color=colour, lw=2.0,
                 label=f"{lbl}: $\\mu$={s.mean():.2f} $\\sigma$={s.std():.3f} "
                       f"({tens:.1f}$\\sigma$), N$_p$={ne:.0f}")
         if tag:
             print(f"    {tag} {lbl}: mu={s.mean():.3f} sd={s.std():.3f} "
                   f"tension={tens:.1f}sigma N_planets={ne:.0f} N_draws={s.size}")
     ax.hist(nv, bins=edges, color="tab:green", alpha=0.34)
-    ax.plot(gx, S72.gauss(gx, n_mu, n_sd) * nv.size * bw, color="tab:green", lw=2.4,
+    ax.plot(gx, puffy_cuts.gauss(gx, n_mu, n_sd) * nv.size * bw, color="tab:green", lw=2.4,
             label=f"NASA: $\\mu$={n_mu:.2f} $\\sigma$={n_sd:.3f}, N$_p$={n_nasa}")
     ax.set_xlim(gx[0], gx[-1]); ax.set_ylim(0, y_max * 1.15)
     ax.grid(alpha=0.2); ax.legend(fontsize=9, loc="upper left")
     ax.set_xlabel("volatile fraction")
-    ax.set_ylabel(f"number of MC draws (of {S72.N_REPEATS:,})")
+    ax.set_ylabel(f"number of MC draws (of {puffy_cuts.N_REPEATS:,})")
 
 
 def make_figure(cut_label, cut, fname, pools, nasa, m_sil, r_sil, rng):
@@ -357,7 +347,7 @@ def _draw_density_1x2(ax, arr, cut, nasa, m_sil, r_sil, rng, tag=""):
     fraction. Blue / orange: histograms of the 50- / 100-planet surveys with
     their fitted normals. NASA: its fitted normal only, filled (its 27 planets
     are the same in every draw, so only its mean and spread matter)."""
-    nv, _ = S72.mc_nasa(nasa, cut, m_sil, r_sil, rng)
+    nv, _ = puffy_cuts.mc_nasa(nasa, cut, m_sil, r_sil, rng)
     n_mu, n_sd = nv.mean(), nv.std()
     sA, _ = mc_universe_blue_cut(arr, True, cut, m_sil, r_sil, rng)
     sB, _ = mc_universe_blue_cut(arr, False, cut, m_sil, r_sil, rng)
@@ -372,14 +362,14 @@ def _draw_density_1x2(ax, arr, cut, nasa, m_sil, r_sil, rng, tag=""):
     for lbl, s, colour in [("Sub-Neptunes only", sA, "tab:blue"),
                            ("Sub-Neptunes and super-Earths", sB, "tab:orange")]:
         heights, _, _ = ax.hist(s, bins=edges, density=True, color=colour, alpha=0.30)
-        pdf = S72.gauss(gx, s.mean(), s.std())
+        pdf = puffy_cuts.gauss(gx, s.mean(), s.std())
         ax.plot(gx, pdf, color=colour, lw=2.0,
                 label=f"{lbl}: $\\mu$={s.mean():.2f} $\\sigma$={s.std():.3f}")
         y_max = max(y_max, heights.max(), pdf.max())
         tens = abs(s.mean() - n_mu) / np.sqrt(s.std() ** 2 + n_sd ** 2)
         print(f"    {tag} {lbl}: mu={s.mean():.3f} sd={s.std():.3f} "
               f"tension={tens:.1f}sigma N_draws={s.size}")
-    pdf = S72.gauss(gx, n_mu, n_sd)
+    pdf = puffy_cuts.gauss(gx, n_mu, n_sd)
     ax.fill_between(gx, pdf, color="tab:green", alpha=0.30, lw=0)
     ax.plot(gx, pdf, color="tab:green", lw=2.4,
             label=f"Measured exoplanets: $\\mu$={n_mu:.2f} $\\sigma$={n_sd:.3f}")
@@ -464,9 +454,9 @@ def make_paper_2col(pools, nasa, m_sil, r_sil, rng):
 
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
-    m_sil, r_sil = S72.load_silicate()
+    m_sil, r_sil = puffy_cuts.load_silicate()
     rng = np.random.default_rng(SEED)
-    nasa = S72.load_nasa()
+    nasa = puffy_cuts.load_nasa()
 
     print(f"--> building {len(RELATIONS)} rocky-relation pools + detectors "
           f"(mass scatter = {MR_SCATTER_DEX} dex)...")

@@ -1,6 +1,6 @@
 """TESS detector calibration: model SNR vs ExoFOP/SPOC SNR (tess_3in1_calibration.png).
 Smooth-CDPP fallback floors lowered (ref 60->30, floor 30->10 ppm/hr) toward real SPOC CDPP.
-Run from repo root: python plotting/mission_calibration/tess_calibration.py
+Run from repo root: python plotting/scripts/calibration/tess_calibration.py
 """
 
 from __future__ import annotations
@@ -53,7 +53,7 @@ SNR_BINS = [7.1, 10, 20, 50, 100, 300, np.inf]
 SNR_BIN_LABELS = ["7.1-10", "10-20", "20-50", "50-100", "100-300", ">300"]
 
 # Group the six TFOPWG dispositions into the three classes used by the Kepler
-# figure (script 47), with the SAME colours and legend template.
+# figure (kepler_calibration.py), with the SAME colours and legend template.
 DISP_GROUP = {
     "CP": "CONFIRMED", "KP": "CONFIRMED",
     "PC": "CANDIDATE", "APC": "CANDIDATE",

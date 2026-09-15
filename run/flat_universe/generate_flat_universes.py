@@ -14,12 +14,13 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from run.flat_universe.uniform_generator import get_or_build_catalog, UNIFORM_OUT_DIR
+from run.flat_universe.uniform_generator import get_or_build_catalog
+from tools.paths import FLAT_UNIVERSE_DATA_DIR
 
 
 CONFIGS = {
     "rocky_mr_powerlaw": {
-        "cache_path": os.path.join(UNIFORM_OUT_DIR, "flat_150k_seed0_powerlaw.csv"),
+        "cache_path": os.path.join(FLAT_UNIVERSE_DATA_DIR, "flat_150k_seed0_powerlaw.csv"),
         "n_planets": 150000,
         "seed": 0,
         "mass_model": "powerlaw",
@@ -28,13 +29,13 @@ CONFIGS = {
         "mr_beta": 0.6,
     },
     "transit_rv_by_stype": {
-        "cache_path": os.path.join(UNIFORM_OUT_DIR, "flat_3M_seed75-78_independent.csv"),
+        "cache_path": os.path.join(FLAT_UNIVERSE_DATA_DIR, "flat_3M_seed75-78_independent.csv"),
         "n_planets": 3_000_000,
         "seed": 0,  # combined seed; actual seeds per stype in script
         "mass_model": "independent",
     },
     "nominal_150k": {
-        "cache_path": os.path.join(UNIFORM_OUT_DIR, "flat_150k_seed0_independent.csv"),
+        "cache_path": os.path.join(FLAT_UNIVERSE_DATA_DIR, "flat_150k_seed0_independent.csv"),
         "n_planets": 150_000,
         "seed": 0,
         "mass_model": "independent",
@@ -82,7 +83,7 @@ def main():
 
     args = parser.parse_args()
 
-    os.makedirs(UNIFORM_OUT_DIR, exist_ok=True)
+    os.makedirs(FLAT_UNIVERSE_DATA_DIR, exist_ok=True)
 
     if args.all:
         configs_to_gen = list(CONFIGS.keys())

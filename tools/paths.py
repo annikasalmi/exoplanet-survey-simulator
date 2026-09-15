@@ -5,7 +5,6 @@ LIFESIM_INNER_DIR = os.path.join(LIFESIM_OUTER_DIR, "lifesim")
 PPOP_DIR = os.path.join(LIFESIM_OUTER_DIR, "PPop")
 PPOP_DATA_DIR = os.path.join(PPOP_DIR, "data")
 PPOP_STAR_DIR = os.path.join(PPOP_DIR, "StarCatalogs")
-#Hongyi added for kepler data 5/18
 DATA_DIR = os.path.join(LIFESIM_OUTER_DIR, "data")
 
 # ---------------------------------------------------------------------------
@@ -28,6 +27,7 @@ FIGURES_DIR = os.path.join(RESULTS_DIR, "figures")
 PLOTS_DIR = os.path.join(FIGURES_DIR, "simulation")      # plot_all
 ANALYSIS_DIR = os.path.join(FIGURES_DIR, "analysis")     # the analysis scripts
 CALIBRATION_DIR = os.path.join(FIGURES_DIR, "calibration")
+OTHER_FIGURES_DIR = os.path.join(FIGURES_DIR, "other")   # plotting/scripts/*.py
 PAPER_FIGURES_DIR = os.path.join(RESULTS_DIR, "paper")
 
 LOGGING = os.path.join(RESULTS_DIR, "logs")

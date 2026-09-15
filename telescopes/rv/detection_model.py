@@ -434,7 +434,6 @@ class RVData:
 
         self.catalog["rv_reason_category"] = reason
         self.catalog["reason_category"] = reason
-        self.catalog["miss_reason"] = reason
         return self.catalog["rv_reason_category"]
 
     # ------------------------------------------------------------------
@@ -460,7 +459,7 @@ class RVData:
             p_snr = snr_pass.astype(float)
         self.catalog["rv_p_detect"] = p_snr.where(bright, 0.0)
 
-        # Backward-compatible names so the shared plotting helpers can treat RV like a survey.
+        # RV has one scenario; the shared plotters read best/worst (real for HWO and LIFEsim).
         self.catalog["detected"] = detected
         self.catalog["detected_best"] = detected
         self.catalog["detected_worst"] = detected

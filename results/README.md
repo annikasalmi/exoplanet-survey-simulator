@@ -9,7 +9,9 @@ catalogs/     simulated planet populations, one directory per pipeline
 figures/
   simulation/   plot_all output, per run: <sim>_<nruns>_<catalog>/
   analysis/     the analysis scripts, one directory each
-  calibration/  detector calibration against real mission data
+  calibration/  plotting/scripts/calibration/: detectors against real mission
+                data, and the three planet generators against each other
+  other/        the standalone scripts in plotting/scripts/
 paper/        publication figures
 logs/         per-run logs written by run_sim
 ```

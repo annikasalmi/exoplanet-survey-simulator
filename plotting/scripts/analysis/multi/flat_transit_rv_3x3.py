@@ -46,10 +46,10 @@ plt.rcParams.update({
 })
 
 # Which transit pipeline fills the transit row: "TESS" (paper Fig. 2) or
-# "Kepler" (appendix comparison). Patched by script 48's mapskep part.
+# "Kepler" (appendix comparison).
 TRANSIT_MISSION = "TESS"
 
-OTEGI = dict(mr_C=1.03, mr_beta=0.29)      # R = 1.03 M^0.29, script 77's default relation
+OTEGI = dict(mr_C=1.03, mr_beta=0.29)      # R = 1.03 M^0.29 (Otegi et al. 2020)
 MR_SCATTER_DEX = 0.15
 PERIOD_LIMS = (0.2, 20000.0)               # 0.2 d reaches the USP corner of the map
 RADIUS_LIMS = (0.5, 2.2)
@@ -94,7 +94,7 @@ def detect(cat: pd.DataFrame) -> pd.DataFrame:
                  & tess["tess_transiting_geometric"].astype(bool)).to_numpy()
         det_transit = tess["detected"].astype(bool).to_numpy() & denom
     # Paper operator: mass measured if EITHER channel reaches K/sigma_K >= 5 on a
-    # host with band-mag <= 12 in that channel's band (scripts 50/53 lineage).
+    # host with band-mag <= 12 in that channel's band.
     det_rv = np.zeros(len(cat), bool)
     for inst in ("HARPS", "NIRPS"):
         out = run_rv(cat, inst)

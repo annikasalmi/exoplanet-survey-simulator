@@ -67,13 +67,12 @@ RV_MAG_TARGET = 12.0
 MASS_MIN = 2.0                 # super-Earth threshold (cold rocky desert cut)
 COLD_MAX = 50.0                # cold rocky desert boundary [I_earth]
 OTEGI_C, OTEGI_BETA, OTEGI_SCATTER = 1.03, 0.29, 0.15
-MASS_FRAC_ERR = 0.20           # log-normal measurement noise (script 72 convention)
+MASS_FRAC_ERR = 0.20           # log-normal measurement noise (as in puffy_cuts_flat.py)
 RAD_FRAC_ERR = 0.046
 NASA_MASS_PREC = 0.25
 NASA_RAD_PREC = 0.08
 N_FRAC_REP = 4000               # noise realizations for the predicted volatile fraction
-                                # (matches the 4,000-draw convention of script 52's density figure
-                                # and the main paper's own Section-4.2 MC procedure)
+                                # (as in the main paper's Section-4.2 MC procedure)
 
 # Nested insolation panels, matching paper Figure 1 (rocky_mr_insolation_3panel): the cold
 # rocky desert is the I<50 panel, I<10 its extreme, I>50 the hot control.

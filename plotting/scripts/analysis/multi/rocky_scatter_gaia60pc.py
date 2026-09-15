@@ -101,7 +101,7 @@ PAPER_FIG_DIR.mkdir(parents=True, exist_ok=True)
 LHS1140B_MASS_MEARTH   = 5.60
 LHS1140B_RADIUS_REARTH = 1.730
 
-# ── NASA quality settings (mirror scripts 35 / 36) ───────────────────────────
+# ── NASA quality settings ────────────────────────────────────────────────────
 
 FORCE_REDOWNLOAD_NASA    = False
 DOWNLOAD_NASA_IF_MISSING = True
@@ -892,7 +892,7 @@ def plot_combined(kepler: pd.DataFrame, tess: pd.DataFrame,
     return out
 
 
-# ── Mass-radius diagnostic (from script 36) ──────────────────────────────────
+# ── Mass-radius diagnostic ───────────────────────────────────────────────────
 
 STYPE_COLORS = {"F": "#e6ab02", "G": "#66a61e", "K": "#7570b3", "M": "#d95f02"}
 
@@ -913,7 +913,7 @@ def plot_mr_diagnostic(m_ref, r_ref, shift: float,
     red_shift = shift if red_shift is None else red_shift
 
     m_line = np.linspace(XLIM[0] + 1e-3, XLIM[1], 600)
-    # Red rocky threshold = professor's silicate curve (m_ref, r_ref), anchored to LHS 1140 b.
+    # Red rocky threshold = silicate curve (m_ref, r_ref), anchored to LHS 1140 b.
     r_threshold = np.interp(m_line, m_ref, r_ref + red_shift, left=np.nan, right=np.nan)
     # Black dashed reference = pure-rock curve (ref.ddat), drawn only for comparison.
     if REF_CURVE_PATH.exists():
@@ -1040,7 +1040,7 @@ def plot_threshold_curve_comparison(m_ref, r_ref, nasa_win: pd.DataFrame) -> Pat
     return out
 
 
-# ── Cold Corner definition (professor's 50-insolation cut) ────────────────────
+# ── Cold Corner definition (I < 50) ───────────────────────────────────────────
 
 # The Cold Corner highlighted in Figure 1 and the mass-radius panels: large
 # (radius > COLD_CORNER_RADIUS) planets receiving little insolation (I < 50).
@@ -1184,7 +1184,7 @@ def plot_mr_insolation_panels(m_ref, r_ref, nasa_win: pd.DataFrame,
     return out
 
 
-# ── Standalone rocky scatter (from script 36, with straight 90% line) ─────────
+# ── Standalone rocky scatter (with straight 90% line) ─────────────────────────
 
 def plot_rocky_scatter_standalone(rocky_win: pd.DataFrame, shift: float) -> Path:
     """Insolation vs radius for in-window confirmed rocky planets, colored by
@@ -1302,7 +1302,7 @@ def main():
     plot_threshold_curve_comparison(m_ref, r_ref, nasa_win)
     plot_rocky_scatter_standalone(rocky_win, shift)
 
-    # 1x3 mass-radius insolation panels (professor's figure, our data). Facility
+    # 1x3 mass-radius insolation panels. Facility
     # styles are built from the full in-window sample shown here (rocky + puffy).
     # Kepler and K2 are the same spacecraft, so they share one color here.
     mr_win = nasa_win.assign(discovery_facility=nasa_win["discovery_facility"].replace(

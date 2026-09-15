@@ -481,8 +481,6 @@ def _prepare_tess_ppop(df: pd.DataFrame) -> pd.DataFrame:
         if c:
             df = df.rename(columns={c: "radius_p"})
 
-    if "tess_transiting_geometric" not in df.columns and "transiting_geometric" in df.columns:
-        df["tess_transiting_geometric"] = df["transiting_geometric"]
     if "tess_star_bright_enough" not in df.columns:
         df["tess_star_bright_enough"] = True
     if "tess_observed" not in df.columns:

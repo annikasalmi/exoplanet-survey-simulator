@@ -65,7 +65,7 @@ class KeplerData:
         # Multiplicative calibration of toy MES to the official DR25 pipeline MES.
         # Default = MES_OFFICIAL_CALIBRATION (~1/1.19). Pass 1.0 to recover the
         # raw, uncalibrated (optimistic) boxcar MES, e.g. for the before/after
-        # comparison in important_plots/kepler_calibration.py.
+        # comparison in plotting/scripts/calibration/kepler_calibration.py.
         mes_calibration: Optional[float] = None,
         kepler_mag_limit: float = 16.0,
         fallback_cdpp_ppm: float = CDPP_NONSTELLAR_KP12_PPM,
@@ -85,18 +85,11 @@ class KeplerData:
         estimate_missing_semimajor_axis: bool = True,
 
         # Detection efficiency model (same logic as TESSData).
-        # 'threshold' = hard MES >= mes_threshold step (default; backward-compatible).
+        # 'threshold' = hard MES >= mes_threshold step (default).
         # 'sigmoid'   = logistic probability weight for expected-detection analysis.
         #   Usage: expected_count = kepler_p_detect.sum()  (NOT a Bernoulli draw)
         detection_model: str = "threshold",
         sigmoid_steepness: float = 1.5,
-
-        # Backward-compatibility knobs from older toy versions.
-        # They are kept so older scripts do not crash if they still pass them.
-        snr_threshold_best: Optional[float] = None,
-        snr_threshold_worst: Optional[float] = None,
-        default_noise_ppm: Optional[float] = None,
-        depth_threshold_ppm: Optional[float] = None,
     ):
         if Data is not None and isinstance(data, Data):
             self.catalog = pd.DataFrame(data.catalog)
@@ -117,10 +110,6 @@ class KeplerData:
             else float(mes_calibration)
         )
         self.kepler_mag_limit = kepler_mag_limit
-
-        # If an old caller passes default_noise_ppm, use it as the CDPP fallback.
-        if default_noise_ppm is not None and fallback_cdpp_ppm == self.CDPP_NONSTELLAR_KP12_PPM:
-            fallback_cdpp_ppm = float(default_noise_ppm)
         self.fallback_cdpp_ppm = fallback_cdpp_ppm
         self.use_kepmag_cdpp_fallback = use_kepmag_cdpp_fallback
         self.cdpp_kp_ref_mag = cdpp_kp_ref_mag
@@ -135,12 +124,6 @@ class KeplerData:
         self.use_observed_transit_depth_for_nasa = use_observed_transit_depth_for_nasa
         self.assume_bright_if_kepmag_missing_for_nasa = assume_bright_if_kepmag_missing_for_nasa
         self.estimate_missing_semimajor_axis = estimate_missing_semimajor_axis
-
-        # Store old parameters only as diagnostics/backward compatibility.
-        self.snr_threshold_best = snr_threshold_best
-        self.snr_threshold_worst = snr_threshold_worst
-        self.default_noise_ppm = default_noise_ppm
-        self.depth_threshold_ppm = depth_threshold_ppm
 
         # Make outside datasets speak the local project language.
         self.catalog = self.standardize_catalog_columns(self.catalog, self.source)
@@ -403,7 +386,7 @@ class KeplerData:
     def calc_transit_depth_ppm_model(self):
         return self.calc_transit_depth_fraction() * 1e6
 
-    # Backward-compatible name.
+    # Observed depth for NASA rows that have one, else the (Rp/R*)^2 model depth.
     def calc_transit_depth_ppm(self):
         if self._is_nasa_like() and self.use_observed_transit_depth_for_nasa:
             if "observed_transit_depth_ppm" in self.catalog.columns:
@@ -616,10 +599,6 @@ class KeplerData:
         self.catalog["n_transits_keplerish"] = n_transits
         return n_transits
 
-    # Backward-compatible old name.
-    def calc_number_of_transits(self):
-        return self.calc_number_of_observed_transits_keplerish()
-
     def calc_kepler_mes(self):
         transit_depth_ppm = self.calc_transit_depth_ppm()
         duration_hr = self.estimate_transit_duration_hours()
@@ -640,10 +619,6 @@ class KeplerData:
         self.catalog["one_sigma_depth_ppm"] = one_sigma_depth_ppm
         self.catalog["min_detectable_depth_ppm"] = min_detectable_depth_ppm
         return mes
-
-    # Backward-compatible old method name.
-    def calc_snr(self):
-        return self.calc_kepler_mes()
 
     def calc_depth_good_keplerish(self):
         mes = self.calc_kepler_mes()
@@ -670,7 +645,6 @@ class KeplerData:
         reason[detected.to_numpy()] = "detected"
 
         self.catalog["reason_category"] = reason
-        self.catalog["miss_reason"] = reason
         return self.catalog["reason_category"]
 
     # ============================================================
@@ -710,11 +684,7 @@ class KeplerData:
         self.catalog["kepler_depth_pass"] = depth_good
         self.catalog["detected"] = detected
 
-        # Backward-compatible names for older plotting files.
-        self.catalog["kepler_star_bright_enough_best"] = bright_enough_kepler
-        self.catalog["kepler_star_bright_enough_worst"] = bright_enough_kepler
-        self.catalog["kepler_depth_pass_best"] = depth_good
-        self.catalog["kepler_depth_pass_worst"] = depth_good
+        # Kepler has one scenario; the shared plotters read best/worst (real for HWO and LIFEsim).
         self.catalog["detected_best"] = detected
         self.catalog["detected_worst"] = detected
 

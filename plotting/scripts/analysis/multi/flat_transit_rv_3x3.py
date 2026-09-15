@@ -8,7 +8,6 @@ from __future__ import annotations
 import os
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 
-import importlib.util
 import sys
 from pathlib import Path
 
@@ -34,16 +33,7 @@ if str(ROOT) not in sys.path:
 
 from run.flat_universe.uniform_generator import generate_flat_catalog
 from run.ppop.flat_detect import run_kepler, run_tess, run_rv, TESSData
-
-
-def _load(name, path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-
-S44 = _load("s44", ROOT / "plotting" / "scripts" / "analysis" / "multi" / "rocky_scatter_gaia60pc.py")
+from plotting.scripts.analysis.multi import rocky_scatter_gaia60pc as rocky_scatter
 
 OUT_DIR = Path(ANALYSIS_DIR) / "flat_transit_rv_3x3"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -85,7 +75,7 @@ XBINS = {
 # Linear radius axis from 0.6 R_earth, binned in 0.1 R_earth steps (an edge
 # falls on the 1.4 R_earth desert boundary). The top bin spans 2.0-2.2: few
 # planets above 2.1 R_earth are rocky, so a 2.1-2.2 bin would be mostly empty.
-Y_LIMS = (0.6, S44.RADIUS_LIMITS[1])
+Y_LIMS = (0.6, rocky_scatter.RADIUS_LIMITS[1])
 YBINS = np.append(np.round(np.arange(Y_LIMS[0], 2.0 + 1e-9, 0.1), 2), Y_LIMS[1])
 Y_TICKS = [1.0, 1.5, 2.0]
 
@@ -123,7 +113,7 @@ def detect(cat: pd.DataFrame) -> pd.DataFrame:
 
 def rocky_transiting(cat: pd.DataFrame, m_ref, r_ref, r_min: float) -> pd.DataFrame:
     """Keep rocky planets above r_min that pass the transit-geometry prefilter."""
-    thr = S44.rocky_threshold_at_mass(cat["mass_p"].to_numpy(), m_ref, r_ref, 0.0)
+    thr = rocky_scatter.rocky_threshold_at_mass(cat["mass_p"].to_numpy(), m_ref, r_ref, 0.0)
     rocky = (cat["radius_p"].to_numpy() <= thr) & np.isfinite(thr)
     cat = cat[rocky & (cat["radius_p"].to_numpy() > r_min)].copy()
     # Geometric transit prefilter with the detector's own criterion, so the
@@ -144,7 +134,7 @@ def build_column(stype: str, m_ref, r_ref) -> pd.DataFrame:
     )
     # Catalogue floor stays at the paper's 0.6 R_earth: the detectors draw random
     # numbers per planet, so changing the catalogue would shift the numbers.
-    cat = rocky_transiting(cat, m_ref, r_ref, S44.RADIUS_LIMITS[0])
+    cat = rocky_transiting(cat, m_ref, r_ref, rocky_scatter.RADIUS_LIMITS[0])
     panel = detect(cat).assign(main=True)
     denom = panel["denom"].to_numpy()
     print(f"  {stype}: {cfg['n']:,} drawn -> {len(cat):,} rocky transiting-geometry "
@@ -160,7 +150,7 @@ def build_column(stype: str, m_ref, r_ref) -> pd.DataFrame:
             teff_lims=cfg["teff"], insol_lims=cfg["insol"],
             mass_model="powerlaw", mass_scatter_dex=MR_SCATTER_DEX, **OTEGI,
         )
-        extra = rocky_transiting(extra, m_ref, r_ref, S44.RADIUS_LIMITS[0])
+        extra = rocky_transiting(extra, m_ref, r_ref, rocky_scatter.RADIUS_LIMITS[0])
         panel = pd.concat([panel, detect(extra).assign(main=False)], ignore_index=True)
         print(f"     + {cfg['map_extra_n']:,} map-only draws -> {len(extra):,} candidates")
     return panel
@@ -179,8 +169,8 @@ def fraction_grid(panel: pd.DataFrame, test: str, xbins: np.ndarray):
 def window_stats(panel: pd.DataFrame, test: str):
     """Detected among transiting rocky planets in the Cold Rocky Desert (S<50, R>1.4)."""
     panel = panel[panel["main"]]  # map-only supplementary draws are excluded
-    region = ((panel["flux_p"] < S44.COLD_CORNER_INSOL)
-              & (panel["radius_p"] > S44.COLD_CORNER_RADIUS)
+    region = ((panel["flux_p"] < rocky_scatter.COLD_CORNER_INSOL)
+              & (panel["radius_p"] > rocky_scatter.COLD_CORNER_RADIUS)
               & panel["denom"]).to_numpy()
     n = int(region.sum())
     if n == 0:
@@ -198,18 +188,18 @@ def main():
     if TRANSIT_MISSION != "TESS":
         rows[0] = (f"Transit test ({TRANSIT_MISSION})", "transit")
         rows[2] = (f"Transit ({TRANSIT_MISSION}) + RV", "joint")
-    m_ref, r_ref = S44.load_rocky_reference_curve()
-    shift = S44.compute_rocky_threshold_shift(m_ref, r_ref)
-    _, rocky = S44.load_and_filter_nasa(m_ref, r_ref, shift)
-    rocky_win = S44.restrict_to_window(rocky)
+    m_ref, r_ref = rocky_scatter.load_rocky_reference_curve()
+    shift = rocky_scatter.compute_rocky_threshold_shift(m_ref, r_ref)
+    _, rocky = rocky_scatter.load_and_filter_nasa(m_ref, r_ref, shift)
+    rocky_win = rocky_scatter.restrict_to_window(rocky)
     # Kepler and K2 are the same spacecraft, so they share one color; everything
     # except TESS and Kepler/K2 is grouped as "Other observatories".
     rocky_win = rocky_win.assign(discovery_facility=rocky_win["discovery_facility"].replace(
         {"Kepler": "Kepler and K2", "K2": "Kepler and K2"}))
-    color_map, major, counts = S44.build_facility_styles(rocky_win, contrast_overrides=True)
+    color_map, major, counts = rocky_scatter.build_facility_styles(rocky_win, contrast_overrides=True)
     major = [f for f in major
              if f in ("Transiting Exoplanet Survey Satellite (TESS)", "Kepler and K2")]
-    color_map["Kepler and K2"] = S44.FACILITY_COLOR_OVERRIDES["K2"]  # brown reads on viridis
+    color_map["Kepler and K2"] = rocky_scatter.FACILITY_COLOR_OVERRIDES["K2"]  # brown reads on viridis
     lhs_mask = rocky_win["planet_label"].str.contains(r"LHS\s*1140\s*b", case=False,
                                                       na=False, regex=True)
     for st in COLUMNS:
@@ -229,16 +219,16 @@ def main():
         panel = panels[stype]
         r = rocky_win[rocky_win["stype_clean"] == stype]
         xbins = XBINS[stype]
-        fit = S44.fit_90pct_line(r["flux_p"].values, r["radius_p"].values)
+        fit = rocky_scatter.fit_90pct_line(r["flux_p"].values, r["radius_p"].values)
         for i, (row_name, test) in enumerate(rows):
             ax = axes[i, j]
             grid, _ = fraction_grid(panel, test, xbins)
             mesh = ax.pcolormesh(xbins, YBINS, grid, shading="auto",
-                                 vmin=0, vmax=1, cmap=S44.CMAP_DETECTED)
-            S44._overlay_rocky_by_facility(ax, r[~lhs_mask.loc[r.index]], color_map, major,
+                                 vmin=0, vmax=1, cmap=rocky_scatter.CMAP_DETECTED)
+            rocky_scatter._overlay_rocky_by_facility(ax, r[~lhs_mask.loc[r.index]], color_map, major,
                                            star_candidates=False)
             for _, row in r[lhs_mask.loc[r.index]].iterrows():
-                c = color_map.get(row["discovery_facility"], S44.OTHER_COLOR)
+                c = color_map.get(row["discovery_facility"], rocky_scatter.OTHER_COLOR)
                 ax.errorbar([row["flux_p"]], [row["radius_p"]],
                             yerr=[[abs(row["radius_err_minus"])], [abs(row["radius_err_plus"])]],
                             fmt="o", ms=14, color=c, mec="white", mew=1.8,
@@ -260,13 +250,13 @@ def main():
                                 fontsize=20, color="white", zorder=8)
 
             xlo = xbins[0]
-            ax.fill_between([xlo, S44.COLD_CORNER_INSOL], S44.COLD_CORNER_RADIUS,
+            ax.fill_between([xlo, rocky_scatter.COLD_CORNER_INSOL], rocky_scatter.COLD_CORNER_RADIUS,
                             Y_LIMS[1], color="red", alpha=0.15, zorder=1.5, lw=0)
             # Bold Cold Rocky Desert outline: bottom edge (R=1.4) + right edge (S=50).
-            ax.plot([xlo, S44.COLD_CORNER_INSOL], [S44.COLD_CORNER_RADIUS] * 2,
+            ax.plot([xlo, rocky_scatter.COLD_CORNER_INSOL], [rocky_scatter.COLD_CORNER_RADIUS] * 2,
                     color="red", lw=2.6, zorder=6)
-            ax.plot([S44.COLD_CORNER_INSOL, S44.COLD_CORNER_INSOL],
-                    [S44.COLD_CORNER_RADIUS, Y_LIMS[1]], color="red", lw=2.6, zorder=6)
+            ax.plot([rocky_scatter.COLD_CORNER_INSOL, rocky_scatter.COLD_CORNER_INSOL],
+                    [rocky_scatter.COLD_CORNER_RADIUS, Y_LIMS[1]], color="red", lw=2.6, zorder=6)
             fn, n_denom, n_missed = window_stats(panel, test)
             if fn is not None:
                 n_pass = n_denom - n_missed
@@ -305,16 +295,16 @@ def main():
 
     handles = [
         Line2D([0], [0], marker="o", linestyle="", color=color_map[f], markersize=10,
-               label=S44.short_facility(f))
+               label=rocky_scatter.short_facility(f))
         for f in major
     ]
     if len(rocky_win) > sum(counts[f] for f in major):
-        handles.append(Line2D([0], [0], marker="o", linestyle="", color=S44.OTHER_COLOR,
+        handles.append(Line2D([0], [0], marker="o", linestyle="", color=rocky_scatter.OTHER_COLOR,
                               markersize=10, label="Other observatories"))
     handles += [
         Patch(facecolor="red", alpha=0.15, edgecolor="red", lw=2.0,
               label=(r"$R>%.1f\,R_\oplus$, $I<%g\,I_\oplus$"
-                     % (S44.COLD_CORNER_RADIUS, S44.COLD_CORNER_INSOL))),
+                     % (rocky_scatter.COLD_CORNER_RADIUS, rocky_scatter.COLD_CORNER_INSOL))),
     ]
     # Anchored just below the figure (bbox_inches="tight" keeps it): with zero
     # layout padding, an "outside" legend would overlap the bottom x-labels.

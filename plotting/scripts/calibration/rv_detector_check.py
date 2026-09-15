@@ -6,7 +6,6 @@ Run: python plotting/scripts/calibration/rv_detector_check.py [--instrument NIRP
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import sys
 from pathlib import Path
 from urllib.parse import quote
@@ -23,8 +22,9 @@ try:
 except Exception:
     pass
 
-from tools.paths import LIFESIM_OUTER_DIR, TESS_DATA_DIR, PAPER_FIGURES_DIR, CALIBRATION_DIR, KEPLER_DATA_DIR
-ROOT = Path(LIFESIM_OUTER_DIR)
+from tools.paths import TESS_DATA_DIR, PAPER_FIGURES_DIR, CALIBRATION_DIR, KEPLER_DATA_DIR
+from telescopes.rv.detection_model import RVData
+
 PPOP_DIR = Path(TESS_DATA_DIR) / "Gaia"
 RVAMP_CACHE = Path(KEPLER_DATA_DIR) / "NASA" / "NASA_PSCompPars_rvamp_calibration.csv"
 OUT_DIR = Path(CALIBRATION_DIR) / "rv_detector_check"
@@ -32,11 +32,6 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 PAPER_FIG_DIR = Path(PAPER_FIGURES_DIR)
 PAPER_FIG_DIR.mkdir(parents=True, exist_ok=True)
-
-_spec = importlib.util.spec_from_file_location("rv_data", ROOT / "telescopes" / "rv" / "detection_model.py")
-_rv = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(_rv)
-RVData = _rv.RVData
 
 STYPE_COLORS = {"F": "#e6ab02", "G": "#66a61e", "K": "#7570b3", "M": "#d95f02", "A": "0.6", "Unknown": "0.8"}
 PPOP_COLS = ["radius_p", "mass_p", "p_orb", "inc_p", "ecc_p",

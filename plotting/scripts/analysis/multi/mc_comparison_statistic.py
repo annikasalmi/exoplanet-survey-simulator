@@ -4,16 +4,16 @@ sample's 25%/8% errors, using bayesian_cold_rocky_desert.py's machinery.
 Run: [N_DRAWS=500] python plotting/scripts/analysis/multi/mc_comparison_statistic.py
 """
 
-import importlib.util
 import os
+import sys
 import time
 from pathlib import Path
 
-_HERE = Path(__file__).resolve().parent
-_spec = importlib.util.spec_from_file_location(
-    "bayes_cold_rocky_desert", _HERE / "bayesian_cold_rocky_desert.py")
-S41 = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(S41)
+ROOT = Path(__file__).resolve().parents[4]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from plotting.scripts.analysis.multi import bayesian_cold_rocky_desert as bayes
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -23,9 +23,9 @@ from tools.paths import ANALYSIS_DIR
 OUT_DIR = os.path.join(ANALYSIS_DIR, "mc_comparison_statistic")
 
 # ---- overrides: small pool, own cache dir ----
-S41.FLAT_N_POOL = 2_000_000
-S41.CHUNK = 2_000_000
-S41._out_dir = lambda: OUT_DIR
+bayes.FLAT_N_POOL = 2_000_000
+bayes.CHUNK = 2_000_000
+bayes._out_dir = lambda: OUT_DIR
 N_DRAWS = int(os.environ.get("N_DRAWS", "5000"))
 
 LABELS = {"rocky_formation": "Sub-Neptune + Super-Earth",
@@ -48,11 +48,11 @@ def frac_draws(u, lo, hi, rng, m_sil, r_sil, n_obs, n_rep=N_DRAWS):
     for _ in range(n_rep):
         mo = m0 * np.exp(rng.normal(0.0, MASS_CUT_ERR, m0.size))
         ro = r0 * np.exp(rng.normal(0.0, RAD_CUT_ERR, r0.size))
-        k = np.flatnonzero(mo > S41.MASS_MIN)
+        k = np.flatnonzero(mo > bayes.MASS_MIN)
         if k.size < n_obs:
             continue
         pick = rng.choice(k, n_obs, replace=False)
-        out.append(float(S41.is_volatile(mo[pick], ro[pick], m_sil, r_sil).mean()))
+        out.append(float(bayes.is_volatile(mo[pick], ro[pick], m_sil, r_sil).mean()))
     return np.array(out)
 
 
@@ -65,22 +65,22 @@ def nasa_frac_draws(nasa, lo, hi, rng, m_sil, r_sil, n_rep=N_DRAWS):
     for t in range(n_rep):
         mb = m * np.exp(rng.normal(0.0, MASS_CUT_ERR, m.size))
         rb = r * np.exp(rng.normal(0.0, RAD_CUT_ERR, r.size))
-        k = mb > S41.MASS_MIN
-        fr[t] = S41.is_volatile(mb[k], rb[k], m_sil, r_sil).mean() if k.any() else np.nan
+        k = mb > bayes.MASS_MIN
+        fr[t] = bayes.is_volatile(mb[k], rb[k], m_sil, r_sil).mean() if k.any() else np.nan
     return fr[np.isfinite(fr)]
 
 
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     t0 = time.time()
-    m_sil, r_sil = S41.load_silicate()
-    nasa = S41.load_nasa(precision=True)
+    m_sil, r_sil = bayes.load_silicate()
+    nasa = bayes.load_nasa(precision=True)
 
     print("--> building Otegi pool (rocky_formation; escape_only derived from it)")
-    otegi = S41.make_pool("powerlaw", mr_C=S41.OTEGI_C, mr_beta=S41.OTEGI_BETA,
-                          mass_scatter_dex=S41.OTEGI_SCATTER)
-    rocky_true = ~S41.is_volatile(otegi["mass"], otegi["radius"], m_sil, r_sil)
-    keep = ~(rocky_true & (otegi["mass"] > S41.MASS_MIN))
+    otegi = bayes.make_pool("powerlaw", mr_C=bayes.OTEGI_C, mr_beta=bayes.OTEGI_BETA,
+                          mass_scatter_dex=bayes.OTEGI_SCATTER)
+    rocky_true = ~bayes.is_volatile(otegi["mass"], otegi["radius"], m_sil, r_sil)
+    keep = ~(rocky_true & (otegi["mass"] > bayes.MASS_MIN))
     univ = {"rocky_formation": otegi,
             "escape_only": {k: (v[keep] if isinstance(v, np.ndarray) else v)
                             for k, v in otegi.items()}}
@@ -89,8 +89,8 @@ def main():
                          "xtick.labelsize": 24, "ytick.labelsize": 24, "legend.fontsize": 21})
     rng = np.random.default_rng(0)
     fig, axes = plt.subplots(1, 3, figsize=(24, 7.5), layout="constrained")
-    for ax, (blabel, lo, hi) in zip(axes, S41.INSOL_BINS):
-        k_obs, n_obs = S41.nasa_bin(nasa, lo, hi, S41.MASS_MIN, m_sil, r_sil)
+    for ax, (blabel, lo, hi) in zip(axes, bayes.INSOL_BINS):
+        k_obs, n_obs = bayes.nasa_bin(nasa, lo, hi, bayes.MASS_MIN, m_sil, r_sil)
         f_obs = k_obs / n_obs
         fobs_t = nasa_frac_draws(nasa, lo, hi, rng, m_sil, r_sil)  # sets sigma_obs only
         sig_obs = float(fobs_t.std())

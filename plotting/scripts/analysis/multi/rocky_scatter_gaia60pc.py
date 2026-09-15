@@ -1044,7 +1044,7 @@ def plot_threshold_curve_comparison(m_ref, r_ref, nasa_win: pd.DataFrame) -> Pat
 
 # The Cold Corner highlighted in Figure 1 and the mass-radius panels: large
 # (radius > COLD_CORNER_RADIUS) planets receiving little insolation (I < 50).
-COLD_CORNER_INSOL  = 50.0   # I_earth  — "cold" boundary shown to Hongyi by the professor
+COLD_CORNER_INSOL  = 50.0   # I_earth  — "cold" boundary
 COLD_CORNER_RADIUS = 1.4    # R_earth  — "large rocky" lower bound of the corner
 COLD_CORNER_COLOR  = "#ff9ec4"  # light pink band under the silicate curve
 

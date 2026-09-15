@@ -21,16 +21,6 @@ from tools.paths import FLAT_UNIVERSE_DATA_DIR
 FLAT_CACHE_DIR = Path(FLAT_UNIVERSE_DATA_DIR)
 FLAT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-# Hongyi's original flat universe parameters (for reproducibility)
-HONGYI_CONFIGS = {
-    'flat_rocky_mr_vs_nasa': {'seed': 0, 'n_planets': 150_000},
-    'flat_transit_rv_3x3_G': {'seed': 75, 'n_planets': 3_000_000},
-    'flat_transit_rv_3x3_K': {'seed': 76, 'n_planets': 2_500_000},
-    'flat_transit_rv_3x3_M': {'seed': 77, 'n_planets': 1_500_000},
-    'likelihood_ratio_catalog': {'seed': 0, 'n_planets': 1_000_000},
-}
-
-
 def _get_or_generate_universe(seed=0, n_planets=150000, universe_type='A'):
     """Load the cached flat universe or generate it. universe_type: 'A' (drop rocky M>2) or 'B' (all)."""
     cache_file = FLAT_CACHE_DIR / f"flat_universe_{universe_type}_seed{seed}_n{n_planets}.csv"

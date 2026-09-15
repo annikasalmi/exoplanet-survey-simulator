@@ -1,30 +1,12 @@
-"""Run the Kepler / TESS / RV detectors on a flat catalog. Loads the detector modules by file
-path so the lifesim package __init__ (which needs Qt) is never imported.
-"""
+"""Run the Kepler / TESS / RV detectors on a flat catalog."""
 
 from __future__ import annotations
 
-import importlib.util
-from pathlib import Path
-
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parents[2]
-
-
-def _load(name: str, rel: str):
-    spec = importlib.util.spec_from_file_location(name, ROOT / rel)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-_kep = _load("kepler_data", "telescopes/kepler/detection_model.py")
-_tess = _load("tess_data", "telescopes/tess/detection_model.py")
-_rv = _load("rv_data", "telescopes/rv/detection_model.py")
-
-KeplerData = _kep.KeplerData
-TESSData = _tess.TESSData
-RVData = _rv.RVData
+from telescopes.kepler.detection_model import KeplerData
+from telescopes.tess.detection_model import TESSData
+from telescopes.rv.detection_model import RVData
 
 
 def run_kepler(catalog: pd.DataFrame) -> pd.DataFrame:

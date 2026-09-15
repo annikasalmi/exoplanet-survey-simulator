@@ -38,4 +38,4 @@ jobs:
       - name: Run the quickstart demo
         run: |
           python simulation_demo.py
-          test -f results/figures/analysis/likelihood_ratio_catalog/full_catalog_lr.png
+          test -f results/figures/analysis/flat_transit_rv_3x3/flat_transit_rv_3x3_otegi.png

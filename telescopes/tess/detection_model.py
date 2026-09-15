@@ -1,6 +1,9 @@
 """TESS toy transit detector for P-Pop and NASA tables. detected = observed by TESS, transiting,
 bright enough, enough transits and SNR >= snr_threshold; tess_p_detect is a threshold or sigmoid
-weight. Noise: SPOC CDPP tables by TIC, then binned median CDPP, then a smooth Tmag fallback.
+weight. By default every star is observed for 5 consecutive sectors, the same coverage for every star
+as the Kepler detector gives its full mission; use_tesspoint=True takes the real pointings instead.
+Noise per sector is SPOC's measured CDPP, by TIC when available, else the median of 2-min targets
+at the same Tmag, else a smooth Tmag fallback. Reference files are built by build_reference_data.py.
 """
 
 from __future__ import annotations
@@ -35,18 +38,26 @@ class TESSData:
         10.5: "rrmscdpp10p5", 12.5: "rrmscdpp12p5", 15.0: "rrmscdpp15p0",
     }
 
-    # Calibration against official SPOC SNR (ExoFOP TOI): the boxcar SNR runs ~1.52x high near the
-    # 7.1 cut, so this ~1/1.52 factor makes model/official ~1.0 where detection is decided.
+    # Calibration against official SPOC SNR: on 1,551 SPOC multi-sector TOIs, given their searched
+    # sectors and per-sector SPOC CDPP, the boxcar SNR runs 1.26x high (median over official SNR
+    # 10-100); after this factor model/official is 0.92-1.03 in every SNR bin.
     # Re-derive with plotting/scripts/calibration/tess_calibration.py.
-    SNR_OFFICIAL_CALIBRATION = 0.66
+    SNR_OFFICIAL_CALIBRATION = 0.80
 
-    # Teff grid for proxy Tmag color corrections (upgrade #5).
-    # TEFF_GRID and G_MINUS_T_GRID give G - T color term (subtract from G to get T).
-    # MBOL_MINUS_T_GRID gives mbol - T correction (subtract from mbol to get T).
-    # Sources: TIC (Stassun+2019), Sullivan+2015, rough empirical matching.
+    DATA_DIR = Path(__file__).resolve().parent / "data"
+
+    # Proxy-Tmag colour terms vs Teff: G - T and mbol - T (subtract from G or mbol to get T).
+    # Medians over 4,078 dwarf planet hosts (log g >= 4) in NASA PSCompPars, whose sy_tmag is TIC-8
+    # (Stassun et al. 2019); the 2500 K bin has only 4 stars. Re-derive with
+    # `python telescopes/tess/build_reference_data.py tmag`.
     _TEFF_GRID = np.array([2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 7000, 8000], dtype=float)
-    _G_MINUS_T  = np.array([2.80, 2.50, 1.80, 1.10, 0.80, 0.60, 0.45, 0.35, 0.20, 0.15], dtype=float)
-    _MBOL_MINUS_T = np.array([2.00, 1.80, 1.40, 1.00, 0.70, 0.50, 0.40, 0.35, 0.20, 0.10], dtype=float)
+    _G_MINUS_T  = np.array([1.79, 1.37, 1.16, 0.94, 0.71, 0.60, 0.50, 0.43, 0.32, 0.12], dtype=float)
+    _MBOL_MINUS_T = np.array([-0.30, 0.19, 0.35, 0.42, 0.43, 0.46, 0.44, 0.39, 0.29, 0.13], dtype=float)
+
+    # Priority order of noise sources; each row reports the best one any of its sectors used.
+    NOISE_SOURCES = ["official_spoc_cdpp_tic_sector", "official_spoc_cdpp_tic_any_sector",
+                     "spoc_cdpp_tmag_sector_bin", "spoc_cdpp_tmag_all_sectors", "smooth_tmag_fallback"]
+    NOISE_TMAG_BIN = 0.5
 
     def __init__(
         self,
@@ -55,31 +66,45 @@ class TESSData:
         *,
         sector_days: float = 27.4,
         dutycycle: float = 0.92,
-        default_n_sectors: int = 1,
+        # Coverage when use_tesspoint is False: every star observed for this many consecutive sectors in
+        # one continuous window, as the Kepler detector gives every star its full mission.
+        default_n_sectors: int = 5,
         min_transits: int = 2,
         snr_threshold: float = 7.1,
         # Multiplicative calibration of toy SNR to the official SPOC pipeline SNR.
-        # Default = SNR_OFFICIAL_CALIBRATION (~1/1.52 at threshold). Pass 1.0 to recover the
-        # raw, uncalibrated (optimistic) boxcar SNR, e.g. for the before/after
-        # comparison in plotting/scripts/calibration/tess_calibration.py.
+        # Default = SNR_OFFICIAL_CALIBRATION (1/1.26). Pass 1.0 to recover the raw, uncalibrated
+        # (optimistic) boxcar SNR, as plotting/scripts/calibration/tess_calibration.py does.
         snr_calibration: Optional[float] = None,
         tmag_limit: float = 16.0,
         phase_mode: str = "random",  # random or expected
         random_seed: int = 42,
-        use_tesspoint: bool = True,
+        # True: sectors from the real pointings in data/sector_grid.npz (tess-point on a sky grid).
+        # False: every star gets default_n_sectors (cvz_n_sectors in the CVZ, if set).
+        use_tesspoint: bool = False,
+        # True answers "if TESS had looked, would it have found it?": stars the real pointings never
+        # covered get the median sector count of covered sky at the same |ecliptic latitude| and
+        # stay tess_observed. tess_observed_real records whether TESS really covered the star.
+        condition_on_observed: bool = True,
+        # Take sectors from an input tess_sectors column ("1;2;5") instead, e.g. for TOIs.
+        use_catalog_sectors: bool = False,
+        sector_grid_path: Optional[Union[str, Path]] = None,
+        noise_table_path: Optional[Union[str, Path]] = None,
         use_mast_tic: bool = False,
         mast_max_rows: int = 500,
+        # Per-TIC SPOC CDPP CSVs from MAST (results/catalogs/tess/CDPP); only rows with a ticid use them.
         cdpp_dir: Optional[Union[str, Path]] = None,
         use_cdpp_tables: bool = True,
-        smooth_noise_ref_ppm_1hr: float = 60.0,
-        smooth_noise_floor_ppm_1hr: float = 30.0,
+        # Last-resort noise when no SPOC table covers a row: 1-hr noise ~ ticgen's pre-launch model
+        # (Sullivan et al. 2015 with its 60 ppm/hr systematic floor), within 10% for Tmag 6-12.
+        smooth_noise_ref_ppm_1hr: float = 200.0,
+        smooth_noise_floor_ppm_1hr: float = 60.0,
         # upgrade #3: apply impact-parameter b correction to modelled transit duration
         apply_b_to_duration: bool = True,
         # upgrade #4: Teff-based color correction for proxy Tmag (critical for M dwarfs)
         apply_mdwarf_tmag_correction: bool = True,
-        # upgrade #1: CVZ tagging and fallback sector count for CVZ stars
+        # CVZ tagging, and an optional larger fixed sector count for CVZ stars (None = no special case)
         cvz_ecliptic_lat_deg: float = 78.0,
-        cvz_n_sectors: int = 13,
+        cvz_n_sectors: Optional[int] = None,
         # upgrade #2: FFI cadence scaling for smooth CDPP fallback.
         # None = calibrated as-is (matches SPOC 2-min targets).
         # Set to 30.0 for primary-mission FFI stars or 10.0 for extended-mission FFI stars.
@@ -108,6 +133,10 @@ class TESSData:
         self.rng = np.random.default_rng(random_seed)
 
         self.use_tesspoint = bool(use_tesspoint)
+        self.condition_on_observed = bool(condition_on_observed)
+        self.use_catalog_sectors = bool(use_catalog_sectors)
+        self.sector_grid_path = Path(sector_grid_path) if sector_grid_path else self.DATA_DIR / "sector_grid.npz"
+        self.noise_table_path = Path(noise_table_path) if noise_table_path else self.DATA_DIR / "spoc_cdpp_tmag.csv"
         self.use_mast_tic = bool(use_mast_tic)
         self.mast_max_rows = int(mast_max_rows)
         self.cdpp_dir = Path(cdpp_dir) if cdpp_dir is not None else None
@@ -119,21 +148,24 @@ class TESSData:
         self.apply_b_to_duration = bool(apply_b_to_duration)
         self.apply_mdwarf_tmag_correction = bool(apply_mdwarf_tmag_correction)
         self.cvz_ecliptic_lat_deg = float(cvz_ecliptic_lat_deg)
-        self.cvz_n_sectors = int(cvz_n_sectors)
+        self.cvz_n_sectors = int(cvz_n_sectors) if cvz_n_sectors is not None else None
         self.ffi_cadence_min = float(ffi_cadence_min) if ffi_cadence_min is not None else None
         self.detection_model = detection_model.lower().strip()
         self.sigmoid_steepness = float(sigmoid_steepness)
 
         self.cdpp_table = self._load_cdpp_tables(self.cdpp_dir) if self.use_cdpp_tables else pd.DataFrame()
+        self.noise_table = pd.read_csv(self.noise_table_path) if self.noise_table_path.exists() else pd.DataFrame()
         self.catalog = self._standardize(self.catalog, self.source)
         self._add_basic_columns()
 
         if self.use_mast_tic:
             self._enrich_from_tic()
-        if self.use_tesspoint:
-            self._add_tesspoint_visibility()
+        if self.use_catalog_sectors and "tess_sectors" in self.catalog.columns:
+            self._add_catalog_visibility()
+        elif self.use_tesspoint and self.sector_grid_path.exists():
+            self._add_grid_visibility()
         else:
-            self._add_default_visibility()
+            self._add_default_visibility("fixed_n_sectors" if not self.use_tesspoint else "no_sector_grid_fixed_n_sectors")
 
         if validate_for_detection:
             self._validate()
@@ -394,69 +426,99 @@ class TESSData:
     def _coalesce(a, b):
         return b if pd.isna(a) and not pd.isna(b) else a
 
-    def _add_tesspoint_visibility(self) -> None:
-        if not {"ra", "dec"}.issubset(self.catalog.columns):
-            self._add_default_visibility("no_ra_dec_default")
-            return
-        try:
-            from tess_stars2px import tess_stars2px_function_entry
-        except Exception:
-            self._add_default_visibility("tesspoint_not_installed_default")
-            return
+    # Visibility produces self._pairs, one row per (catalog row, sector) the star is observed in.
+    # Sectors < 0 are assumed ones (fixed count, or filled for stars the pointings missed); their
+    # noise comes from the all-sector SPOC medians.
 
-        ids = np.arange(len(self.catalog))
-        ra = self._num(self.catalog["ra"]).to_numpy(float)
-        dec = self._num(self.catalog["dec"]).to_numpy(float)
-        ok = np.isfinite(ra) & np.isfinite(dec)
-        sectors = [[] for _ in range(len(self.catalog))]
-        cameras = [[] for _ in range(len(self.catalog))]
-        ccds = [[] for _ in range(len(self.catalog))]
-        cols = [[] for _ in range(len(self.catalog))]
-        rows = [[] for _ in range(len(self.catalog))]
-
-        try:
-            out = tess_stars2px_function_entry(ids[ok], ra[ok], dec[ok])
-            out_id, _elng, _elat, out_sec, out_cam, out_ccd, out_col, out_row = out[:8]
-            for sid, sec, cam, ccd, col, row in zip(out_id, out_sec, out_cam, out_ccd, out_col, out_row):
-                i = int(sid)
-                sectors[i].append(int(sec)); cameras[i].append(int(cam)); ccds[i].append(int(ccd))
-                cols[i].append(float(col)); rows[i].append(float(row))
-            self.catalog["tess_sector_source"] = "tess-point"
-        except Exception as exc:
-            self._add_default_visibility(f"tesspoint_failed:{type(exc).__name__}")
-            return
-
-        self.catalog["tess_sectors"] = [self._join_ints(x) for x in sectors]
-        self.catalog["tess_cameras"] = [self._join_ints(x) for x in cameras]
-        self.catalog["tess_ccds"] = [self._join_ints(x) for x in ccds]
-        self.catalog["tess_colpix"] = [self._join_floats(x) for x in cols]
-        self.catalog["tess_rowpix"] = [self._join_floats(x) for x in rows]
-        self.catalog["tess_n_sectors"] = [len(set(x)) for x in sectors]
-        self.catalog["tess_observed"] = self.catalog["tess_n_sectors"] > 0
-        self.catalog["tess_observed_days"] = self.catalog["tess_n_sectors"] * self.sector_days * self.dutycycle
-        # upgrade #1: tag CVZ stars (tess-point handles actual sector counts, but tag is useful)
-        self._tag_cvz()
-
-    def _add_default_visibility(self, source="default") -> None:
-        # upgrade #1: compute ecliptic latitude first so CVZ stars get more sectors
-        self._tag_cvz()
-        n_sec = pd.Series(self.default_n_sectors, index=self.catalog.index, dtype=int)
-        if "tess_in_cvz" in self.catalog.columns:
-            n_sec = n_sec.where(~self.catalog["tess_in_cvz"].astype(bool), self.cvz_n_sectors)
+    def _set_visibility(self, rows, sectors, sector_text, source, observed_real, span=None) -> None:
+        n_rows = len(self.catalog)
+        self._pairs = pd.DataFrame({"row": np.asarray(rows, dtype=np.int64),
+                                    "sector": np.asarray(sectors, dtype=np.int64)})
+        # span = sectors one pair stands for: 1 for a real sector, n for a continuous n-sector window.
+        self._pairs["span"] = 1 if span is None else np.asarray(span, dtype=np.int64)
+        n_sec = np.bincount(self._pairs["row"], weights=self._pairs["span"], minlength=n_rows).astype(np.int64)
         self.catalog["tess_n_sectors"] = n_sec
-        self.catalog["tess_sectors"] = [
-            "" if n <= 0 else ";".join(map(str, range(1, n + 1)))
-            for n in n_sec
-        ]
+        self.catalog["tess_sectors"] = sector_text
         self.catalog["tess_sector_source"] = source
+        self.catalog["tess_observed_real"] = observed_real
         self.catalog["tess_observed"] = n_sec > 0
         self.catalog["tess_observed_days"] = n_sec * self.sector_days * self.dutycycle
 
+    @staticmethod
+    def _expand(rows, counts):
+        """Repeat each row counts[i] times; also return 0..counts[i]-1 within each row."""
+        counts = np.asarray(counts, dtype=np.int64)
+        rep = np.repeat(np.asarray(rows, dtype=np.int64), counts)
+        within = np.arange(len(rep)) - np.repeat(np.cumsum(counts) - counts, counts)
+        return rep, within
+
+    def _add_default_visibility(self, source="fixed_n_sectors") -> None:
+        self._tag_cvz()
+        n_sec = np.full(len(self.catalog), self.default_n_sectors, dtype=np.int64)
+        if self.cvz_n_sectors is not None:
+            n_sec[self.catalog["tess_in_cvz"].to_numpy(bool)] = self.cvz_n_sectors
+        rows = np.flatnonzero(n_sec > 0)
+        self._set_visibility(rows, np.full(len(rows), -1), "", source, n_sec > 0, span=n_sec[rows])
+
+    def _add_catalog_visibility(self) -> None:
+        self._tag_cvz()
+        lists = [[int(s) for s in re.split(r"[;,\s]+", str(t)) if s.strip().isdigit()]
+                 for t in self.catalog["tess_sectors"].fillna("")]
+        counts = [len(x) for x in lists]
+        rows, _ = self._expand(np.arange(len(lists)), counts)
+        sectors = np.array([s for x in lists for s in x], dtype=np.int64)
+        text = [";".join(map(str, x)) for x in lists]
+        self._set_visibility(rows, sectors, text, "catalog", np.array(counts) > 0)
+
+    def _add_grid_visibility(self) -> None:
+        """Real sectors per star from the tess-point sky grid (see build_reference_data.py)."""
+        z = np.load(self.sector_grid_path)
+        n_lon, n_sinlat = int(z["n_lon"]), int(z["n_sinlat"])
+        covered = np.unpackbits(z["covered_bits"], axis=1)[:, :int(z["max_sector"])].astype(bool)
+
+        self._tag_cvz()
+        elon = self.catalog["tess_ecliptic_lon"].to_numpy(float)
+        elat = self.catalog["tess_ecliptic_lat"].to_numpy(float)
+        ok = np.isfinite(elon) & np.isfinite(elat)
+        i_lon = np.floor(np.nan_to_num(elon) / 360.0 * n_lon).astype(np.int64) % n_lon
+        i_lat = np.floor((np.sin(np.deg2rad(np.nan_to_num(elat))) + 1.0) / 2.0 * n_sinlat).astype(np.int64)
+        cell = np.where(ok, np.clip(i_lat, 0, n_sinlat - 1) * n_lon + i_lon, 0)
+
+        # CSR layout: sectors of cell c are cell_sectors[indptr[c]:indptr[c + 1]].
+        cnt_cell = covered.sum(axis=1)
+        indptr = np.r_[0, np.cumsum(cnt_cell)]
+        cell_sectors = np.nonzero(covered)[1] + 1
+        n_real = np.where(ok, cnt_cell[cell], 0)
+        rows, within = self._expand(np.arange(len(cell)), n_real)
+        sectors = cell_sectors[indptr[cell[rows]] + within]
+
+        used = np.unique(cell[n_real > 0])
+        cell_text = {c: ";".join(map(str, cell_sectors[indptr[c]:indptr[c + 1]])) for c in used}
+        text = np.array([cell_text.get(c, "") for c in cell], dtype=object)
+        text[n_real == 0] = ""
+        source = np.where(n_real > 0, "tess-point_sky_grid", "not_covered_by_tess")
+
+        if self.condition_on_observed:
+            # Median sector count of covered sky in 10-deg |ecliptic latitude| bands.
+            cell_abslat = np.abs(np.rad2deg(np.arcsin(-1.0 + (np.arange(n_sinlat) + 0.5) * 2.0 / n_sinlat)))
+            cell_band = np.repeat(np.minimum(cell_abslat // 10, 8).astype(int), n_lon)
+            band_median = np.array([np.median(cnt_cell[(cell_band == b) & (cnt_cell > 0)]) for b in range(9)])
+            row_band = np.minimum(np.abs(np.nan_to_num(elat)) // 10, 8).astype(int)
+            n_fill = np.where(ok, band_median[row_band], np.median(cnt_cell[cnt_cell > 0]))
+            n_fill = np.where(n_real == 0, np.maximum(np.round(n_fill), 1), 0).astype(np.int64)
+            fill_rows, fill_within = self._expand(np.arange(len(cell)), n_fill)
+            rows = np.r_[rows, fill_rows]
+            sectors = np.r_[sectors, -(fill_within + 1)]
+            source = np.where(n_fill > 0, "assumed_if_observed", source)
+
+        self._set_visibility(rows, sectors, text, source, n_real > 0)
+
     def _tag_cvz(self) -> None:
-        """Tag stars in the TESS continuous viewing zones (|ecliptic latitude| > cvz_ecliptic_lat_deg),
-        which get ~13 sectors a year. Sets tess_ecliptic_lat (deg) and tess_in_cvz.
+        """Ecliptic coordinates (tess_ecliptic_lon/lat, deg) and tess_in_cvz: |ecliptic latitude|
+        > cvz_ecliptic_lat_deg, the continuous viewing zones (~13 sectors a year).
         """
         if not {"ra", "dec"}.issubset(self.catalog.columns):
+            self.catalog["tess_ecliptic_lon"] = np.nan
             self.catalog["tess_ecliptic_lat"] = np.nan
             self.catalog["tess_in_cvz"] = False
             return
@@ -466,16 +528,11 @@ class TESSData:
         sin_elat = (np.sin(dec_rad) * np.cos(eps)
                     - np.cos(dec_rad) * np.sin(eps) * np.sin(ra_rad))
         elat = np.rad2deg(np.arcsin(np.clip(sin_elat, -1.0, 1.0)))
+        elon = np.rad2deg(np.arctan2(np.sin(ra_rad) * np.cos(eps) + np.tan(dec_rad) * np.sin(eps),
+                                     np.cos(ra_rad))) % 360.0
+        self.catalog["tess_ecliptic_lon"] = elon
         self.catalog["tess_ecliptic_lat"] = elat
         self.catalog["tess_in_cvz"] = np.abs(elat) > self.cvz_ecliptic_lat_deg
-
-    @staticmethod
-    def _join_ints(values):
-        return ";".join(str(int(v)) for v in values)
-
-    @staticmethod
-    def _join_floats(values):
-        return ";".join(f"{float(v):.2f}" for v in values)
 
     # ------------------------------------------------------------------
     # CDPP tables and noise
@@ -533,58 +590,61 @@ class TESSData:
         m = re.search(r"[-_]s(\d{4})[-_]", name.lower())
         return int(m.group(1)) if m else pd.NA
 
-    def _nearest_cdpp_col(self, duration_hr: float) -> tuple[float, str]:
-        dur = float(np.clip(duration_hr, self.CDPP_DURATIONS_HR.min(), self.CDPP_DURATIONS_HR.max()))
-        nearest = float(self.CDPP_DURATIONS_HR[np.argmin(np.abs(self.CDPP_DURATIONS_HR - dur))])
-        return nearest, self.CDPP_COLS[nearest]
+    def _nearest_cdpp_index(self, duration_hr) -> np.ndarray:
+        dur = np.clip(np.asarray(duration_hr, dtype=float), self.CDPP_DURATIONS_HR.min(), self.CDPP_DURATIONS_HR.max())
+        return np.abs(dur[:, None] - self.CDPP_DURATIONS_HR[None, :]).argmin(axis=1)
 
-    def _cdpp_for_row_sector(self, ticid, sector, tmag, duration_hr):
-        nearest, col = self._nearest_cdpp_col(duration_hr)
-        if self.cdpp_table.empty or col not in self.cdpp_table.columns:
-            return self._smooth_cdpp(duration_hr, tmag), nearest, "smooth_tmag_fallback_no_table"
+    def _pair_cdpp(self, rows, sectors, col_idx, tmag, ticid):
+        """CDPP (ppm) and noise-source rank for each observed (row, sector) pair, best source first:
+        SPOC CDPP for this TIC and sector, this TIC in any sector, the median of 2-min targets at the
+        same Tmag in this sector, the same across all sectors, then the smooth fallback.
+        """
+        cols = list(self.CDPP_COLS.values())
+        ci = col_idx[rows]
+        t = tmag[rows]
+        n = len(rows)
+        cdpp = np.full(n, np.nan)
+        rank = np.full(n, len(self.NOISE_SOURCES) - 1, dtype=np.int64)
 
-        tic = pd.NA if pd.isna(ticid) else int(ticid)
-        sec = pd.NA if pd.isna(sector) else int(sector)
+        def take(values, r):
+            nonlocal cdpp
+            v = values[np.arange(n), ci]
+            fill = np.isnan(cdpp) & np.isfinite(v) & (v > 0)
+            cdpp[fill] = v[fill]
+            rank[fill] = r
 
-        if not pd.isna(tic):
-            m = self.cdpp_table["ticid"].eq(tic)
-            if not pd.isna(sec) and "sector" in self.cdpp_table.columns:
-                m = m & self.cdpp_table["sector"].eq(sec)
-            val = self.cdpp_table.loc[m, col].dropna()
-            if len(val):
-                return float(val.median()), nearest, "official_spoc_cdpp_tic_sector"
+        if not self.cdpp_table.empty and np.isfinite(ticid).any():
+            raw = self.cdpp_table.dropna(subset=["ticid"])
+            by_sector = raw.groupby(["ticid", "sector"])[cols].median()
+            tic = pd.array(np.where(np.isfinite(ticid[rows]), ticid[rows], -1), dtype="Int64")
+            take(by_sector.reindex(pd.MultiIndex.from_arrays([tic, pd.array(sectors, dtype="Int64")])).to_numpy(float), 0)
+            take(raw.groupby("ticid")[cols].median().reindex(tic).to_numpy(float), 1)
 
-            val = self.cdpp_table.loc[self.cdpp_table["ticid"].eq(tic), col].dropna()
-            if len(val):
-                return float(val.median()), nearest, "official_spoc_cdpp_tic_any_sector"
+        if not self.noise_table.empty:
+            nt = self.noise_table
+            t_bin = np.round(np.nan_to_num(t, nan=-99.0) / self.NOISE_TMAG_BIN) * self.NOISE_TMAG_BIN
+            per_sector = nt[nt["sector"] > 0].set_index(["sector", "tmag_bin"])[cols]
+            take(per_sector.reindex(pd.MultiIndex.from_arrays([sectors, t_bin])).to_numpy(float), 2)
+            # All-sector medians, interpolated in Tmag and held flat past the table's ends.
+            allsec = nt[nt["sector"] == 0].sort_values("tmag_bin")
+            interp = np.column_stack([np.interp(t, allsec["tmag_bin"], allsec[c]) for c in cols])
+            take(interp, 3)
 
-        if not pd.isna(tmag) and "tmag" in self.cdpp_table.columns:
-            bin_half_width = 0.25
-            m = self.cdpp_table["tmag"].between(float(tmag) - bin_half_width, float(tmag) + bin_half_width)
-            if not pd.isna(sec) and "sector" in self.cdpp_table.columns:
-                val = self.cdpp_table.loc[m & self.cdpp_table["sector"].eq(sec), col].dropna()
-                if len(val) >= 10:
-                    return float(val.median()), nearest, "empirical_cdpp_tmag_sector_bin"
-            val = self.cdpp_table.loc[m, col].dropna()
-            if len(val) >= 10:
-                return float(val.median()), nearest, "empirical_cdpp_tmag_bin"
-
-        return self._smooth_cdpp(duration_hr, tmag), nearest, "smooth_tmag_fallback"
+        missing = np.isnan(cdpp)
+        cdpp[missing] = self._smooth_cdpp(self.CDPP_DURATIONS_HR[ci[missing]], t[missing])
+        return cdpp, rank
 
     def _smooth_cdpp(self, duration_hr, tmag):
-        """Smooth photon-noise CDPP fallback. With ffi_cadence_min set, scales by sqrt(cadence_min / 2)
-        for FFI targets (~3.87 at 30 min, ~2.24 at 10 min). SPOC-matched rows don't use this.
+        """Smooth photon-plus-floor CDPP fallback. With ffi_cadence_min set, scales by
+        sqrt(cadence_min / 2) for FFI targets (~3.87 at 30 min, ~2.24 at 10 min).
         """
-        if pd.isna(tmag):
-            return 5000.0
-        noise_1hr = np.sqrt(
-            self.smooth_noise_floor_ppm_1hr ** 2
-            + self.smooth_noise_ref_ppm_1hr ** 2 * 10 ** (0.4 * (float(tmag) - 10.0))
-        )
-        cdpp = float(noise_1hr / np.sqrt(max(float(duration_hr), 0.1)))
+        tmag = np.asarray(tmag, dtype=float)
+        noise_1hr = np.sqrt(self.smooth_noise_floor_ppm_1hr ** 2
+                            + self.smooth_noise_ref_ppm_1hr ** 2 * 10 ** (0.4 * (tmag - 10.0)))
+        cdpp = noise_1hr / np.sqrt(np.maximum(np.asarray(duration_hr, dtype=float), 0.1))
         if self.ffi_cadence_min is not None:
-            cdpp *= np.sqrt(self.ffi_cadence_min / 2.0)
-        return cdpp
+            cdpp = cdpp * np.sqrt(self.ffi_cadence_min / 2.0)
+        return np.where(np.isfinite(tmag), cdpp, 5000.0)
 
     # ------------------------------------------------------------------
     # Transit detection functions
@@ -641,62 +701,59 @@ class TESSData:
         self.catalog["tess_transit_duration_source"] = dur_source
         return dur
 
-    def transit_counts(self) -> list[dict[int, int]]:
-        """Estimate how many transits land in each TESS sector."""
-        counts_by_row = []
-        p = self._num(self.catalog["p_orb"]).replace(0, np.nan)
-        for idx, sectors_text in self.catalog["tess_sectors"].fillna("").items():
-            sectors = [int(s) for s in str(sectors_text).split(";") if str(s).strip().isdigit()]
-            if not sectors or pd.isna(p.loc[idx]):
-                counts_by_row.append({})
-                continue
-            d = self.sector_days * self.dutycycle
-            if self.phase_mode == "expected":
-                n = max(0, int(np.floor(d / p.loc[idx])))
-                counts_by_row.append({sec: n for sec in sectors})
-            else:
-                row_counts = {}
-                for sec in sectors:
-                    phase = self.rng.random() * p.loc[idx]
-                    n = int(np.floor((d - phase) / p.loc[idx]) + 1) if d >= phase else 0
-                    row_counts[sec] = max(n, 0)
-                counts_by_row.append(row_counts)
-        self.catalog["tess_n_transits"] = [sum(d.values()) for d in counts_by_row]
-        self.catalog["tess_sector_transit_counts"] = [";".join(f"{k}:{v}" for k, v in d.items()) for d in counts_by_row]
-        self.catalog["tess_enough_transits"] = self.catalog["tess_n_transits"] >= self.min_transits
-        return counts_by_row
+    def transit_counts(self) -> pd.DataFrame:
+        """Transits in each observed window, one row per (catalog row, sector or continuous span).
+        A window lasts span * sector_days * dutycycle days, like the Kepler detector's
+        dataspan * dutycycle. phase_mode 'random' draws one phase per window; 'expected' uses the
+        mean count d / P, which is fractional, so a planet with one transit every other sector counts.
+        """
+        pairs = self._pairs.copy()
+        p = self._num(self.catalog["p_orb"]).to_numpy(float)[pairs["row"].to_numpy()]
+        d = pairs["span"].to_numpy() * self.sector_days * self.dutycycle
+        good = np.isfinite(p) & (p > 0)
+        p = np.where(good, p, 1.0)
+        if self.phase_mode == "expected":
+            n = d / p
+        else:
+            phase = self.rng.random(len(pairs)) * p
+            n = np.where(d >= phase, np.floor((d - phase) / p) + 1, 0)
+        pairs["n"] = np.where(good, n, 0.0)
+        n_total = np.bincount(pairs["row"], weights=pairs["n"], minlength=len(self.catalog))
+        if self.phase_mode != "expected":
+            n_total = n_total.astype(np.int64)
+        self.catalog["tess_n_transits"] = n_total
+        self.catalog["tess_enough_transits"] = n_total >= self.min_transits
+        return pairs
 
-    def snr(self, counts_by_row: Optional[list[dict[int, int]]] = None) -> pd.Series:
-        """TESS transit SNR using sector-duration CDPP: SNR = depth * sqrt(sum_i N_i / CDPP_i^2)."""
-        if counts_by_row is None:
-            counts_by_row = self.transit_counts()
-        depth = self.depth_ppm()
-        dur = self.duration_hr()
-        tmag = self._num(self.catalog["tess_tmag"])
-        tic = self._num(self.catalog.get("ticid", pd.Series(np.nan, index=self.catalog.index)))
+    def snr(self, pairs: Optional[pd.DataFrame] = None) -> pd.Series:
+        """TESS transit SNR over all observed sectors: SNR = depth * sqrt(sum_i N_i / CDPP_i^2).
+        tess_cdpp_ppm is the effective per-transit CDPP, sqrt(sum N_i / sum(N_i / CDPP_i^2)).
+        """
+        if pairs is None:
+            pairs = self.transit_counts()
+        n_rows = len(self.catalog)
+        depth = self.depth_ppm().to_numpy(float)
+        dur = self.duration_hr().to_numpy(float)
+        tmag = self._num(self.catalog["tess_tmag"]).to_numpy(float)
+        tic = self._num(self.catalog.get("ticid", pd.Series(np.nan, index=self.catalog.index))).to_numpy(float)
         dilution = self._num(self.catalog.get("tess_dilution", self.catalog.get("dilution", pd.Series(1.0, index=self.catalog.index)))).fillna(1.0).clip(lower=1.0)
+        col_idx = self._nearest_cdpp_index(dur)
 
-        snr_values, cdpp_values, cdpp_durs, noise_sources = [], [], [], []
-        for i, idx in enumerate(self.catalog.index):
-            row_sum = 0.0
-            row_cdpps, row_durs, row_sources = [], [], []
-            for sec, n in counts_by_row[i].items():
-                if n <= 0:
-                    continue
-                c, c_dur, src = self._cdpp_for_row_sector(tic.loc[idx], sec, tmag.loc[idx], dur.loc[idx])
-                if np.isfinite(c) and c > 0:
-                    row_sum += n / c**2
-                    row_cdpps.append(c); row_durs.append(c_dur); row_sources.append(src)
-            snr_values.append(float(depth.loc[idx] / dilution.loc[idx] * np.sqrt(row_sum) * self.snr_calibration) if row_sum > 0 else 0.0)
-            cdpp_values.append(float(np.median(row_cdpps)) if row_cdpps else np.nan)
-            cdpp_durs.append(float(np.median(row_durs)) if row_durs else np.nan)
-            noise_sources.append("+".join(sorted(set(row_sources))) if row_sources else "no_transits")
+        obs = pairs[pairs["n"] > 0]
+        rows = obs["row"].to_numpy()
+        cdpp, rank = self._pair_cdpp(rows, obs["sector"].to_numpy(), col_idx, tmag, tic)
+        inv_var = np.bincount(rows, weights=obs["n"].to_numpy() / cdpp ** 2, minlength=n_rows)
+        n_used = np.bincount(rows, weights=obs["n"].to_numpy(), minlength=n_rows)
+        best = np.full(n_rows, len(self.NOISE_SOURCES), dtype=np.int64)
+        np.minimum.at(best, rows, rank)
 
+        snr = np.where(inv_var > 0, depth / dilution.to_numpy() * np.sqrt(inv_var) * self.snr_calibration, 0.0)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            self.catalog["tess_cdpp_ppm"] = np.where(inv_var > 0, np.sqrt(n_used / inv_var), np.nan)
         self.catalog["tess_dilution"] = dilution
-        self.catalog["tess_cdpp_ppm"] = cdpp_values
-        self.catalog["tess_cdpp_duration_hr"] = cdpp_durs
-        self.catalog["tess_noise_source"] = noise_sources
-        self.catalog["tess_snr"] = snr_values
+        self.catalog["tess_cdpp_duration_hr"] = np.where(inv_var > 0, self.CDPP_DURATIONS_HR[col_idx], np.nan)
+        self.catalog["tess_noise_source"] = np.array(self.NOISE_SOURCES + ["no_transits"], dtype=object)[best]
+        self.catalog["tess_snr"] = snr
         self.catalog["tess_snr_threshold"] = self.snr_threshold
         return self.catalog["tess_snr"]
 

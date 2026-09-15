@@ -1,10 +1,14 @@
-"""TESS detector calibration: model SNR vs ExoFOP/SPOC SNR (tess_3in1_calibration.png).
-Smooth-CDPP fallback floors lowered (ref 60->30, floor 30->10 ppm/hr) toward real SPOC CDPP.
+"""TESS detector calibration: model SNR vs official SPOC SNR for TOIs (tess_3in1_calibration.png).
+Each TOI gets the sectors of the SPOC multi-sector run that produced its SNR (Source, e.g.
+spoc-s01-s69) and its own per-sector SPOC CDPP by TIC, so what is left is the SNR formula itself.
+Prints the SNR_OFFICIAL_CALIBRATION to put in TESSData. Needs the SPOC CDPP CSVs in
+results/catalogs/tess/CDPP (MAST TCE bulk-download page).
 Run from repo root: python plotting/scripts/calibration/tess_calibration.py
 """
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 from urllib.parse import quote
@@ -65,14 +69,24 @@ DISP_COLORS = {
     "FALSE POSITIVE": "#909090",
 }
 
-# ── Improved CDPP calibration constants ───────────────────────────────────────
-# OLD values (caused ~0.6x ratio at all MES bins for bright stars):
-#   smooth_noise_ref_ppm_1hr  = 60, smooth_noise_floor_ppm_1hr = 30
-# NEW values (calibrated to SPOC CDPP statistics from Ricker+2015 / Sullivan+2015):
-SMOOTH_REF_PPM = 30.0    # photon-noise reference at Tmag=10 (was 60)
-SMOOTH_FLOOR_PPM = 10.0  # systematic noise floor (was 30)
-
 CDPP_DIR = Path(TESS_DATA_DIR) / "CDPP"
+MAX_CDPP_SECTOR = 106
+# Fit the calibration away from the 7.1 cut, where TOIs are biased to upward noise fluctuations.
+CAL_SNR_RANGE = (10.0, 100.0)
+
+
+def searched_sectors(sectors_text, source_text):
+    """Sectors a SPOC multi-sector run searched for this TOI: the TOI's listed sectors inside the
+    run's range (Source 'spoc-s01-s69-...'). None for QLP, single-sector 'spoc', or runs reaching
+    past the last sector with a CDPP table.
+    """
+    m = re.match(r"spoc-s(\d+)-s(\d+)", str(source_text).lower())
+    if not m or int(m.group(2)) > MAX_CDPP_SECTOR:
+        return None
+    lo, hi = int(m.group(1)), int(m.group(2))
+    secs = [int(s) for s in re.split(r"[,;\s]+", str(sectors_text)) if s.strip().isdigit()]
+    secs = [s for s in secs if lo <= s <= hi]
+    return ";".join(map(str, secs)) if secs else None
 
 
 # ── Download ExoFOP TOI catalog ────────────────────────────────────────────────
@@ -193,7 +207,9 @@ def prepare(df: pd.DataFrame) -> pd.DataFrame:
         df = df.dropna(subset=["official_snr"]).copy()
         df = df[df["official_snr"] > 0].copy()
 
-    print(f"Valid TOI rows (with official SNR): {len(df):,}")
+    df["tess_sectors"] = [searched_sectors(s, src) for s, src in zip(df["Sectors"], df["Source"])]
+    df = df.dropna(subset=["tess_sectors"]).copy()
+    print(f"Valid SPOC multi-sector TOI rows (with official SNR): {len(df):,}")
     return df
 
 
@@ -201,26 +217,28 @@ def prepare(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def run_detector(df: pd.DataFrame) -> pd.DataFrame:
-    """Run TESSData with improved smooth CDPP calibration constants."""
-    cdpp_dir = CDPP_DIR if CDPP_DIR.exists() else None
-    td = TESSData(
-        df,
-        source="auto",
-        default_n_sectors=4,          # typical for TOIs; tess-point won't run (no star catalog)
-        min_transits=2,
-        snr_threshold=SNR_THRESHOLD,
-        tmag_limit=16.0,
-        use_tesspoint=False,          # TOI table has ra/dec but not indexed in Gaia catalog
-        use_mast_tic=False,
-        cdpp_dir=cdpp_dir,
-        use_cdpp_tables=(cdpp_dir is not None),
-        smooth_noise_ref_ppm_1hr=SMOOTH_REF_PPM,     # IMPROVED: 60 -> 30
-        smooth_noise_floor_ppm_1hr=SMOOTH_FLOOR_PPM, # IMPROVED: 30 -> 10
-        apply_b_to_duration=True,
-        apply_mdwarf_tmag_correction=True,
-        ffi_cadence_min=None,
-        validate_for_detection=True,
-    )
+    """Run TESSData on the TOIs' own searched sectors and per-TIC SPOC CDPP, derive the SNR
+    calibration from the uncalibrated run, then rerun with it.
+    """
+    if not CDPP_DIR.exists():
+        raise FileNotFoundError(f"SPOC CDPP CSVs not found in {CDPP_DIR}")
+
+    def run(cal):
+        return TESSData(
+            df, source="auto", min_transits=2, snr_threshold=SNR_THRESHOLD, tmag_limit=16.0,
+            use_catalog_sectors=True, phase_mode="expected", cdpp_dir=CDPP_DIR,
+            snr_calibration=cal, validate_for_detection=True,
+        )
+
+    raw = run(1.0).determine_detectable()
+    official = pd.to_numeric(raw["official_snr"], errors="coerce")
+    in_range = official.between(*CAL_SNR_RANGE)
+    cal = float(1.0 / (raw.loc[in_range, "tess_snr"] / official[in_range]).median())
+    print(f"Derived SNR calibration: {cal:.3f} (median official/model over {in_range.sum():,} TOIs "
+          f"with official SNR {CAL_SNR_RANGE[0]:g}-{CAL_SNR_RANGE[1]:g}); "
+          f"TESSData.SNR_OFFICIAL_CALIBRATION is {TESSData.SNR_OFFICIAL_CALIBRATION}")
+
+    td = run(cal)
     out = td.determine_detectable()
     out["toy_over_official_snr"] = (
         pd.to_numeric(out["tess_snr"], errors="coerce") /
@@ -374,14 +392,9 @@ def write_summary(out: pd.DataFrame) -> None:
         f"Total TOI rows analysed: {len(out):,}",
         f"Toy/official SNR ratio:  median={ratio_col.median():.3f}  mean={ratio_col.mean():.3f}",
         "  (1.0 = perfect; < 1.0 = toy is conservative)",
-        "",
-        "Formula change (smooth CDPP fallback):",
-        f"  smooth_noise_ref_ppm_1hr  : 60 -> {SMOOTH_REF_PPM}",
-        f"  smooth_noise_floor_ppm_1hr: 30 -> {SMOOTH_FLOOR_PPM}",
-        "",
-        "Implied CDPP at transit duration=1hr:",
-        f"  Tmag=9:  old ~48 ppm/hr -> new ~{np.sqrt(SMOOTH_FLOOR_PPM**2 + SMOOTH_REF_PPM**2*10**(-0.4)):.0f} ppm/hr",
-        f"  Tmag=12: old ~154 ppm/hr -> new ~{np.sqrt(SMOOTH_FLOOR_PPM**2 + SMOOTH_REF_PPM**2*10**(0.8)):.0f} ppm/hr",
+        f"SNR calibration applied: x{out.attrs.get('snr_calibration', float('nan')):.3f} "
+        f"(fit on official SNR {CAL_SNR_RANGE[0]:g}-{CAL_SNR_RANGE[1]:g})",
+        "Noise source per TOI: " + ", ".join(f"{k}={v:,}" for k, v in out["tess_noise_source"].value_counts().items()),
         "",
         "Ratio by official SNR bin:",
     ]

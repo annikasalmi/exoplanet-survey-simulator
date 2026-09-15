@@ -15,16 +15,10 @@ from tools.paths import TESS_DATA_DIR
 # universe, 2.5-4 GB each; four or more ran out of memory on 16 GB.
 MAX_WORKERS = 2
 
+# Every star gets TESSData's default coverage (5 consecutive sectors) and noise
+# from the binned SPOC CDPP table in telescopes/tess/data. P-Pop stars have no TIC IDs, so the per-TIC CDPP CSVs would go unused.
 TESS_DEFAULTS = {
-    "use_tesspoint": True,
-    "use_mast_tic": False,
-    "cdpp_dir": os.path.join(TESS_DATA_DIR, "CDPP"),
-    "use_cdpp_tables": True,
-    # Fallback when tess-point is unavailable.  tess-point is active for the 400
-    # Gaia catalogs (tess_sector_source == "tess-point"), so this default is never
-    # used in practice.  Value 5 = median observed across the Gaia population
-    # (mean=7, p25=3, p75=8; CVZ |elat|>78° fraction = 4.3% → 13 sectors).
-    "default_n_sectors": 5,
+    "use_cdpp_tables": False,
     "min_transits": 2,
     "snr_threshold": 7.1,
     "phase_mode": "random",

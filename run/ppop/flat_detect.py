@@ -14,7 +14,7 @@ def run_kepler(catalog: pd.DataFrame) -> pd.DataFrame:
 
 
 def run_tess(catalog: pd.DataFrame) -> pd.DataFrame:
-    return TESSData(catalog.copy(), source="ppop", use_tesspoint=False).determine_detectable()
+    return TESSData(catalog.copy(), source="ppop", use_cdpp_tables=False).determine_detectable()
 
 
 def run_rv(catalog: pd.DataFrame, instrument: str = "HARPS") -> pd.DataFrame:

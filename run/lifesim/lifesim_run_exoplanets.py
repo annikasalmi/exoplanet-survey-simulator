@@ -9,15 +9,12 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 import lifesim
 
 from tools.paths import LIFESIM_DATA_DIR, EXOPLANETS_2026_CSV
-import os
 os.makedirs(LIFESIM_DATA_DIR, exist_ok=True)
 from tools.exoplanet_catalog import load_and_filter_exoplanets
 
 from run.run_sim import plot_all
 
 def load_exoplanets_csv(csv_path=EXOPLANETS_2026_CSV):
-    if not os.path.isabs(csv_path):
-        csv_path = os.path.join(os.path.dirname(__file__), '..', '..', csv_path)
     df = load_and_filter_exoplanets(csv_path, instrument='LIFE')
     
     # Create star objects for LIFEsim

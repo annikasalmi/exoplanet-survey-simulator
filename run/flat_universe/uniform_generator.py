@@ -16,9 +16,7 @@ if str(ROOT) not in sys.path:
 import numpy as np
 import pandas as pd
 
-
-# Default output location for cached flat catalogues.
-UNIFORM_OUT_DIR = os.path.join(ROOT, "run/flat_universe/data")
+from tools.paths import FLAT_UNIVERSE_DATA_DIR
 
 # Default parameter box (matches P-Pop bounds; small-planet focus per request).
 DEFAULTS = dict(
@@ -218,7 +216,7 @@ def get_or_build_catalog(cache_path: str, rebuild: bool = False, **kwargs) -> pd
 
 
 if __name__ == "__main__":
-    out_csv = os.path.join(UNIFORM_OUT_DIR, "flat_catalog.csv")
+    out_csv = os.path.join(FLAT_UNIVERSE_DATA_DIR, "flat_catalog.csv")
     df = get_or_build_catalog(out_csv, rebuild=True, n_planets=200000, seed=0)
     print("Rows:", len(df))
     print(df[["radius_p", "mass_p", "p_orb", "flux_p", "semimajor_p",

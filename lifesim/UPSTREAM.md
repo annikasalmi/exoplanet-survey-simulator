@@ -5,5 +5,8 @@ Ottiger and Sascha Quanz (ETH Zürich), under GPLv3. The fork point is `a2b8eeb`
 `core/data.py` had catalog handling reworked to match DataFrame handling throughout the repo more smoothly.
 Additional changes were to `core/core.py`, `instrument/instrument.py` and `util/habitable.py` to use paths tooling
 and to use seeded random numbers as opposed to np.random.
+`instrument/instrument.py`, `optimize/optimizer.py` and `optimize/ahgs.py` write catalog cells in one step
+(`catalog.iat[i, col]`) instead of through chained assignment (`catalog.col.iat[i]`), which pandas 3 ignores.
+Under pandas 2 the output is unchanged.
 
 To see exactly what changed, run `git diff a2b8eeb..HEAD -- lifesim`.

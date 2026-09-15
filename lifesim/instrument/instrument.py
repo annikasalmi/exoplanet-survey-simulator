@@ -334,24 +334,24 @@ class Instrument(InstrumentModule):
 
                     # Add up the noise and caluclate the SNR
                     noise = noise_bg + noise_planet
-                    self.data.catalog.snr_1h.iat[n_p] = np.sqrt((flux_planet ** 2 / noise).sum())
+                    self.data.catalog.iat[n_p, self.data.catalog.columns.get_loc('snr_1h')] = np.sqrt((flux_planet ** 2 / noise).sum())
 
                     # save baseline
-                    self.data.catalog['baseline'].iat[n_p] = self.data.inst['bl']
+                    self.data.catalog.iat[n_p, self.data.catalog.columns.get_loc('baseline')] = self.data.inst['bl']
 
                     if save_mode:
-                        self.data.catalog.noise_astro.iat[n_p] = [noise_bg]
-                        self.data.catalog.planet_flux_use.iat[n_p] = (
+                        self.data.catalog.iat[n_p, self.data.catalog.columns.get_loc('noise_astro')] = [noise_bg]
+                        self.data.catalog.iat[n_p, self.data.catalog.columns.get_loc('planet_flux_use')] = (
                             [flux_planet_thermal
                              * integration_time
                              * self.data.inst['eff_tot']
                              * self.data.inst['telescope_area']])
-                        self.data.catalog['photon_rate_planet'].iat[n_p] = (
+                        self.data.catalog.iat[n_p, self.data.catalog.columns.get_loc('photon_rate_planet')] = (
                                 flux_planet
                                 / integration_time
                                 / self.data.inst['eff_tot']
                         ).sum()
-                        self.data.catalog['photon_rate_noise'].iat[n_p] = (
+                        self.data.catalog.iat[n_p, self.data.catalog.columns.get_loc('photon_rate_noise')] = (
                                 noise
                                 / integration_time
                                 / self.data.inst['eff_tot']

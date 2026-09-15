@@ -1,6 +1,6 @@
 """TESS detector calibration: model SNR vs ExoFOP/SPOC SNR (tess_3in1_calibration.png).
 Smooth-CDPP fallback floors lowered (ref 60->30, floor 30->10 ppm/hr) toward real SPOC CDPP.
-Run from repo root: python plotting/mission_calibration/tess_calibration.py
+Run from repo root: python plotting/scripts/calibration/tess_calibration.py
 """
 
 from __future__ import annotations

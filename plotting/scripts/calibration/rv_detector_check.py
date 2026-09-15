@@ -1,6 +1,6 @@
 """RV detector calibration against published semi-amplitudes (PSCompPars pl_rvamp): model K vs
 published K, recovery per K bin, K ratio; plus P-Pop stage checks (noise budget, losses).
-Run: python plotting/mission_calibration/rv_detector_check.py [--instrument NIRPS]
+Run: python plotting/scripts/calibration/rv_detector_check.py [--instrument NIRPS]
 """
 
 from __future__ import annotations

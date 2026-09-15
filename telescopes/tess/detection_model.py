@@ -37,7 +37,7 @@ class TESSData:
 
     # Calibration against official SPOC SNR (ExoFOP TOI): the boxcar SNR runs ~1.52x high near the
     # 7.1 cut, so this ~1/1.52 factor makes model/official ~1.0 where detection is decided.
-    # Re-derive with plotting/mission_calibration/tess_calibration.py.
+    # Re-derive with plotting/scripts/calibration/tess_calibration.py.
     SNR_OFFICIAL_CALIBRATION = 0.66
 
     # Teff grid for proxy Tmag color corrections (upgrade #5).

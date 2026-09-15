@@ -36,7 +36,7 @@ class KeplerData:
 
     # Calibration against official Kepler DR25 MES (koi_max_mult_ev): the boxcar MES runs ~1.19x
     # high, so this ~1/1.19 factor brings the median model/official ratio to ~1.0.
-    # Re-derive with plotting/mission_calibration/kepler_calibration.py.
+    # Re-derive with plotting/scripts/calibration/kepler_calibration.py.
     MES_OFFICIAL_CALIBRATION = 0.84
 
     # Earth-size planet across Sun-size star gives roughly 84 ppm.

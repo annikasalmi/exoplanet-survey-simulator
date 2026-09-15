@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
-from tools.paths import LIFESIM_OUTER_DIR, ANALYSIS_DIR
+from tools.paths import LIFESIM_OUTER_DIR, CALIBRATION_DIR
 ROOT = Path(LIFESIM_OUTER_DIR)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -30,14 +30,14 @@ from PPop.StabilityModels import He2019
 from PPop.OrbitModels import Random
 from PPop.AlbedoModels import Uniform
 from PPop.ExozodiModels import Ertel2020
-from run.ppop.uniform_generator import generate_flat_catalog, DEFAULTS
+from run.flat_universe.uniform_generator import generate_flat_catalog, DEFAULTS
 
 N_STARS = 1200
 SUBSET_SEED = 12345
 DRAW_SEED = 0
 TARGET = 1_000_000
 N_FLAT = 200_000           # flat planets kept for the population panels
-OUT_DIR = os.path.join(ANALYSIS_DIR, "08_generator_comparison")
+OUT_DIR = os.path.join(CALIBRATION_DIR, "generator_comparison")
 CACHE = os.path.join(OUT_DIR, "three_generators_data.npz")
 
 COL = {"old": "#d1495b", "new": "#1f77b4", "flat": "#6c757d"}

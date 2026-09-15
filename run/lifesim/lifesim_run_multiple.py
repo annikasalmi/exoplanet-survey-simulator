@@ -114,7 +114,7 @@ def main(parallel=True, nruns=np.arange(1), star_catalog='Gaia', run_anew=True):
     print(f"Finished {len(nruns)} runs in {time.time() - start:.2f} seconds")
 
     # Combine all runs into one DataFrame
-    df_concat = pd.concat(results, keys=nruns).reset_index(level=0).rename(columns={'level_0': 'run'})
+    df_concat = pd.concat(results, keys=nruns).reset_index(level=0).rename(columns={'level_0': 'run'}).reset_index(drop=True)
 
     print(f"Total time: {time.time() - start:.2f} seconds")
 

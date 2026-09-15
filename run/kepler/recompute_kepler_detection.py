@@ -58,7 +58,8 @@ def main():
         return
 
     print(f"Re-running Kepler detection on {len(files)} catalog(s) "
-          f"(cdpp_variability_ppm=28, quadrature floor)\n")
+          f"(CDPP fallback {KeplerData.CDPP_NONSTELLAR_KP12_PPM} ppm @Kp12 (+) "
+          f"{KeplerData.CDPP_STELLAR_PPM} ppm stellar floor)\n")
     print(f"{'file':24s} {'rows':>9s}   detected% among transiting (F / G / K / M)")
     print("-" * 78)
 

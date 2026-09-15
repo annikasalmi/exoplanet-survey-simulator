@@ -1,30 +1,42 @@
-name: Run Code on Push
+name: Tests
 
 on:
   push:
     branches:
-      - annika/master  
+      - annika/master
+  pull_request:
+  workflow_dispatch:
 
 jobs:
-  run-my-code:
+  test:
     runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    env:
+      MPLBACKEND: Agg
+      QT_QPA_PLATFORM: offscreen
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
+          cache: pip
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Check working directory
-        run: pwd && ls -al
-
-      - name: Run integration
         run: |
+          pip install -r requirements.txt
           pip install -e .
-          python tests/integration.py
+
+      # Every pipeline end to end on stars within 10 pc, plus the detector unit tests.
+      - name: Run tests
+        run: pytest -v -rfEX
+
+      # The README quickstart. plot_flat_universe reports plotter errors without
+      # failing, so check the figure exists.
+      - name: Run the quickstart demo
+        run: |
+          python simulation_demo.py
+          test -f results/figures/analysis/likelihood_ratio_catalog/full_catalog_lr.png

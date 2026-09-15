@@ -21,7 +21,7 @@ NASA_INPUT_CSV = Path(PSCOMPPARS_CSV)
 NASA_OUTPUT_CSV = NASA_DATA_DIR / "kepler_catalog_nasa_pscomppars.csv"
 
 # Detection settings for the NASA PSCompPars population.
-FALLBACK_CDPP_PPM = 100.0
+FALLBACK_CDPP_PPM = KeplerData.CDPP_NONSTELLAR_KP12_PPM
 MISSION_DURATION_DAYS = 4 * 365.25
 MIN_TRANSITS = 3
 MES_THRESHOLD = 7.1

@@ -69,7 +69,7 @@ def main(parallel=False, nruns=np.arange(1), star_catalog='Gaia', run_anew=True)
         else:
             results = [run_hwo_import_catalog(i=i, star_catalog=star_catalog) for i in nruns]
 
-    df_concat = pd.concat(results, keys=nruns).reset_index(level=0).rename(columns={'level_0': 'run'})
+    df_concat = pd.concat(results, keys=nruns).reset_index(level=0).rename(columns={'level_0': 'run'}).reset_index(drop=True)
     print(f"Total time: {time.time() - start:.2f} seconds")
 
     return df_concat

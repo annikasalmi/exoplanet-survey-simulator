@@ -32,7 +32,7 @@ class Optimizer(OptimizationModule):
                 if n_p == 3200:
                     break
                 for i, theta in enumerate(theta_p):
-                    self.data.catalog.angsep.iat[n_p] = (self.data.catalog.semimajor_p.iloc[n_p]
+                    self.data.catalog.iat[n_p, self.data.catalog.columns.get_loc('angsep')] = (self.data.catalog.semimajor_p.iloc[n_p]
                                                          / self.data.catalog.distance_s.iloc[n_p]
                                                          * np.sqrt(
                         np.cos(self.data.catalog.small_omega_p.iloc[n_p] + theta) ** 2
@@ -47,12 +47,12 @@ class Optimizer(OptimizationModule):
                     flux_planet = self.data.catalog.planet_flux_use.iloc[n_p][0] * transm_eff
                     snr_phase[i] = np.sqrt((flux_planet ** 2 / noise).sum())
 
-                self.data.catalog.snr_phase.iat[n_p] = [snr_phase]
+                self.data.catalog.iat[n_p, self.data.catalog.columns.get_loc('snr_phase')] = [snr_phase]
 
         for n_p in tqdm(range(self.data.catalog.shape[0])):
             i = np.argmax(self.data.catalog.snr_phase.iloc[n_p][0])
-            self.data.catalog.theta_p.iat[n_p] = theta_p[i]
-            self.data.catalog.angsep.iat[n_p] = (self.data.catalog.semimajor_p.iloc[n_p]
+            self.data.catalog.iat[n_p, self.data.catalog.columns.get_loc('theta_p')] = theta_p[i]
+            self.data.catalog.iat[n_p, self.data.catalog.columns.get_loc('angsep')] = (self.data.catalog.semimajor_p.iloc[n_p]
                                                  / self.data.catalog.distance_s.iloc[n_p]
                                                  * np.sqrt(
                         np.cos(self.data.catalog.small_omega_p.iloc[n_p]
@@ -60,7 +60,7 @@ class Optimizer(OptimizationModule):
                         + np.cos(self.data.catalog.inc_p.iloc[n_p]) ** 2
                         * np.sin(self.data.catalog.small_omega_p.iloc[n_p]
                                  + self.data.catalog.theta_p.iloc[n_p]) ** 2))
-            self.data.catalog.snr_new.iat[n_p] = self.data.catalog.snr_phase.iloc[n_p][0][i]
+            self.data.catalog.iat[n_p, self.data.catalog.columns.get_loc('snr_new')] = self.data.catalog.snr_phase.iloc[n_p][0][i]
 
     def ahgs(self):
         # set 0 if type limit is not hit

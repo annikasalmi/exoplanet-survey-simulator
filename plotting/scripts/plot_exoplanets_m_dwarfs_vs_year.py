@@ -1,6 +1,10 @@
+"""Discovery year vs stellar Teff for small planets (R < 2.6 R_earth) around stars below 4000 K.
+Run: python plotting/scripts/plot_exoplanets_m_dwarfs_vs_year.py  -> results/figures/other/exoplanets_m_dwarfs_vs_year.png
+"""
+import os
 import pandas as pd
 import matplotlib.pyplot as plt
-from tools.paths import EXOPLANETS_ALL_2025_CSV
+from tools.paths import EXOPLANETS_ALL_2025_CSV, OTHER_FIGURES_DIR
 
 df = pd.read_csv(EXOPLANETS_ALL_2025_CSV)
 
@@ -50,11 +54,14 @@ plt.legend(handles=legend_elements, loc='lower right')
 
 plt.xlabel('Stellar Effective Temperature (K)', fontsize=16)
 plt.ylabel('Discovery Year', fontsize=16)
-plt.title('Exoplanets (R < 2.6 R$_\oplus$) around Stars with T$_{eff}$ < 4000K', fontsize=16)
+plt.title(r'Exoplanets (R < 2.6 R$_\oplus$) around Stars with T$_{eff}$ < 4000K', fontsize=16)
 
 # Add colorbar
 cbar = plt.colorbar(scatter)
-cbar.set_label('Planet Radius (R$_\oplus$)', rotation=270, labelpad=15)
+cbar.set_label(r'Planet Radius (R$_\oplus$)', rotation=270, labelpad=15)
 
 plt.tight_layout()
-plt.show() 
+os.makedirs(OTHER_FIGURES_DIR, exist_ok=True)
+out = os.path.join(OTHER_FIGURES_DIR, 'exoplanets_m_dwarfs_vs_year.png')
+plt.savefig(out, dpi=300, bbox_inches='tight')
+print(f"Plot saved to {out}")

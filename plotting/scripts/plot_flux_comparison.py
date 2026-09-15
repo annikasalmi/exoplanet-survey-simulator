@@ -1,10 +1,11 @@
+"""Planet vs star blackbody flux at HWO wavelengths for known exoplanets.
+Run: python plotting/scripts/plot_flux_comparison.py  -> results/figures/other/
+"""
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import os
-import sys
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from tools.paths import LIFESIM_OUTER_DIR, EXOPLANETS_2026_CSV
+from tools.paths import OTHER_FIGURES_DIR, EXOPLANETS_2026_CSV
 from tools.exoplanet_catalog import read_nasa_csv
 import tools.physics_constants as const
 
@@ -133,13 +134,12 @@ def plot_planetary_vs_stellar_flux():
     plt.legend()
     
     # Save the plot
-    output_dir = os.path.join(LIFESIM_OUTER_DIR, 'plots')
-    os.makedirs(output_dir, exist_ok=True)
-    plt.savefig(os.path.join(output_dir, 'planetary_vs_stellar_flux.png'), 
+    os.makedirs(OTHER_FIGURES_DIR, exist_ok=True)
+    plt.savefig(os.path.join(OTHER_FIGURES_DIR, 'planetary_vs_stellar_flux.png'),
                 dpi=300, bbox_inches='tight')
-    plt.show()
-    
-    print(f"Plot saved to {os.path.join(output_dir, 'planetary_vs_stellar_flux.png')}")
+    plt.close()
+
+    print(f"Plot saved to {os.path.join(OTHER_FIGURES_DIR, 'planetary_vs_stellar_flux.png')}")
 
 def plot_flux_ratio_vs_wavelength():
     """
@@ -252,13 +252,12 @@ def plot_flux_ratio_vs_wavelength():
     plt.legend()
     
     # Save the plot
-    output_dir = os.path.join(LIFESIM_OUTER_DIR, 'plots')
-    os.makedirs(output_dir, exist_ok=True)
-    plt.savefig(os.path.join(output_dir, 'flux_ratio_vs_wavelength.png'), 
+    os.makedirs(OTHER_FIGURES_DIR, exist_ok=True)
+    plt.savefig(os.path.join(OTHER_FIGURES_DIR, 'flux_ratio_vs_wavelength.png'),
                 dpi=300, bbox_inches='tight')
-    plt.show()
-    
-    print(f"Flux ratio plot saved to {os.path.join(output_dir, 'flux_ratio_vs_wavelength.png')}")
+    plt.close()
+
+    print(f"Flux ratio plot saved to {os.path.join(OTHER_FIGURES_DIR, 'flux_ratio_vs_wavelength.png')}")
 
 if __name__ == "__main__":
     plot_planetary_vs_stellar_flux()

@@ -11,6 +11,7 @@ figures/
   analysis/     the analysis scripts, one directory each
   calibration/  plotting/scripts/calibration/: detectors against real mission
                 data, and the three planet generators against each other
+  other/        the standalone scripts in plotting/scripts/
 paper/        publication figures
 logs/         per-run logs written by run_sim
 ```

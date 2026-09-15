@@ -4,3 +4,10 @@ requires = [
     "wheel"
 ]
 build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Only test_*.py: the other scripts in tests/ are one-off analyses, not tests.
+python_files = ["test_*.py"]
+# Import this checkout even when the venv's editable install points at another one.
+pythonpath = ["."]

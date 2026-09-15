@@ -44,6 +44,15 @@ are in the same file but commented out.
 - `results/`: everything the pipelines write (git-ignored, see `results/README.md`)
 - `lifesim/`, `PPop/`: the vendored forks
 
+## Tests
+
+```bash
+pytest
+```
+
+This runs every pipeline end to end on the Gaia stars within 10 pc, in about three
+minutes, and writes nothing under `results/`. CI runs it on every push and pull request.
+
 ## Credit and licence
 
 LIFEsim is by Felix Dannert, Maurice Ottiger and Sascha Quanz (ETH Zürich). P-pop is

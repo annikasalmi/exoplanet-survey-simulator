@@ -43,6 +43,15 @@ class KeplerData:
     # This is geometry, not a universal Kepler detection threshold.
     EARTH_SUN_TRANSIT_DEPTH_PPM = 84.0
 
+    # Fallback noise for rows without per-target rrmscdpp (every P-Pop row): 6.5-hr CDPP of
+    # 12th-mag Kepler dwarfs. Gilliland et al. 2011 (ApJS 197, 6) measured a median intrinsic
+    # stellar noise of 19.5 ppm; Gilliland et al. 2015 (AJ 150, 133) found it unchanged over the
+    # full mission, with stellar + Poisson = 664 ppm^2 and a 98 ppm^2 instrument/pipeline residual
+    # in the final SOC 9.2 processing. The non-stellar part is sqrt(664 - 19.5^2 + 98) = 19.5 ppm,
+    # so CDPP(Kp=12) = 19.5 (+) 19.5 = 28 ppm, matching the ~30 ppm those papers quote.
+    CDPP_NONSTELLAR_KP12_PPM = 19.5
+    CDPP_STELLAR_PPM = 19.5
+
     def __init__(
         self,
         data: Union[pd.DataFrame, object],
@@ -59,15 +68,15 @@ class KeplerData:
         # comparison in important_plots/kepler_calibration.py.
         mes_calibration: Optional[float] = None,
         kepler_mag_limit: float = 16.0,
-        fallback_cdpp_ppm: float = 100.0,
+        fallback_cdpp_ppm: float = CDPP_NONSTELLAR_KP12_PPM,
         use_kepmag_cdpp_fallback: bool = True,
         cdpp_kp_ref_mag: float = 12.0,
         cdpp_min_ppm: float = 20.0,
         cdpp_max_ppm: float = 2000.0,
         # Stellar-variability floor added in quadrature to photon noise, so bright nearby F/G dwarfs
         # aren't treated as noiseless (which saturates FGK detections). Main knob for bright-star
-        # detectability; 28 ppm sits between a quiet (~20) and a mildly active (~40 ppm) FGK dwarf.
-        cdpp_variability_ppm: float = 28.0,
+        # detectability; default is the Gilliland et al. median (see CDPP_STELLAR_PPM).
+        cdpp_variability_ppm: float = CDPP_STELLAR_PPM,
 
         # NASA-specific switches. These are the keywords your NASA runner uses.
         use_observed_transit_flag_for_nasa: bool = True,
@@ -110,7 +119,7 @@ class KeplerData:
         self.kepler_mag_limit = kepler_mag_limit
 
         # If an old caller passes default_noise_ppm, use it as the CDPP fallback.
-        if default_noise_ppm is not None and fallback_cdpp_ppm == 100.0:
+        if default_noise_ppm is not None and fallback_cdpp_ppm == self.CDPP_NONSTELLAR_KP12_PPM:
             fallback_cdpp_ppm = float(default_noise_ppm)
         self.fallback_cdpp_ppm = fallback_cdpp_ppm
         self.use_kepmag_cdpp_fallback = use_kepmag_cdpp_fallback
@@ -554,7 +563,8 @@ class KeplerData:
         cdpp_photon = cdpp_photon.replace([np.inf, -np.inf], np.nan).fillna(self.fallback_cdpp_ppm)
 
         # Add the stellar-variability floor in quadrature so bright F/G dwarfs (Kp ~7-9 at 60 pc) don't
-        # become noiseless. M dwarfs (Kp ~13, CDPP ~200 ppm) are essentially unchanged.
+        # become noiseless. The 10**(0.2 dKp) scaling is photon-limited, so it underestimates noise
+        # for Kp >~ 14 where background and read noise matter; within 60 pc that is only M dwarfs.
         cdpp = np.sqrt(cdpp_photon ** 2 + self.cdpp_variability_ppm ** 2)
         return cdpp.clip(lower=self.cdpp_min_ppm, upper=self.cdpp_max_ppm)
 

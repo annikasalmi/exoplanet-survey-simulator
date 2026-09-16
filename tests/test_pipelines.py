@@ -12,6 +12,7 @@ import pytest
 
 import plotting.base_plotter as base_plotter
 import plotting.likelihood_ratio_plotter as likelihood_ratio_plotter
+from plotting.plot_flat_universe import plot_flat_universe
 import run.flat_universe.run_flat_universe as flat
 import run.hwo.hwo_run_multiple as hwo
 import run.kepler.run_kepler as kepler
@@ -151,8 +152,7 @@ def test_flat_universe(sandbox):
     pd.testing.assert_frame_equal(cached, df, check_dtype=False)
     pd.testing.assert_frame_equal(regenerated, df, check_dtype=False)
 
-    # plot_flat_universe swallows plotter errors, so call the plotter directly.
-    likelihood_ratio_plotter.main(df)
+    plot_flat_universe(df)
     assert list((sandbox / 'likelihood_ratio').glob('*.png'))
 
 

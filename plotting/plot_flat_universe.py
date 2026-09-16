@@ -17,10 +17,5 @@ def plot_flat_universe(df, nruns=1, use_multiprocessing=False, **kwargs):
     print(f"\nPlotting flat universe ({len(df):,} planets, "
           f"universes {sorted(df['universe_type'].unique())})")
 
-    try:
-        likelihood_ratio_plotter.main(df)
-        print("[ok] likelihood_ratio_catalog")
-    except Exception as e:
-        print(f"[fail] likelihood_ratio_catalog: {e}")
-
+    likelihood_ratio_plotter.main(df)
     print("Flat universe plotting complete.\n")

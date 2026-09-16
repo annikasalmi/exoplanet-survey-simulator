@@ -663,7 +663,7 @@ def main(df):
     rs = cfgs["precision"]["res"]["shape"]
     rf = cfgs["full"]["res"]["cond_loc"]
     rsf = cfgs["full"]["res"]["shape"]
-    print("\n================ CAVEMAN SUMMARY ================")
+    print("\n================ SUMMARY ================")
     print("  We made two fake universes. Same everything, except one has cold big rocky")
     print("  planets (B) and one does not (A). Both go through our detectors + NASA-size")
     print("  noise. A classifier learns the ONLY difference: the corner. Each NASA planet")
@@ -686,11 +686,9 @@ def main(df):
     print("     share lesson); composition-dependent publication bias within a location remains.")
     print("  2. Corner membership uses the silicate line + TRUE parameters; M-R model enters")
     print("     only via the silicate curve, not a mass-from-radius draw (flat M ⊥ R).")
-    print("  3. Homogeneous-subsample rerun, M-R swap, coverage test = plan steps 6-8, not built.")
-    print("  4. Classifier imperfection costs power only — the null calibration keeps validity.")
+    print("  3. Classifier imperfection costs power only — the null calibration keeps validity.")
 
 
 if __name__ == "__main__":
     from run.flat_universe.run_flat_universe import main as run_flat
     main(run_flat(seed=RNG_SEED, n_planets=FLAT_N_POOL, run_anew=False))
-DOWNLOAD_NASA_DATA = False  # Set to True to download fresh data, False to use local CSV

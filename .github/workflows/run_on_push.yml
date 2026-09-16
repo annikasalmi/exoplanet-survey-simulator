@@ -34,8 +34,7 @@ jobs:
       - name: Run tests
         run: pytest -v -rfEX
 
-      # The README quickstart. plot_flat_universe reports plotter errors without
-      # failing, so check the figure exists.
+      # The README quickstart; also check the figure landed where the README says.
       - name: Run the quickstart demo
         run: |
           python simulation_demo.py

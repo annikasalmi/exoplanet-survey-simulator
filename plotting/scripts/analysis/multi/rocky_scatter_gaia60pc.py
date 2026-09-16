@@ -13,7 +13,7 @@ import sys
 import numpy as np
 import pandas as pd
 
-from tools.paths import SILICON_CURVE, ANALYSIS_DIR, PAPER_FIGURES_DIR, KEPLER_DATA_DIR, TESS_DATA_DIR, KEPLER_REF_CURVE, EXOPLANETS_2026_CSV
+from tools.paths import SILICON_CURVE, ANALYSIS_DIR, PAPER_FIGURES_DIR, KEPLER_DATA_DIR, TESS_DATA_DIR, KEPLER_REF_CURVE
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -54,17 +54,10 @@ TESS_PPOP_DIR   = Path(TESS_DATA_DIR) / "Gaia"
 
 
 def _ppop_files(directory: Path, stem: str) -> list[Path]:
-    """Return <stem>_<i>.csv for i in 0..N_UNIVERSES-1, in order.
-    Falls back to local CSV if DOWNLOAD_NASA_DATA=False."""
+    """Return <stem>_<i>.csv for i in 0..N_UNIVERSES-1, in order. Raises if none exist."""
     wanted = [directory / f"{stem}_{i}.csv" for i in range(N_UNIVERSES)]
     present = [f for f in wanted if f.exists()]
     if not present:
-        # Fallback to local CSV when run/ catalogs don't exist
-        if not DOWNLOAD_NASA_DATA:
-            local_csv = Path(EXOPLANETS_2026_CSV)
-            if local_csv.exists():
-                print(f"No P-Pop catalogs in {directory}, using local CSV: {local_csv}")
-                return [local_csv]
         raise FileNotFoundError(
             f"No P-Pop catalogs found in {directory} for stem '{stem}' "
             f"(expected {stem}_0.csv .. {stem}_{N_UNIVERSES - 1}.csv)"
@@ -1331,4 +1324,3 @@ if __name__ == "__main__":
         import traceback
         traceback.print_exc()
         sys.exit(1)
-DOWNLOAD_NASA_DATA = False  # Set to True to download fresh data, False to use local CSV

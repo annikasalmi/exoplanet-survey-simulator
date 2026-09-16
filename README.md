@@ -24,8 +24,10 @@ pip install -e .
 python simulation_demo.py
 ```
 
-That builds one flat universe, runs it through the Kepler, TESS and RV detection
-models, and writes plots under `results/figures/`. It takes under a minute. To try
+That draws flat populations of rocky planets around G, K and M stars, runs them
+through the TESS transit and HARPS/NIRPS RV detection models, and plots the fraction
+detected in a 3x3 insolation-radius map, with NASA's measured rocky planets on top.
+The figure goes to `results/figures/analysis/flat_transit_rv_3x3/`. It takes under a minute. To try
 another pipeline, change `SIM_NAME` at the top of the script; every option except
 `flat_universe` builds a P-Pop universe and takes about 30 minutes.
 

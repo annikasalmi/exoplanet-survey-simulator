@@ -474,4 +474,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-DOWNLOAD_NASA_DATA = False  # Set to True to download fresh data, False to use local CSV

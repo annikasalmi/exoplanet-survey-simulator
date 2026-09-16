@@ -179,7 +179,7 @@ def window_stats(panel: pd.DataFrame, test: str):
     return (n - n_pass) / n, n, n - n_pass
 
 
-def main():
+def main(paper_copy: bool = True):
     print("=" * 70)
     print("flat_transit_rv_3x3.py — flat-Otegi selection maps (paper Fig. 2)")
     print(f"Transit pipeline: {TRANSIT_MISSION}")
@@ -321,10 +321,11 @@ def main():
     suffix = "" if TRANSIT_MISSION == "TESS" else f"_{TRANSIT_MISSION.lower()}"
     out = OUT_DIR / f"flat_transit_rv_3x3_otegi{suffix}.png"
     fig.savefig(out, dpi=170, bbox_inches="tight")
-    fig.savefig(PAPER_FIG_DIR / out.name, dpi=170, bbox_inches="tight")
-    plt.close(fig)
     print(f"\nSaved: {out}")
-    print(f"Saved paper copy: {PAPER_FIG_DIR / out.name}")
+    if paper_copy:
+        fig.savefig(PAPER_FIG_DIR / out.name, dpi=170, bbox_inches="tight")
+        print(f"Saved paper copy: {PAPER_FIG_DIR / out.name}")
+    plt.close(fig)
 
 
 if __name__ == "__main__":
@@ -334,4 +335,3 @@ if __name__ == "__main__":
         import traceback
         traceback.print_exc()
         sys.exit(1)
-DOWNLOAD_NASA_DATA = False  # Set to True to download fresh data, False to use local CSV

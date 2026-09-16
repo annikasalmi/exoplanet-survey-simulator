@@ -21,11 +21,15 @@ from tools.paths import FLAT_UNIVERSE_DATA_DIR
 FLAT_CACHE_DIR = Path(FLAT_UNIVERSE_DATA_DIR)
 FLAT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-def _get_or_generate_universe(seed=0, n_planets=150000, universe_type='A'):
-    """Load the cached flat universe or generate it. universe_type: 'A' (drop rocky M>2) or 'B' (all)."""
+SEED = 0
+N_PLANETS = 150_000
+
+def _get_or_generate_universe(seed, n_planets, universe_type, run_anew):
+    """Load the cached flat universe, or generate it if run_anew or no cache exists.
+    universe_type: 'A' (drop rocky M>2) or 'B' (all)."""
     cache_file = FLAT_CACHE_DIR / f"flat_universe_{universe_type}_seed{seed}_n{n_planets}.csv"
 
-    if cache_file.exists():
+    if not run_anew and cache_file.exists():
         print(f"  Loading cached {universe_type}: {cache_file.name}")
         return pd.read_csv(cache_file)
 
@@ -50,16 +54,16 @@ def _get_or_generate_universe(seed=0, n_planets=150000, universe_type='A'):
 
 
 def main(
-    seed=0,
-    n_planets=150000,
+    seed=SEED,
+    n_planets=N_PLANETS,
     parallel=False,
     nruns=np.arange(1),
     star_catalog=None,
     run_anew=True,
 ):
     """Flat-universe (A and B) detection pipeline; returns both concatenated with kepler_/tess_/rv_detected,
-    universe_type and run columns. run_anew=True ignores the cache. parallel, nruns and star_catalog are
-    unused, accepted so run_sim can call this like the telescope pipelines.
+    universe_type and run columns. run_anew=True regenerates and overwrites the cache; False reuses it.
+    parallel, nruns and star_catalog are unused, accepted so run_sim can call this like the telescope pipelines.
     """
     start = time.time()
     print(f"Flat universe: seed={seed}, n_planets={n_planets:,}")
@@ -70,7 +74,8 @@ def main(
         df = _get_or_generate_universe(
             seed=seed,
             n_planets=n_planets,
-            universe_type=universe_type
+            universe_type=universe_type,
+            run_anew=run_anew,
         )
         df['run'] = 0
         results.append(df)
@@ -85,5 +90,5 @@ def main(
 
 
 if __name__ == "__main__":
-    df = main(seed=0, n_planets=150000)
+    df = main()
     print("\nColumns:", df.columns.tolist())

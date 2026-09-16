@@ -5,7 +5,6 @@ R/M come from Teff, insolation from the orbit (kept within 1e-2..1e4 I_earth). S
 
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 
@@ -15,8 +14,6 @@ if str(ROOT) not in sys.path:
 
 import numpy as np
 import pandas as pd
-
-from tools.paths import FLAT_UNIVERSE_DATA_DIR
 
 # Default parameter box (matches P-Pop bounds; small-planet focus per request).
 DEFAULTS = dict(
@@ -202,22 +199,8 @@ def generate_flat_catalog(
     return df
 
 
-def get_or_build_catalog(cache_path: str, rebuild: bool = False, **kwargs) -> pd.DataFrame:
-    """Load a cached flat catalogue, or build (and cache) it. Shared by the scripts."""
-    if (not rebuild) and os.path.exists(cache_path):
-        print(f"--> Loading cached flat catalogue: {cache_path}")
-        return pd.read_csv(cache_path)
-    print(f"--> Building flat catalogue: {kwargs}")
-    catalog = generate_flat_catalog(**kwargs)
-    os.makedirs(os.path.dirname(cache_path), exist_ok=True)
-    catalog.to_csv(cache_path, index=False)
-    print(f"--> Cached flat catalogue ({len(catalog)} planets) to: {cache_path}")
-    return catalog
-
-
 if __name__ == "__main__":
-    out_csv = os.path.join(FLAT_UNIVERSE_DATA_DIR, "flat_catalog.csv")
-    df = get_or_build_catalog(out_csv, rebuild=True, n_planets=200000, seed=0)
+    df = generate_flat_catalog(n_planets=200000, seed=0)
     print("Rows:", len(df))
     print(df[["radius_p", "mass_p", "p_orb", "flux_p", "semimajor_p",
               "teff_s", "radius_s", "distance_s"]].describe().round(3).to_string())

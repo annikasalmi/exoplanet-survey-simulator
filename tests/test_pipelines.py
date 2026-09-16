@@ -140,11 +140,13 @@ def test_flat_universe(sandbox):
     for col in ('kepler_detected', 'tess_detected', 'rv_detected'):
         assert 0 < df[col].sum() < len(df), f'{col} is all-or-nothing'
 
-    # The second call reads the cache; deleting it forces a fresh draw from the same seed.
-    cached = flat.main(seed=0, n_planets=n_planets)
+    # run_anew=False reads the cache. Truncating the cache then shows run_anew=True ignores
+    # it and redraws the same universe from the seed.
+    cached = flat.main(seed=0, n_planets=n_planets, run_anew=False)
     for path in (sandbox / 'flat_universe').glob('*.csv'):
-        path.unlink()
-    regenerated = flat.main(seed=0, n_planets=n_planets)
+        pd.read_csv(path).head(10).to_csv(path, index=False)
+    assert len(flat.main(seed=0, n_planets=n_planets, run_anew=False)) == 20
+    regenerated = flat.main(seed=0, n_planets=n_planets, run_anew=True)
     df = df.drop(columns='radius_bin')
     pd.testing.assert_frame_equal(cached, df, check_dtype=False)
     pd.testing.assert_frame_equal(regenerated, df, check_dtype=False)

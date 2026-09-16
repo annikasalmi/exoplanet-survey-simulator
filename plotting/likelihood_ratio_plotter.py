@@ -692,5 +692,5 @@ def main(df):
 
 if __name__ == "__main__":
     from run.flat_universe.run_flat_universe import main as run_flat
-    main(run_flat(seed=RNG_SEED, n_planets=FLAT_N_POOL))
+    main(run_flat(seed=RNG_SEED, n_planets=FLAT_N_POOL, run_anew=False))
 DOWNLOAD_NASA_DATA = False  # Set to True to download fresh data, False to use local CSV

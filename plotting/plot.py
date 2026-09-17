@@ -5,8 +5,6 @@ import os
 from plotting.plot_by_type import PlotPlanetType
 from plotting.plot_by_type_LTC3 import PlotPlanetTypeLTC3, PlanetDetectionPlotterLTC3
 from plotting.plot_detections import PlanetDetectionPlotter
-from plotting.plot_rejections import PlanetRejectionPlotter
-from plotting.plot_hz_limits import PlotHZLimits
 import matplotlib.pyplot as plt
 
 plt.rcParams.update({'font.size': 16})
@@ -28,7 +26,7 @@ def _run_plotter_class(plotter_class, df, nruns, star_catalog, sim_name, **kwarg
         return f"{plotter_class.__name__} failed: {str(e)}"
 
 
-def plot_all(df, nruns=1, star_catalog='Gaia', sim_name='HWO', use_multiprocessing=True):
+def plot_all(df, nruns=1, star_catalog='Gaia', sim_name='kepler', use_multiprocessing=True):
     """
     Generate all plots using multiprocessing for parallel execution.
     
@@ -61,6 +59,9 @@ def plot_all(df, nruns=1, star_catalog='Gaia', sim_name='HWO', use_multiprocessi
     
     # Add rejection plotting only for HWO
     if sim_name == 'HWO' or sim_name == 'HWO_exoplanets':
+        # HWO-specific figure; import it only for HWO plotting runs.
+        from plotting.plot_hz_limits import PlotHZLimits
+        from plotting.plot_rejections import PlanetRejectionPlotter
         plotting_tasks.append((PlanetRejectionPlotter, {}))
         plotting_tasks.append((PlotHZLimits, {}))
         

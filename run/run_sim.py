@@ -1,6 +1,7 @@
 import time
 import os
 import sys
+from importlib import import_module
 import numpy as np
 import pandas as pd
 from datetime import datetime
@@ -10,13 +11,9 @@ import logging
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from tools.paths import LOGGING, EXOPLANETS_2026_CSV
-from telescopes.hwo.detection_model import HWOData
 from telescopes.kepler.detection_model import KeplerData
 from telescopes.tess.detection_model import TESSData
 
-
-from run.lifesim.lifesim_run_multiple import main as main_lifesim
-from run.hwo.hwo_run_multiple import main as main_hwo
 from run.kepler.run_kepler import main as main_kepler
 from run.tess.run_tess import main as main_tess
 from run.rv.run_rv import main as main_rv
@@ -48,7 +45,8 @@ def run_with_progress(func, name, estimated_minutes=12, *args, **kwargs):
         raise
     return result
 
-def run_sim(func=main_hwo, name='hwo', parallel=True, nruns=500, star_catalog='Gaia', run_anew=True, plot=True, **kwargs):
+def run_sim(func=main_kepler, name='kepler', parallel=True, nruns=500,
+            star_catalog='Gaia', run_anew=True, plot=True, **kwargs):
     start_time = time.time()
     print(f"Starting simulation: {name} with {len(nruns)} universe(s)...")
     try:
@@ -92,28 +90,33 @@ def run_sim(func=main_hwo, name='hwo', parallel=True, nruns=500, star_catalog='G
     return df_concat
 
 
-def run_exoplanet_plotting(name='HWO_exoplanets', star_catalog='exoplanet_catalog', plot=True):
+def run_exoplanet_plotting(name='Kepler_exoplanets', star_catalog='exoplanet_catalog', plot=True):
     print("Loading exoplanets data for plotting...")
 
     exo_path = EXOPLANETS_2026_CSV
     name_lower = name.lower()
 
     telescope_map = {
-        "hwo": ("HWO", HWOData),
         "kepler": ("Kepler", KeplerData),
         "tess": ("TESS", TESSData),
+        "hwo": ("HWO", "telescopes.hwo.detection_model", "HWOData"),
     }
 
     telescope_name, DataClass = None, None
     for key, value in telescope_map.items():
         if key in name_lower:
-            telescope_name, DataClass = value
+            telescope_name, *model = value
+            if len(model) == 1:
+                DataClass = model[0]
+            else:
+                module_name, class_name = model
+                DataClass = getattr(import_module(module_name), class_name)
             break
 
     if telescope_name is None:
         raise ValueError(
             f"Unknown telescope name: {name}. "
-            "Use 'HWO_exoplanets', 'Kepler_exoplanets', or later 'TESS_exoplanets'."
+            "Use 'Kepler_exoplanets', 'TESS_exoplanets', or 'HWO_exoplanets'."
         )
 
     # Load catalog for the chosen telescope
@@ -219,8 +222,8 @@ if __name__ == "__main__":
     # file takes roughly 3-4 h in total. See the README.
     NRUNS = np.arange(10)
 
-    # Run exoplanet plotting
-    # run_exoplanet_plotting(name='HWO_exoplanets', star_catalog='Gaia', plot=True)
+    # Run an observed-catalog comparison instead of drawing new populations:
+    # run_exoplanet_plotting(name='Kepler_exoplanets', star_catalog='Gaia', plot=True)
 
     run_sim(func=main_kepler, name = 'kepler', parallel=True, nruns=NRUNS, star_catalog='Gaia', run_anew=True, plot=True) # Gaia 60pc
     print('Completed Kepler')
@@ -228,9 +231,13 @@ if __name__ == "__main__":
     run_sim(func=main_tess, name = 'TESS', parallel=True, nruns=NRUNS, star_catalog='Gaia', run_anew=True, plot=True) # Gaia 60pc
     print('Completed TESS')
     
-    # run_sim(func=main_hwo, name = 'hwo', parallel=False, nruns=NRUNS, star_catalog='Gaia', run_anew=True) # CHANGED run_anew to TRUE to re-run HWO with Gaia catalog
-    # # print('Completed HWO')
-    
+    # Optional HWO and LIFE pipelines:
+    # from run.hwo.hwo_run_multiple import main as main_hwo
+    # run_sim(func=main_hwo, name='hwo', parallel=False, nruns=NRUNS,
+    #         star_catalog='Gaia', run_anew=True)
+    # print('Completed HWO')
+
+    # from run.lifesim.lifesim_run_multiple import main as main_lifesim
     # run_sim(func=main_lifesim, name='lifesim', parallel=False, nruns=NRUNS, star_catalog='Gaia', run_anew=True, plot=True)
     # print('Completed Lifesim Gaia')
 

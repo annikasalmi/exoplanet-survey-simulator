@@ -1,5 +1,11 @@
-Welcome to LIFEsim's documentation!
-===================================
+LIFEsim component documentation
+================================
+
+This directory documents the repository's vendored LIFEsim component. See the repository
+``README.md`` for the end-to-end multi-instrument workflow.
+
+LIFEsim documentation
+---------------------
 
 LIFEsim is the simulator software for the Large Interferometer For Exoplanets (LIFE). It simulates
 the interferometric measurement of LIFE to demonstrate the capabilities of the observatory. Coupled

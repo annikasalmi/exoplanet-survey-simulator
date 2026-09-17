@@ -18,7 +18,8 @@ class PlotPlanetType(BasePlotter):
     Handles best/worst case overlays for HWO scenarios.
     """
     
-    def __init__(self, df: pd.DataFrame, nruns: int = 1, star_catalog: str = 'Gaia', name: str = 'HWO'):
+    def __init__(self, df: pd.DataFrame, nruns: int = 1,
+                 star_catalog: str = 'Gaia', name: str = 'kepler'):
         """Initialize the plotter with data and metadata."""
         super().__init__(df, nruns, star_catalog, name)
         # Ensure temp_zone column is present for all plotting methods that need it

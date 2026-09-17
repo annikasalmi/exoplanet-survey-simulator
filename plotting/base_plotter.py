@@ -13,7 +13,8 @@ class BasePlotter:
     Provides shared initialization, data handling, and plotting utilities.
     """
     
-    def __init__(self, df: pd.DataFrame, nruns: int = 1, star_catalog: str = 'Gaia', name: str = 'HWO'):
+    def __init__(self, df: pd.DataFrame, nruns: int = 1,
+                 star_catalog: str = 'Gaia', name: str = 'kepler'):
         """Initialize base plotter with common parameters."""
         self.df = df.copy()
         self.nruns = nruns

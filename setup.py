@@ -12,8 +12,8 @@ def read(rel_path: str) -> str:
 setup(
     name='exoplanet-survey-simulator',
     version=__version__,
-    description='Detectability of potentially habitable exoplanets around M dwarfs '
-                'for the LIFE and HWO mission concepts',
+    description='Simulating transit and radial-velocity selection effects in rocky '
+                'and volatile-rich exoplanet populations',
     long_description=read('README.md'),
     long_description_content_type='text/markdown',
     author='Annika Salmi',
@@ -54,7 +54,8 @@ setup(
     extras_require={'test': ['pytest>=6.0.0', 'pytest-cov>=2.10.0']},
     license='GPLv3',
     zip_safe=False,
-    keywords='exoplanets astronomy LIFE HWO habitability',
+    keywords='exoplanets astronomy survey selection transit radial-velocity rocky '
+             'volatile-rich',
     python_requires='>=3.9',
     classifiers=[
         'Development Status :: 3 - Alpha',

@@ -2,9 +2,7 @@
 Modified from P-pop.py: creating a function to be used to be called multiple times
 '''
 
-# Don't print annoying warnings. Comment out if you want to see them.
 import warnings
-warnings.filterwarnings('ignore')
 import os
 import numpy as np
 import sys

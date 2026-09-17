@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 
 from tools.paths import KEPLER_DATA_DIR
-from telescopes.kepler.detection_model import KeplerData
+from science.telescopes.kepler.detection_model import KeplerData
 
 KEPLER_DIR = Path(KEPLER_DATA_DIR) / "Gaia"
 N_UNIVERSES = 10
@@ -67,7 +67,7 @@ def main():
         )
         print(f"{f.name:24s} {len(out):9,d}   {deltas}")
 
-    print("\nDone. All catalogs updated in place. Re-run plotting/scripts/analysis/multi/rocky_scatter_gaia60pc.py to see the corrected FGK background.")
+    print("\nDone. All catalogs updated in place. Re-run plotting/scripts/analysis/rocky_scatter_gaia60pc.py to see the corrected FGK background.")
 
 
 if __name__ == "__main__":

@@ -20,7 +20,7 @@ import run.lifesim.lifesim_run_multiple as lifesim
 import run.rv.run_rv as rv
 import run.run_sim as run_sim_module
 import run.tess.run_tess as tess
-from run.ppop.ppop_generator import PPop
+from science.populations.ppop import PPop
 
 # Gaia stars within 10 pc: ~220 stars and ~700 planets per universe, a few seconds
 # each, and still enough planets that Kepler and TESS detect some.

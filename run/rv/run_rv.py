@@ -6,8 +6,8 @@ from functools import partial
 import numpy as np
 import pandas as pd
 
-from run.ppop.flat_detect import run_rv_best
-from run.ppop.ppop_generator import PPop, set_star_catalog
+from science.populations.ppop import PPop, set_star_catalog
+from science.telescopes.detection import run_rv_best
 from tools.paths import RV_DATA_DIR
 
 # Each universe peaks at 2-2.5 GB, as for Kepler; more workers than this swaps on 16 GB.

@@ -34,14 +34,10 @@ def load_simulator(name):
 
 def main():
     if SIM_NAME == 'flat_universe':
-        print(
-            "\nMapping the TESS + HARPS/NIRPS selection function for rocky planets "
-            "around G, K and M stars.\n"
-            "This shows how the combined survey selection effects transform the "
-            "underlying planet population.\n"
-        )
-        # Imported here because the module sets figure-wide font sizes on import.
-        from plotting.scripts.analysis.multi import flat_transit_rv_3x3
+        print("\nRunning flat_universe: rocky planets around G, K and M stars through the "
+              "TESS transit and HARPS/NIRPS RV detection models.\n")
+        # Keep the paper-figure machinery out of startup for the other pipelines.
+        from plotting.scripts.analysis import flat_transit_rv_3x3
         flat_transit_rv_3x3.main(paper_copy=False)
     elif SIM_NAME in SIMULATORS:
         print(f"\nRunning {SIM_NAME} with {NRUNS} run(s), catalog {STAR_CATALOG!r}.\n")

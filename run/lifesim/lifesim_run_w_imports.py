@@ -1,7 +1,7 @@
 import os
 import lifesim
 import numpy as np
-from run.ppop.ppop_generator import PPop
+from science.populations.ppop import PPop
 import multiprocessing as mp
 import time
 import pandas as pd
@@ -36,4 +36,3 @@ if __name__ == '__main__':
     
     mp.set_start_method('spawn')
     main()
-

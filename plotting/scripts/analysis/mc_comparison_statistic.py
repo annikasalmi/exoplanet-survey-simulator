@@ -1,19 +1,13 @@
 """Paper MC figure (mc_comparison_statistic_<N_DRAWS>.png): distribution of x_k = (f_k - f_obs)^2 /
 sigma_obs^2 for I<10, I<50, I>50 (M>2), each draw a NASA-sized (7/27/75) mock survey with the
 sample's 25%/8% errors, using bayesian_cold_rocky_desert.py's machinery.
-Run: [N_DRAWS=500] python plotting/scripts/analysis/multi/mc_comparison_statistic.py
+Run: [N_DRAWS=500] python plotting/scripts/analysis/mc_comparison_statistic.py
 """
 
 import os
-import sys
 import time
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[4]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-from plotting.scripts.analysis.multi import bayesian_cold_rocky_desert as bayes
+from plotting.scripts.analysis import bayesian_cold_rocky_desert as bayes
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -22,10 +16,8 @@ from tools.paths import ANALYSIS_DIR, PAPER_FIGURES_DIR
 
 OUT_DIR = os.path.join(ANALYSIS_DIR, "mc_comparison_statistic")
 
-# ---- overrides: small pool, own cache dir ----
-bayes.FLAT_N_POOL = 2_000_000
-bayes.CHUNK = 2_000_000
-bayes._out_dir = lambda: OUT_DIR
+MC_POOL_SIZE = 2_000_000
+MC_CHUNK_SIZE = 2_000_000
 N_DRAWS = int(os.environ.get("N_DRAWS", "5000"))
 
 LABELS = {"rocky_formation": "Sub-Neptune + Super-Earth",
@@ -77,8 +69,11 @@ def main():
     nasa = bayes.load_nasa(precision=True)
 
     print("--> building Otegi pool (rocky_formation; escape_only derived from it)")
-    otegi = bayes.make_pool("powerlaw", mr_C=bayes.OTEGI_C, mr_beta=bayes.OTEGI_BETA,
-                          mass_scatter_dex=bayes.OTEGI_SCATTER)
+    otegi = bayes.make_pool(
+        "powerlaw", pool_size=MC_POOL_SIZE, chunk_size=MC_CHUNK_SIZE, cache_dir=OUT_DIR,
+        mr_C=bayes.OTEGI_C, mr_beta=bayes.OTEGI_BETA,
+        mass_scatter_dex=bayes.OTEGI_SCATTER,
+    )
     rocky_true = ~bayes.is_volatile(otegi["mass"], otegi["radius"], m_sil, r_sil)
     keep = ~(rocky_true & (otegi["mass"] > bayes.MASS_MIN))
     univ = {"rocky_formation": otegi,

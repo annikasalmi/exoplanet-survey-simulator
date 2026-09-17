@@ -1,4 +1,4 @@
-"""Build the two small reference files TESSData reads by default, both under telescopes/tess/data/:
+"""Build the two small reference files TESSData reads by default, under science/telescopes/tess/data/:
 
   sector_grid.npz       which TESS sectors (1..MAX_SECTOR) cover each cell of an equal-area sky
                         grid, from tess-point. Looking stars up in it replaces a per-star tess-point
@@ -8,7 +8,7 @@
                         plus all-sector rows (sector 0). Built from the per-sector MAST files in
                         results/catalogs/tess/CDPP (MAST TCE bulk-download page).
 
-Run from repo root:  python telescopes/tess/build_reference_data.py [grid|noise|all] [cdpp_dir]
+Run from repo root:  python science/telescopes/tess/build_reference_data.py [grid|noise|all] [cdpp_dir]
 """
 
 import sys
@@ -17,10 +17,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-
-ROOT = Path(__file__).resolve().parents[2]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
 
 from tools.paths import TESS_DATA_DIR
 
@@ -77,7 +73,7 @@ def build_grid(chunk=5000):
 
 
 def build_noise(cdpp_dir=Path(TESS_DATA_DIR) / "CDPP"):
-    from telescopes.tess.detection_model import TESSData
+    from science.telescopes.tess.detection_model import TESSData
 
     tab = TESSData._load_cdpp_tables(TESSData.__new__(TESSData), Path(cdpp_dir))
     if tab.empty:
@@ -106,7 +102,7 @@ def print_tmag_corrections():
     """Median mbol - Tmag and G - Tmag per Teff bin over dwarf planet hosts in NASA PSCompPars,
     for TESSData._MBOL_MINUS_T and _G_MINUS_T (sy_tmag there is TIC-8, Stassun et al. 2019).
     """
-    from telescopes.tess.detection_model import TESSData
+    from science.telescopes.tess.detection_model import TESSData
     from tools.exoplanet_catalog import read_nasa_csv
     from tools.paths import PSCOMPPARS_CSV
 

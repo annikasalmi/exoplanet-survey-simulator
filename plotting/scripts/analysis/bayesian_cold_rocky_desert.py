@@ -6,36 +6,24 @@ likelihood = transit+RV detection fraction. Scores NASA's volatile fraction per 
 from __future__ import annotations
 
 import os
-os.environ.setdefault("OMP_NUM_THREADS", "1")
-
 import sys
 from pathlib import Path
 
 from tools.paths import REPO_ROOT, PSCOMPPARS_CSV, ANALYSIS_DIR
 ROOT = Path(REPO_ROOT)
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
 
 import numpy as np
 import pandas as pd
 
 from tools.paths import SILICON_CURVE
 from tools.exoplanet_catalog import read_nasa_csv
-import matplotlib
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 from scipy.stats import binom
 from scipy.ndimage import gaussian_filter
 
-try:
-    sys.stdout.reconfigure(encoding="utf-8")
-    sys.stderr.reconfigure(encoding="utf-8")
-except Exception:
-    pass
-
-from run.flat_universe.uniform_generator import generate_flat_catalog
-from run.ppop.flat_detect import run_kepler, run_tess, run_rv_best
+from science.populations.flat import generate_flat_catalog
+from science.telescopes.detection import run_kepler, run_rv_best, run_tess
 
 # Transit leg of the joint detector. This module IS the Kepler analysis; the parallel TESS
 # analysis (42_bayesian_cold_rocky_desert_tess.py) imports this module and calls main("tess").
@@ -45,6 +33,12 @@ _TRANSIT = {"kepler": run_kepler, "tess": run_tess}
 _MISSION_LABEL = {"kepler": "Kepler", "tess": "TESS"}
 _OUT_NAME = {"kepler": "bayesian_cold_rocky_desert",
              "tess": "42_bayesian_cold_rocky_desert_tess"}
+
+
+def _out_dir(mission=None):
+    """Return the analysis output directory without creating it."""
+    mission = MISSION if mission is None else mission
+    return os.path.join(ANALYSIS_DIR, _OUT_NAME[mission])
 
 
 SILICATE_CURVE = Path(SILICON_CURVE)
@@ -153,7 +147,7 @@ def load_nasa(precision: bool):
         n=int(k.sum()))
 
 
-def _detect_chunk(mass_model, n, seed, **kw):
+def _detect_chunk(mass_model, n, seed, mission=None, **kw):
     """Generate n planets -> box cut -> joint Kepler+RV detection. Per-row detectors, so this is
     equivalent to processing one big pool but with bounded memory."""
     pool = generate_flat_catalog(n_planets=n, seed=seed, mass_model=mass_model, **kw)
@@ -163,7 +157,7 @@ def _detect_chunk(mass_model, n, seed, **kw):
     keep = (r.between(BOX["r_lo"], BOX["r_hi"]) & m.between(BOX["m_lo"], BOX["m_hi"])
             & f.between(BOX["f_lo"], BOX["f_hi"]))
     pool = pool[keep].copy()
-    kep = _TRANSIT[MISSION](pool)
+    kep = _TRANSIT[mission or MISSION](pool)
     rd = run_rv_best(pool, mag_target=RV_MAG_TARGET)["detected"].to_numpy(bool)
     return dict(
         mass=pd.to_numeric(pool["mass_p"], errors="coerce").to_numpy(float),
@@ -175,24 +169,28 @@ def _detect_chunk(mass_model, n, seed, **kw):
     )
 
 
-def make_pool(mass_model, **kw):
+def make_pool(mass_model, *, pool_size=None, chunk_size=None, cache_dir=None, mission=None, **kw):
     """Uniform-parameter pool -> box cut -> joint Kepler+RV detection (cached to npz), built in
     CHUNK-sized pieces (distinct per-chunk seeds) to bound peak memory. Returns TRUE arrays, the
     joint-detected mask, and the geometric transit mask (detected ⊂ transit)."""
+    pool_size = FLAT_N_POOL if pool_size is None else int(pool_size)
+    chunk_size = CHUNK if chunk_size is None else int(chunk_size)
+    mission = MISSION if mission is None else mission
+    cache_dir = _out_dir(mission) if cache_dir is None else os.fspath(cache_dir)
     tag = "_".join([mass_model] + [f"{k}{v}" for k, v in sorted(kw.items())]
-                   + [f"N{FLAT_N_POOL}", f"s{RNG_SEED}"])
-    cache = os.path.join(ANALYSIS_DIR, _OUT_NAME[MISSION], f"pool_{tag}.npz")
+                   + [f"N{pool_size}", f"s{RNG_SEED}"])
+    cache = os.path.join(cache_dir, f"pool_{tag}.npz")
     if os.path.exists(cache):
         print(f"    loaded cached pool: {os.path.basename(cache)}")
         z = np.load(cache)
         return {fld: z[fld] for fld in z.files}
     parts, done, ci = [], 0, 0
-    while done < FLAT_N_POOL:
-        n = min(CHUNK, FLAT_N_POOL - done)
-        parts.append(_detect_chunk(mass_model, n, RNG_SEED + ci, **kw))
+    while done < pool_size:
+        n = min(chunk_size, pool_size - done)
+        parts.append(_detect_chunk(mass_model, n, RNG_SEED + ci, mission=mission, **kw))
         done += n
         ci += 1
-        print(f"      chunk {ci}: {done:>9d}/{FLAT_N_POOL} generated+detected")
+        print(f"      chunk {ci}: {done:>9d}/{pool_size} generated+detected")
     result = {fld: np.concatenate([p[fld] for p in parts]) for fld in parts[0]}
     np.savez(cache, **result)
     return result
@@ -588,4 +586,9 @@ def main(mission="kepler"):
 
 
 if __name__ == "__main__":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
     main()

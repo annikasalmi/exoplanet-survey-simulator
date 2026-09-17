@@ -34,8 +34,8 @@ try:
 except Exception:
     pass
 
-from run.flat_universe.uniform_generator import generate_flat_catalog
-from run.ppop.flat_detect import run_kepler, run_rv_best
+from science.populations.flat import generate_flat_catalog
+from science.telescopes.detection import run_kepler, run_rv_best
 
 SILICATE_CURVE = Path(SILICON_CURVE)
 NASA_FILE = Path(PSCOMPPARS_CSV)

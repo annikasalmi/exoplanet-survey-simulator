@@ -452,7 +452,10 @@ class Bus(object):
         try:
             repo = git.Repo(lifesim_path)
             version_dict['git_sha'] = repo.head.object.hexsha
-            version_dict['git_branch'] = repo.active_branch.name
+            try:
+                version_dict['git_branch'] = repo.active_branch.name
+            except TypeError:
+                version_dict['git_branch'] = 'detached HEAD'
         except (ValueError, git.exc.InvalidGitRepositoryError):
             version_dict['git_sha'] = 'not a git repository'
             version_dict['git_branch'] = 'not a git repository'

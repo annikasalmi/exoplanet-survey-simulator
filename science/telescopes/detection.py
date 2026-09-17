@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pandas as pd
 
-from telescopes.kepler.detection_model import KeplerData
-from telescopes.tess.detection_model import TESSData
-from telescopes.rv.detection_model import RVData
+from science.telescopes.kepler.detection_model import KeplerData
+from science.telescopes.tess.detection_model import TESSData
+from science.telescopes.rv.detection_model import RVData
 
 
 def run_kepler(catalog: pd.DataFrame) -> pd.DataFrame:

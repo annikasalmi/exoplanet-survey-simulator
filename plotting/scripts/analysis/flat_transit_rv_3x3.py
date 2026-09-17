@@ -1,49 +1,34 @@
 """Paper selection map (flat_transit_rv_3x3_otegi.png): rows = TESS transit, RV mass (best of
 HARPS/NIRPS), both; columns = G, K, M hosts. Background = rocky flat-universe planets (Otegi masses).
-Run: python plotting/scripts/analysis/multi/flat_transit_rv_3x3.py
+Run: python plotting/scripts/analysis/flat_transit_rv_3x3.py
 """
 
 from __future__ import annotations
-
-import os
-os.environ.setdefault("OMP_NUM_THREADS", "1")
 
 import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import matplotlib
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 from matplotlib.ticker import FuncFormatter
 
-try:
-    sys.stdout.reconfigure(encoding="utf-8")
-    sys.stderr.reconfigure(encoding="utf-8")
-except Exception:
-    pass
-
 from tools.paths import REPO_ROOT, ANALYSIS_DIR, PAPER_FIGURES_DIR
 ROOT = Path(REPO_ROOT)
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
 
-from run.flat_universe.uniform_generator import generate_flat_catalog
-from run.ppop.flat_detect import run_kepler, run_tess, run_rv, TESSData
-from plotting.scripts.analysis.multi import rocky_scatter_gaia60pc as rocky_scatter
+from science.populations.flat import generate_flat_catalog
+from science.telescopes.detection import TESSData, run_kepler, run_rv, run_tess
+from plotting.scripts.analysis import rocky_scatter_gaia60pc as rocky_scatter
 
 OUT_DIR = Path(ANALYSIS_DIR) / "flat_transit_rv_3x3"
-OUT_DIR.mkdir(parents=True, exist_ok=True)
 PAPER_FIG_DIR = Path(PAPER_FIGURES_DIR)
-PAPER_FIG_DIR.mkdir(parents=True, exist_ok=True)
 
-plt.rcParams.update({
+FIGURE_STYLE = {
     "font.size": 21, "axes.titlesize": 26, "axes.labelsize": 23,
     "legend.fontsize": 21, "xtick.labelsize": 19, "ytick.labelsize": 19,
-})
+}
 
 # Which transit pipeline fills the transit row: "TESS" (paper Fig. 2) or
 # "Kepler" (appendix comparison).
@@ -179,7 +164,8 @@ def window_stats(panel: pd.DataFrame, test: str):
     return (n - n_pass) / n, n, n - n_pass
 
 
-def main(paper_copy: bool = True):
+def _main(paper_copy: bool = True):
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
     print("=" * 70)
     print("flat_transit_rv_3x3.py — flat-Otegi selection maps (paper Fig. 2)")
     print(f"Transit pipeline: {TRANSIT_MISSION}")
@@ -323,13 +309,21 @@ def main(paper_copy: bool = True):
     fig.savefig(out, dpi=170, bbox_inches="tight")
     print(f"\nSaved: {out}")
     if paper_copy:
+        PAPER_FIG_DIR.mkdir(parents=True, exist_ok=True)
         fig.savefig(PAPER_FIG_DIR / out.name, dpi=170, bbox_inches="tight")
         print(f"Saved paper copy: {PAPER_FIG_DIR / out.name}")
     plt.close(fig)
 
 
+def main(paper_copy: bool = True):
+    with plt.rc_context(FIGURE_STYLE):
+        return _main(paper_copy=paper_copy)
+
+
 if __name__ == "__main__":
     try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
         main()
     except Exception:
         import traceback

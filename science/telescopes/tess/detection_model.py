@@ -49,7 +49,7 @@ class TESSData:
     # Proxy-Tmag colour terms vs Teff: G - T and mbol - T (subtract from G or mbol to get T).
     # Medians over 4,078 dwarf planet hosts (log g >= 4) in NASA PSCompPars, whose sy_tmag is TIC-8
     # (Stassun et al. 2019); the 2500 K bin has only 4 stars. Re-derive with
-    # `python telescopes/tess/build_reference_data.py tmag`.
+    # `python science/telescopes/tess/build_reference_data.py tmag`.
     _TEFF_GRID = np.array([2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 7000, 8000], dtype=float)
     _G_MINUS_T  = np.array([1.79, 1.37, 1.16, 0.94, 0.71, 0.60, 0.50, 0.43, 0.32, 0.12], dtype=float)
     _MBOL_MINUS_T = np.array([-0.30, 0.19, 0.35, 0.42, 0.43, 0.46, 0.44, 0.39, 0.29, 0.13], dtype=float)

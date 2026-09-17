@@ -30,7 +30,7 @@ from PPop.StabilityModels import He2019
 from PPop.OrbitModels import Random
 from PPop.AlbedoModels import Uniform
 from PPop.ExozodiModels import Ertel2020
-from run.flat_universe.uniform_generator import generate_flat_catalog, DEFAULTS
+from science.populations.flat import DEFAULTS, generate_flat_catalog
 
 N_STARS = 1200
 SUBSET_SEED = 12345

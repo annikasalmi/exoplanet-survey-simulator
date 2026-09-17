@@ -1,6 +1,6 @@
 """Rocky-planet figures: FGKM detection-fraction maps from stacked Gaia-60pc Kepler/TESS catalogs
 with NASA rocky planets overlaid, plus the paper's rocky_mr_insolation_3panel / rocky_scatter_standalone.
-Run: python plotting/scripts/analysis/multi/rocky_scatter_gaia60pc.py [--full]
+Run: python plotting/scripts/analysis/rocky_scatter_gaia60pc.py [--full]
 The paper figures need no universes. --full adds the maps, from the 10 Gaia-60pc universes run_sim.py writes (~3-4 h).
 """
 
@@ -15,8 +15,6 @@ import numpy as np
 import pandas as pd
 
 from tools.paths import SILICON_CURVE, ANALYSIS_DIR, PAPER_FIGURES_DIR, KEPLER_DATA_DIR, TESS_DATA_DIR, KEPLER_REF_CURVE
-import matplotlib
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch, Rectangle
@@ -34,15 +32,6 @@ def find_project_root(start_path: Path) -> Path:
 
 
 ROOT = find_project_root(Path(__file__).resolve())
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-# Allow unicode (⊕, ≤, …) in console output on Windows cp1252 terminals.
-try:
-    sys.stdout.reconfigure(encoding="utf-8")
-    sys.stderr.reconfigure(encoding="utf-8")
-except Exception:
-    pass
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
@@ -79,16 +68,13 @@ ROCKY_CURVE_PATH  = Path(SILICON_CURVE)
 ROCKY_CURVE_LABEL = "silicate rocky curve"
 
 NASA_DATA_DIR = Path(KEPLER_DATA_DIR) / "NASA"
-NASA_DATA_DIR.mkdir(parents=True, exist_ok=True)
 NASA_FLAGS_CACHE = (
     NASA_DATA_DIR / "NASA_PSCompPars_transiting_confirmed_RM_insolation_errors_limits.csv"
 )
 
 OUT_DIR = Path(ANALYSIS_DIR) / "rocky_scatter_gaia60pc"
-OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 PAPER_FIG_DIR = Path(PAPER_FIGURES_DIR)
-PAPER_FIG_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── LHS 1140 b anchor ────────────────────────────────────────────────────────
 
@@ -1267,6 +1253,9 @@ def plot_rocky_scatter_standalone(rocky_win: pd.DataFrame, shift: float) -> Path
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
+    NASA_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    PAPER_FIG_DIR.mkdir(parents=True, exist_ok=True)
     print("=" * 70)
     print("rocky_scatter_gaia60pc.py")
     print("=" * 70)
@@ -1328,6 +1317,9 @@ def main():
 
 if __name__ == "__main__":
     try:
+        # Allow unicode (⊕, ≤, …) in console output on Windows cp1252 terminals.
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
         main()
     except Exception:
         import traceback

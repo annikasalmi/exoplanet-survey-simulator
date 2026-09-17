@@ -21,20 +21,20 @@ PAPER_DIR = ROOT / "results" / "paper"
 STEPS = [
     ("plotting/scripts/calibration/kepler_calibration.py", [],
      ["kepler_3in1_calibration.png"]),
-    ("telescopes/tess/download_cdpp.py", [], []),  # SPOC CDPP tables for tess_calibration
+    ("science/telescopes/tess/download_cdpp.py", [], []),  # SPOC CDPP tables for tess_calibration
     ("plotting/scripts/calibration/tess_calibration.py", [],
      ["tess_3in1_calibration.png"]),
     ("plotting/scripts/calibration/rv_detector_check.py", ["--fig1-only"],
      ["rv_k_vs_published_rvamp.png", "rv_sigmaK_3in1.png"]),
-    ("plotting/scripts/analysis/multi/flat_transit_rv_3x3.py", [],
+    ("plotting/scripts/analysis/flat_transit_rv_3x3.py", [],
      ["flat_transit_rv_3x3_otegi.png"]),
-    ("plotting/scripts/analysis/multi/rocky_scatter_gaia60pc.py", [],
+    ("plotting/scripts/analysis/rocky_scatter_gaia60pc.py", [],
      ["rocky_mr_insolation_3panel.png", "rocky_scatter_standalone.png"]),
-    ("plotting/scripts/analysis/multi/flat_rocky_mr_vs_nasa.py", [],
+    ("plotting/scripts/analysis/flat_rocky_mr_vs_nasa.py", [],
      ["flat_rocky_mr_relations_2x4_cold_corner.png", "flat_otegi_2x2_before_after.png",
       "flat_otegi_2x1_cold_cut.png", "flat_rocky_mr_2col_chen_otegi_cold.png",
       "flat_otegi_1x2_cold_cut.png"]),
-    ("plotting/scripts/analysis/multi/mc_comparison_statistic.py", [],
+    ("plotting/scripts/analysis/mc_comparison_statistic.py", [],
      ["mc_comparison_statistic_5000.png"]),
 ]
 
@@ -57,6 +57,8 @@ def main(argv):
     # checkout is pip-installed in the environment.
     env = dict(os.environ, PYTHONPATH=os.pathsep.join(
         p for p in (str(ROOT), os.environ.get("PYTHONPATH")) if p))
+    env.setdefault("OMP_NUM_THREADS", "1")
+    env.setdefault("MPLBACKEND", "Agg")
     env.pop("N_DRAWS", None)  # mc_comparison_statistic's default, 5000, is the paper's
     t_all = time.time()
     for script, args, figures in steps:

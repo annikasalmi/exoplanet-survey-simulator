@@ -28,7 +28,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 try:
-    from telescopes.kepler.detection_model import KeplerData
+    from science.telescopes.kepler.detection_model import KeplerData
 except Exception as exc:
     raise ImportError(f"Cannot import KeplerData. Run from repo root.\n{exc}") from exc
 

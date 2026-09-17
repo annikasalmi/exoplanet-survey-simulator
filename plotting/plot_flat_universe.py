@@ -1,5 +1,5 @@
 """Plots driven by the flat-universe simulation alone. Plots that also need P-Pop,
-Kepler or TESS runs live in plotting/scripts/analysis/multi/.
+Kepler or TESS runs live in plotting/scripts/analysis/.
 """
 
 from __future__ import annotations

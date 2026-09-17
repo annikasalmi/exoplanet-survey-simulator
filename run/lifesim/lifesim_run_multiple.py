@@ -5,7 +5,7 @@ import numpy as np
 # Add the lifesim directory to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 import lifesim
-from run.ppop.ppop_generator import PPop, set_star_catalog
+from science.populations.ppop import PPop, set_star_catalog
 import multiprocessing as mp
 import time
 import pandas as pd
@@ -116,4 +116,3 @@ if __name__ == '__main__':
     
     mp.set_start_method('spawn')
     main()
-

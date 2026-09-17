@@ -1,39 +1,27 @@
 """Sub-Neptune fraction of flat and P-Pop universes (A/B each) vs NASA under four cuts: all, M > 2,
 I < 50, both. Detection is transit+RV with NASA-like measurement error. Also loaded by
-flat_rocky_mr_vs_nasa.py. Run: python plotting/scripts/analysis/multi/puffy_cuts_flat.py
+flat_rocky_mr_vs_nasa.py. Run: python plotting/scripts/analysis/puffy_cuts_flat.py
 Needs Kepler Gaia-60pc universe 0 from `python run/run_sim.py` (~3-4 h for all 20; see README). Not a paper figure.
 """
 
 from __future__ import annotations
 
 import os
-os.environ.setdefault("OMP_NUM_THREADS", "1")
-
 import sys
 from pathlib import Path
 
 from tools.paths import REPO_ROOT, PSCOMPPARS_CSV, KEPLER_DATA_DIR, ANALYSIS_DIR
 ROOT = Path(REPO_ROOT)
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
 
 import numpy as np
 import pandas as pd
 
 from tools.paths import SILICON_CURVE
 from tools.exoplanet_catalog import read_nasa_csv
-import matplotlib
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-try:
-    sys.stdout.reconfigure(encoding="utf-8")
-    sys.stderr.reconfigure(encoding="utf-8")
-except Exception:
-    pass
-
-from run.flat_universe.uniform_generator import generate_flat_catalog
-from run.ppop.flat_detect import run_kepler, run_rv_best
+from science.populations.flat import generate_flat_catalog
+from science.telescopes.detection import run_kepler, run_rv_best
 
 SILICATE_CURVE = Path(SILICON_CURVE)
 PPOP_CATALOG = Path(KEPLER_DATA_DIR) / "Gaia" / "kepler_catalog_0.csv"
@@ -98,18 +86,18 @@ def build_pool(population, m_sil, r_sil):
     return mass, radius, flux, puffy, td & rd
 
 
-def mc_universe(arrays, drop, cut, m_sil, r_sil, rng):
+def mc_universe(arrays, drop, cut, m_sil, r_sil, rng, n_repeats=N_REPEATS):
     mass, radius, flux, puffy, det = arrays
     keep = ~((~puffy) & (mass > MASS_THRESHOLD)) if drop else np.ones(len(mass), bool)
     if cut.get("insol_max"):
         keep = keep & (flux < cut["insol_max"])
     idx = np.flatnonzero(keep)
     mass_min = cut.get("mass_min")
-    out = np.full(N_REPEATS, np.nan); cnt = np.zeros(N_REPEATS)
+    out = np.full(n_repeats, np.nan); cnt = np.zeros(n_repeats)
     if idx.size:
         m_u, r_u, det_u = mass[idx], radius[idx], det[idx]
         L = idx.size
-        for i in range(N_REPEATS):
+        for i in range(n_repeats):
             s = rng.integers(0, L, N_SAMPLE)
             sel = s[det_u[s]]
             if sel.size == 0:
@@ -148,15 +136,15 @@ def load_nasa():
     return d
 
 
-def mc_nasa(nasa, cut, m_sil, r_sil, rng):
+def mc_nasa(nasa, cut, m_sil, r_sil, rng, n_repeats=N_REPEATS):
     sub = (nasa["ins"] < cut["insol_max"]) if cut.get("insol_max") else np.ones(len(nasa["m"]), bool)
     m, r = nasa["m"][sub], nasa["r"][sub]
     me1, me2, re1, re2 = nasa["me1"][sub], nasa["me2"][sub], nasa["re1"][sub], nasa["re2"][sub]
     n = len(m); mass_min = cut.get("mass_min")
-    out = np.full(N_REPEATS, np.nan); cnt = np.zeros(N_REPEATS)
+    out = np.full(n_repeats, np.nan); cnt = np.zeros(n_repeats)
     # NO bootstrap resample: the fixed set of n precision-passing planets is kept every universe;
     # only each planet's OWN asymmetric measurement error is re-perturbed -> narrower bell (the "real" universe).
-    for i in range(N_REPEATS):
+    for i in range(n_repeats):
         zm, zr = rng.normal(size=n), rng.normal(size=n)
         mb = np.clip(m + np.where(zm >= 0, zm * me1, zm * me2), 1e-3, None)
         rb = np.clip(r + np.where(zr >= 0, zr * re1, zr * re2), 1e-3, None)
@@ -263,4 +251,9 @@ def main():
 
 
 if __name__ == "__main__":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
     main()

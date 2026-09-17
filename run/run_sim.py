@@ -11,8 +11,9 @@ import logging
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from tools.paths import LOGGING, EXOPLANETS_2026_CSV
-from telescopes.kepler.detection_model import KeplerData
-from telescopes.tess.detection_model import TESSData
+from science.telescopes.hwo.detection_model import HWOData
+from science.telescopes.kepler.detection_model import KeplerData
+from science.telescopes.tess.detection_model import TESSData
 
 from run.kepler.run_kepler import main as main_kepler
 from run.tess.run_tess import main as main_tess
@@ -97,20 +98,16 @@ def run_exoplanet_plotting(name='Kepler_exoplanets', star_catalog='exoplanet_cat
     name_lower = name.lower()
 
     telescope_map = {
+        "hwo": ("HWO", HWOData),
         "kepler": ("Kepler", KeplerData),
         "tess": ("TESS", TESSData),
-        "hwo": ("HWO", "telescopes.hwo.detection_model", "HWOData"),
     }
 
     telescope_name, DataClass = None, None
     for key, value in telescope_map.items():
         if key in name_lower:
             telescope_name, *model = value
-            if len(model) == 1:
-                DataClass = model[0]
-            else:
-                module_name, class_name = model
-                DataClass = getattr(import_module(module_name), class_name)
+            DataClass = model[0]
             break
 
     if telescope_name is None:

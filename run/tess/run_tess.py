@@ -6,8 +6,8 @@ from functools import partial
 import numpy as np
 import pandas as pd
 
-from telescopes.tess.detection_model import TESSData
-from run.ppop.ppop_generator import PPop, set_star_catalog
+from science.populations.ppop import PPop, set_star_catalog
+from science.telescopes.tess.detection_model import TESSData
 from tools.paths import TESS_DATA_DIR
 
 # A TESS worker holds CDPP tables, tess-point and an exozodi KDE on top of the
@@ -15,7 +15,7 @@ from tools.paths import TESS_DATA_DIR
 MAX_WORKERS = 2
 
 # Every star gets TESSData's default coverage (5 consecutive sectors) and noise
-# from the binned SPOC CDPP table in telescopes/tess/data. P-Pop stars have no TIC IDs, so the per-TIC CDPP CSVs would go unused.
+# from the binned SPOC CDPP table in science/telescopes/tess/data. P-Pop stars have no TIC IDs, so the per-TIC CDPP CSVs would go unused.
 TESS_DEFAULTS = {
     "use_cdpp_tables": False,
     "min_transits": 2,

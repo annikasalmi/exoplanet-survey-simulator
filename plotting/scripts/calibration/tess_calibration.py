@@ -32,7 +32,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 try:
-    from telescopes.tess.detection_model import TESSData
+    from science.telescopes.tess.detection_model import TESSData
 except Exception as exc:
     raise ImportError(f"Cannot import TESSData. Run from repo root.\n{exc}") from exc
 

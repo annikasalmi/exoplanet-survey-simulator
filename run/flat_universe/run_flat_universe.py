@@ -14,8 +14,8 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in os.sys.path:
     os.sys.path.insert(0, str(ROOT))
 
-from run.flat_universe.uniform_generator import generate_flat_catalog
-from run.ppop.flat_detect import run_kepler, run_tess, run_rv_best
+from science.populations.flat import generate_flat_catalog
+from science.telescopes.detection import run_kepler, run_tess, run_rv_best
 from tools.paths import FLAT_UNIVERSE_DATA_DIR
 
 FLAT_CACHE_DIR = Path(FLAT_UNIVERSE_DATA_DIR)

@@ -67,6 +67,16 @@ python run/make_paper_figures.py rocky_scatter_gaia60pc
 The first complete run requires internet access for NASA Exoplanet Archive queries and the
 TESS SPOC CDPP tables from MAST. Downloads are cached under `results/catalogs/`.
 
+| Figure (`results/paper/`) | Script | Input |
+|---|---|---|
+| `kepler_3in1_calibration.png` | `plotting/scripts/calibration/kepler_calibration.py` | `data/exoplanet_csv/koi_cumulative_stellar.csv` |
+| `tess_3in1_calibration.png` | `plotting/scripts/calibration/tess_calibration.py` | `data/exoplanet_csv/exofop_toi.csv`; SPOC CDPP tables for sectors 1-106 from MAST |
+| `rv_k_vs_published_rvamp.png`, `rv_sigmaK_3in1.png` | `plotting/scripts/calibration/rv_detector_check.py --fig1-only` | NASA Archive query (planets with published K) |
+| `flat_transit_rv_3x3_otegi.png` | `plotting/scripts/analysis/flat_transit_rv_3x3.py` | flat population; NASA Archive query (transiting planets with masses) |
+| `rocky_mr_insolation_3panel.png`, `rocky_scatter_standalone.png` | `plotting/scripts/analysis/rocky_scatter_gaia60pc.py` | NASA Archive query (same as above); `data/silicon_curve.ddat` |
+| `flat_rocky_mr_relations_2x4_cold_corner.png`, `flat_otegi_2x2_before_after.png`, `flat_otegi_2x1_cold_cut.png`, `flat_otegi_1x2_cold_cut.png`, `flat_rocky_mr_2col_chen_otegi_cold.png` | `plotting/scripts/analysis/flat_rocky_mr_vs_nasa.py` | flat population; `data/exoplanet_csv/pscomppars_2026.csv` |
+| `mc_comparison_statistic_5000.png` | `plotting/scripts/analysis/mc_comparison_statistic.py` | flat population; `data/exoplanet_csv/pscomppars_2026.csv` |
+
 ## Full simulation runs
 
 `run/run_sim.py` orchestrates multiple P-Pop universes and plotting. As configured, it
@@ -75,14 +85,24 @@ be enabled in the same file. One universe takes about 20 minutes. Outputs go to 
 
 ## Repository layout
 
-- `run/`: simulation and figure-generation entry points
-- `telescopes/`: Kepler, TESS, RV, and HWO detection models
-- `lifesim/`: LIFE instrument simulation
-- `plotting/`: calibration, visualization, and analysis code
-- `PPop/`: modified population generator and Forecaster copy
-- `tools/`, `data/`: shared code and tracked inputs
-- `results/`: generated catalogues, logs, and figures; see `results/README.md`
-- `docs/`: LIFEsim component documentation
+- `rocky_scatter_gaia60pc.py --full`: the Kepler/TESS detection-fraction maps, from all 10 of each
+- `puffy_cuts_flat.py`: Kepler universe 0
+- `rv_detector_check.py` without `--fig1-only`: the RV pipeline stage check, from up to 60 TESS universes
+
+## Terms
+
+- **Universe A / B**: two flat universes, where A drops rocky planets above 2 Earth masses and B keeps them.
+- **Otegi**: the Otegi et al. (2020) mass-radius relations, R = 1.03 M^0.29 (rocky) and R = 0.70 M^0.63 (volatile-rich).
+
+## Layout
+
+- `run/`: simulation entry points
+- `science/`: population generators and telescope detection models for Kepler, TESS, HWO and RV
+- `plotting/`: plotting and analysis code
+- `tools/`: shared paths and constants
+- `data/`: input data (tracked)
+- `results/`: everything the pipelines write (git-ignored, see `results/README.md`)
+- `lifesim/`, `PPop/`: the vendored forks
 
 ## Tests
 

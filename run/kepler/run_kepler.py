@@ -7,8 +7,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from telescopes.kepler.detection_model import KeplerData
-from run.ppop.ppop_generator import PPop, set_star_catalog
+from science.populations.ppop import PPop, set_star_catalog
+from science.telescopes.kepler.detection_model import KeplerData
 from tools.paths import KEPLER_DATA_DIR, PSCOMPPARS_CSV
 from tools.exoplanet_catalog import read_nasa_csv
 

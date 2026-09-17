@@ -1,48 +1,35 @@
 """Which rocky M-R relation (Chen & Kipping 2017, Otegi 2020, Edmondson 2023, Müller 2024), imposed
 on the flat universe, best matches NASA's volatile (sub-Neptune) fraction? Makes the 2x4 grids and the
-paper's Otegi panels. Run: python plotting/scripts/analysis/multi/flat_rocky_mr_vs_nasa.py
+paper's Otegi panels. Run: python plotting/scripts/analysis/flat_rocky_mr_vs_nasa.py
 """
 
 from __future__ import annotations
 
 import os
-os.environ.setdefault("OMP_NUM_THREADS", "1")
-
 import sys
 from pathlib import Path
 
 from tools.paths import REPO_ROOT, ANALYSIS_DIR, PAPER_FIGURES_DIR
 ROOT = Path(REPO_ROOT)
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
 
 import numpy as np
 import pandas as pd
-import matplotlib
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-try:
-    sys.stdout.reconfigure(encoding="utf-8")
-    sys.stderr.reconfigure(encoding="utf-8")
-except Exception:
-    pass
-
-from run.flat_universe.uniform_generator import generate_flat_catalog
-from run.ppop.flat_detect import run_kepler, run_rv_best
-from plotting.scripts.analysis.multi import puffy_cuts_flat as puffy_cuts
-
-puffy_cuts.N_REPEATS = 4000
+from science.populations.flat import generate_flat_catalog
+from science.telescopes.detection import run_kepler, run_rv_best
+from plotting.scripts.analysis import puffy_cuts_flat as puffy_cuts
 
 OUT_DIR = os.path.join(ANALYSIS_DIR, "flat_rocky_mr_vs_nasa")
 PAPER_FIG_DIR = Path(PAPER_FIGURES_DIR)
 
-plt.rcParams.update({
+FIGURE_STYLE = {
     "font.size": 13, "axes.titlesize": 14, "axes.labelsize": 13,
     "legend.fontsize": 10, "xtick.labelsize": 11, "ytick.labelsize": 11,
-})
+}
 FLAT_N = 150000
 SEED = 0
+MC_REPEATS = 4000
 MR_SCATTER_DEX = 0.15           # common log-normal mass scatter around each rocky relation (tunable)
 
 # (name, equation, applies-over, {mr_C, mr_beta})   R = C·M^β  (R in R⊕, M in M⊕)
@@ -222,7 +209,7 @@ N_SURVEY_ORANGE = 100
 
 
 def mc_universe_blue_cut(arrays, drop, cut, m_sil, r_sil, rng):
-    """Volatile-fraction Monte Carlo for the 1x2's two universes from one pool: each of puffy_cuts.N_REPEATS
+    """Volatile-fraction Monte Carlo for the 1x2's two universes from one pool: each of MC_REPEATS
     surveys draws N_SURVEY_BLUE (blue: truly above the silicate line) or N_SURVEY_ORANGE (orange: whole
     pool) planets that pass the cut after measurement noise.
     """
@@ -235,8 +222,8 @@ def mc_universe_blue_cut(arrays, drop, cut, m_sil, r_sil, rng):
         pool &= puffy
     idx = np.flatnonzero(pool)
     mass_min = cut.get("mass_min") or 0.0
-    out = np.full(puffy_cuts.N_REPEATS, np.nan)
-    for i in range(puffy_cuts.N_REPEATS):
+    out = np.full(MC_REPEATS, np.nan)
+    for i in range(MC_REPEATS):
         m_obs, r_obs = np.empty(0), np.empty(0)
         while m_obs.size < n:
             s = rng.choice(idx, 4 * n)
@@ -251,10 +238,13 @@ def mc_universe_blue_cut(arrays, drop, cut, m_sil, r_sil, rng):
 def _draw_bells(ax, arr, cut, nasa, m_sil, r_sil, rng, tag=""):
     """Bottom-row panel: COUNT histograms of the volatile fraction over the MC draws.
     y = number of the N_REPEATS draws that landed in each bin; N_p = mean planets/draw."""
-    nv, n_nasa = puffy_cuts.mc_nasa(nasa, cut, m_sil, r_sil, rng)
+    nv, n_nasa = puffy_cuts.mc_nasa(
+        nasa, cut, m_sil, r_sil, rng, n_repeats=MC_REPEATS)
     n_mu, n_sd = nv.mean(), nv.std()
-    sA, nA = puffy_cuts.mc_universe(arr, True, cut, m_sil, r_sil, rng)
-    sB, nB = puffy_cuts.mc_universe(arr, False, cut, m_sil, r_sil, rng)
+    sA, nA = puffy_cuts.mc_universe(
+        arr, True, cut, m_sil, r_sil, rng, n_repeats=MC_REPEATS)
+    sB, nB = puffy_cuts.mc_universe(
+        arr, False, cut, m_sil, r_sil, rng, n_repeats=MC_REPEATS)
     all_bell = [b for b in (nv, sA, sB) if b.size]
     cat = np.concatenate(all_bell)
     lo, hi = cat.min(), cat.max(); pad = 0.05 * (hi - lo)
@@ -284,7 +274,7 @@ def _draw_bells(ax, arr, cut, nasa, m_sil, r_sil, rng, tag=""):
     ax.set_xlim(gx[0], gx[-1]); ax.set_ylim(0, y_max * 1.15)
     ax.grid(alpha=0.2); ax.legend(fontsize=9, loc="upper left")
     ax.set_xlabel("volatile fraction")
-    ax.set_ylabel(f"number of MC draws (of {puffy_cuts.N_REPEATS:,})")
+    ax.set_ylabel(f"number of MC draws (of {MC_REPEATS:,})")
 
 
 def make_figure(cut_label, cut, fname, pools, nasa, m_sil, r_sil, rng):
@@ -345,7 +335,8 @@ def _draw_density_1x2(ax, arr, cut, nasa, m_sil, r_sil, rng, tag=""):
     fraction. Blue / orange: histograms of the 50- / 100-planet surveys with
     their fitted normals. NASA: its fitted normal only, filled (its 27 planets
     are the same in every draw, so only its mean and spread matter)."""
-    nv, _ = puffy_cuts.mc_nasa(nasa, cut, m_sil, r_sil, rng)
+    nv, _ = puffy_cuts.mc_nasa(
+        nasa, cut, m_sil, r_sil, rng, n_repeats=MC_REPEATS)
     n_mu, n_sd = nv.mean(), nv.std()
     sA, _ = mc_universe_blue_cut(arr, True, cut, m_sil, r_sil, rng)
     sB, _ = mc_universe_blue_cut(arr, False, cut, m_sil, r_sil, rng)
@@ -450,7 +441,7 @@ def make_paper_2col(pools, nasa, m_sil, r_sil, rng):
     print(f"--> Saved paper copy: {PAPER_FIG_DIR / 'flat_rocky_mr_2col_chen_otegi_cold.png'}")
 
 
-def main():
+def _main():
     os.makedirs(OUT_DIR, exist_ok=True)
     m_sil, r_sil = puffy_cuts.load_silicate()
     rng = np.random.default_rng(SEED)
@@ -470,5 +461,15 @@ def main():
     make_otegi_1x2(nasa, m_sil, r_sil, rng)
 
 
+def main():
+    with plt.rc_context(FIGURE_STYLE):
+        return _main()
+
+
 if __name__ == "__main__":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
     main()

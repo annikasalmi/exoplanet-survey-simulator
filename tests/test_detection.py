@@ -1,6 +1,6 @@
 from tools.exoplanet_catalog import load_and_filter_exoplanets
 from tools.paths import EXOPLANETS_2026_CSV
-from telescopes.hwo.detection_model import HWOData
+from science.telescopes.hwo.detection_model import HWOData
 
 
 def test_hwo_on_real_exoplanet_catalog():

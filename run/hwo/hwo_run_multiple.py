@@ -5,8 +5,8 @@ import multiprocessing as mp
 import numpy as np
 from functools import partial
 
-from telescopes.hwo.detection_model import HWOData
-from run.ppop.ppop_generator import PPop, set_star_catalog
+from science.populations.ppop import PPop, set_star_catalog
+from science.telescopes.hwo.detection_model import HWOData
 from tools.paths import HWO_DATA_DIR
 
 def run_single(i, star_catalog='Gaia'):

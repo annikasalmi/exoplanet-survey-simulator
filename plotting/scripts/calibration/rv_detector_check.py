@@ -24,7 +24,7 @@ except Exception:
     pass
 
 from tools.paths import TESS_DATA_DIR, PAPER_FIGURES_DIR, CALIBRATION_DIR, KEPLER_DATA_DIR
-from telescopes.rv.detection_model import RVData
+from science.telescopes.rv.detection_model import RVData
 
 PPOP_DIR = Path(TESS_DATA_DIR) / "Gaia"
 RVAMP_CACHE = Path(KEPLER_DATA_DIR) / "NASA" / "NASA_PSCompPars_rvamp_calibration.csv"

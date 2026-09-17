@@ -21,7 +21,8 @@ class PlanetDetectionPlotter(BasePlotter):
         self.plot_detection_efficiency_by_planet_type()
         self.plot_detection_efficiency_3d_panels()
         if temp_plots:
-            self.plot_detection_scatter_by_parameter()
+            for var, title in [('temp_p', 'Planet Temperature'), ('radius_p', 'Planet Radius')]:
+                self._create_parameter_scatter_plot(var, title)
 
     def _calculate_efficiency_data(self, df, x_col, bins):
         """Calculate detection efficiency data for given dataframe and bins."""
@@ -149,7 +150,9 @@ class PlanetDetectionPlotter(BasePlotter):
             mesh = self._create_efficiency_panel(ax, df, mask_best, panel)
             all_meshes.append(mesh)
 
-        self._enhance_panel_layout(axs)
+        for ax in axs:
+            ax.grid(True, alpha=0.3)
+            ax.set_facecolor('lightgray')
 
         # Add legend to just the far left axis
         handles, labels = axs[0].get_legend_handles_labels()
@@ -214,17 +217,6 @@ class PlanetDetectionPlotter(BasePlotter):
                       label='Cold/Habitable boundary')
             ax.axvline(x=390, color='red', linestyle='--', alpha=0.5, 
                       label='Habitable/Hot boundary')
-
-    def _enhance_panel_layout(self, axs):
-        """Enhance panel layout with consistent styling."""
-        for ax in axs:
-            ax.grid(True, alpha=0.3)
-            ax.set_facecolor('lightgray')
-
-    def plot_detection_scatter_by_parameter(self) -> None:
-        """Plot detection scatter plots by parameter."""
-        for var, title in [('temp_p', 'Planet Temperature'), ('radius_p', 'Planet Radius')]:
-            self._create_parameter_scatter_plot(var, title)
 
     def _create_parameter_scatter_plot(self, var, title):
         """Create a scatter plot for a specific parameter."""

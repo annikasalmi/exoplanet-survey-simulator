@@ -7,9 +7,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from PPop.StarCatalogs import CrossfieldBrightSample, ExoCat_1, LTC_2, LTC_3, gaia
 from telescopes.kepler.detection_model import KeplerData
-from run.ppop.ppop_generator import PPop
+from run.ppop.ppop_generator import PPop, set_star_catalog
 from tools.paths import KEPLER_DATA_DIR, PSCOMPPARS_CSV
 from tools.exoplanet_catalog import read_nasa_csv
 
@@ -26,28 +25,6 @@ MISSION_DURATION_DAYS = 4 * 365.25
 MIN_TRANSITS = 3
 MES_THRESHOLD = 7.1
 KEPLER_MAG_LIMIT = 16.0
-
-
-def set_star_catalog(PPopObj, star_catalog: str):
-    """
-    Copy the HWO star-catalog logic.
-    This lets Kepler use the same input population as HWO.
-    """
-
-    if star_catalog == "CrossfieldBrightSample":
-        PPopObj.StarCatalog = CrossfieldBrightSample
-    elif star_catalog == "ExoCat_1":
-        PPopObj.StarCatalog = ExoCat_1
-    elif star_catalog == "LTC_3":
-        PPopObj.StarCatalog = LTC_3
-    elif star_catalog == "LTC_2":
-        PPopObj.StarCatalog = LTC_2
-    elif star_catalog == "Gaia":
-        PPopObj.StarCatalog = gaia
-    else:
-        raise ValueError(f"Unknown star catalog: {star_catalog}")
-
-    return PPopObj
 
 
 def run_single(i, star_catalog='Gaia'):

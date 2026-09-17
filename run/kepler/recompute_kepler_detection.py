@@ -22,15 +22,11 @@ KEPLER_DIR = Path(KEPLER_DATA_DIR) / "Gaia"
 N_UNIVERSES = 10
 
 
-def _as_bool(s: pd.Series) -> pd.Series:
-    return s.astype(str).str.lower().isin(["true", "1", "1.0"])
-
-
 def _detected_pct_by_type(df: pd.DataFrame) -> dict:
     """Detected fraction among transiting planets, per spectral type."""
     st = df["stype"].astype(str).str[0]
-    trans = _as_bool(df["transiting_geometric"])
-    det = _as_bool(df["detected"])
+    trans = df["transiting_geometric"].astype(str).str.lower().isin(["true", "1", "1.0"])
+    det = df["detected"].astype(str).str.lower().isin(["true", "1", "1.0"])
     out = {}
     for t in ["F", "G", "K", "M"]:
         m = (st == t) & trans

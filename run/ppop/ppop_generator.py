@@ -19,7 +19,7 @@ from tools.paths import PPOP_DATA_DIR
 
 # Import your own catalogs, distributions and models here.
 import PPop.SystemGenerator as SystemGenerator
-from PPop.StarCatalogs import CrossfieldBrightSample, ExoCat_1, LTC_2, LTC_3
+from PPop.StarCatalogs import CrossfieldBrightSample, ExoCat_1, LTC_2, LTC_3, gaia
 from PPop.PlanetDistributions import Fressin2013, Burke2015, Dressing2015, SAG13,\
                                 Weiss2018, Weiss2018KDE, HabitableNominal, \
                                 HabitablePessimistic, Fernandes2019symm
@@ -35,6 +35,23 @@ from PPop.ExozodiModels import Ertel2020
 M_STAR_BOOST = 1  # 1 = off. The Gaia-60pc catalog is already M-dwarf-complete
                   # (~73% M dwarfs), so artificially duplicating M stars would
                   # over-represent them relative to the real nearby universe.
+
+STAR_CATALOGS = {
+    "CrossfieldBrightSample": CrossfieldBrightSample,
+    "ExoCat_1": ExoCat_1,
+    "LTC_3": LTC_3,
+    "LTC_2": LTC_2,
+    "Gaia": gaia,
+}
+
+
+def set_star_catalog(ppop_obj, star_catalog: str):
+    """Point ppop_obj at the star catalog named star_catalog (a key of STAR_CATALOGS)."""
+    if star_catalog not in STAR_CATALOGS:
+        raise ValueError(f"Unknown star catalog: {star_catalog}")
+    ppop_obj.StarCatalog = STAR_CATALOGS[star_catalog]
+    return ppop_obj
+
 
 class PPop():
     '''

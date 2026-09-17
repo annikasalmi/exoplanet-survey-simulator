@@ -31,7 +31,7 @@ class PlotHZLimits(BasePlotter):
                  ylim_min: float = 0.0, ylim_max: float = 35.0, **kwargs):
         """Initialize with optional dataframe and parameters."""
         if df is None:
-            df = self._create_minimal_dataframe()
+            df = pd.DataFrame({'dummy': [1]})
         super().__init__(df, nruns, star_catalog, name)
         
         # Plot limits
@@ -58,28 +58,12 @@ class PlotHZLimits(BasePlotter):
         self.plot_boundaries()
         self.plot_luminosity_distance()
 
-    def _create_minimal_dataframe(self) -> pd.DataFrame:
-        """Create a minimal dataframe for the plotter to work with."""
-        return pd.DataFrame({'dummy': [1]})
-
     def _get_panel_detection_mask(self, df_panel: pd.DataFrame) -> pd.Series:
         """Get detection mask for a specific panel."""
         mask_best, _ = self._get_detection_masks()
         mask_series = pd.Series(mask_best, index=self.df.index)
         panel_mask = mask_series.reindex(df_panel.index).fillna(False)
         return panel_mask.astype(bool)
-
-    def _get_flux_rejection_mask(self, df: pd.DataFrame) -> pd.Series:
-        """Get mask for planets rejected due to flux ratio."""
-        return df['flux_ratio_value_best'] < self.best_flux_limit
-
-    def _get_iwa_rejection_mask(self, df: pd.DataFrame) -> pd.Series:
-        """Get mask for planets rejected due to IWA."""
-        return df['maxangsep'] < self.iwa_limit
-
-    def _get_exozodi_rejection_mask(self, df: pd.DataFrame) -> pd.Series:
-        """Get mask for planets rejected due to exozodi."""
-        return df['z'] > self.max_z
 
     def _plot_exoplanet_overlay(self, ax: Axes, region_lum: Tuple[float, float], 
                                region_dist: Tuple[float, float]) -> set:
@@ -157,9 +141,9 @@ class PlotHZLimits(BasePlotter):
 
         # Create data subsets for different detection categories
         detected_mask = self._get_panel_detection_mask(self.df)
-        flux_rejected = self._get_flux_rejection_mask(self.df)
-        iwa_rejected = self._get_iwa_rejection_mask(self.df)
-        exozodi_rejected = self._get_exozodi_rejection_mask(self.df)
+        flux_rejected = self.df['flux_ratio_value_best'] < self.best_flux_limit
+        iwa_rejected = self.df['maxangsep'] < self.iwa_limit
+        exozodi_rejected = self.df['z'] > self.max_z
         
         data_subsets = {
             'detected': self.df[detected_mask],

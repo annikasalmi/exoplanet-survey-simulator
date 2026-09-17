@@ -19,7 +19,7 @@ class BasePlotter:
         self.nruns = nruns
         self.star_catalog = star_catalog
         self.name = name
-        self.data_dir = self._make_output_dir()
+        self.data_dir = os.path.join(PLOTS_DIR, str(self.name)+'_'+str(self.nruns)+'_'+str(self.star_catalog))
         
         # Create plots directory if it doesn't exist
         os.makedirs(self.data_dir, exist_ok=True)
@@ -28,13 +28,8 @@ class BasePlotter:
         self._cache = {}
         
         # Pre-compute commonly used values
-        self._precompute_values()
-
-    def _make_output_dir(self):
-        """Create and return output directory for plots."""
-        out_dir = os.path.join(PLOTS_DIR, str(self.name)+'_'+str(self.nruns)+'_'+str(self.star_catalog))
-        os.makedirs(out_dir, exist_ok=True)
-        return out_dir
+        if 'detection_masks' not in self._cache:
+            self._cache['detection_masks'] = self._get_detection_masks()
     
     def _output_filename(self, plot_type: str, suffix: Optional[str] = None) -> str:
         """Centralize output filename formatting."""
@@ -42,11 +37,6 @@ class BasePlotter:
         if suffix:
             base += f"_{suffix}"
         return base + ".png"
-
-    def _precompute_values(self):
-        """Pre-compute values that are used multiple times."""
-        if 'detection_masks' not in self._cache:
-            self._cache['detection_masks'] = self._get_detection_masks()
 
     def _get_detection_masks(self) -> Tuple[pd.Series, Optional[pd.Series]]:
         """Get detection masks for detected, detected_best, detected_worst depending on scenario."""
@@ -137,4 +127,4 @@ class BasePlotter:
 
     def plot_all(self) -> None:
         """Base plot_all method - should be overridden by subclasses."""
-        raise NotImplementedError("Subclasses must implement plot_all()") 
+        raise NotImplementedError("Subclasses must implement plot_all()")

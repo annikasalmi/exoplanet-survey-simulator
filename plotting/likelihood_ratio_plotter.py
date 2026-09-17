@@ -11,9 +11,9 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 import sys
 from pathlib import Path
 
-from tools.paths import LIFESIM_OUTER_DIR, SILICON_CURVE, PSCOMPPARS_CSV, ANALYSIS_DIR
+from tools.paths import REPO_ROOT, SILICON_CURVE, PSCOMPPARS_CSV, ANALYSIS_DIR
 from tools.exoplanet_catalog import read_nasa_csv
-ROOT = Path(LIFESIM_OUTER_DIR)
+ROOT = Path(REPO_ROOT)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 

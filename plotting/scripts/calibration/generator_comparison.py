@@ -10,8 +10,8 @@ from pathlib import Path
 
 import numpy as np
 
-from tools.paths import LIFESIM_OUTER_DIR, CALIBRATION_DIR
-ROOT = Path(LIFESIM_OUTER_DIR)
+from tools.paths import REPO_ROOT, CALIBRATION_DIR
+ROOT = Path(REPO_ROOT)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 warnings.filterwarnings("ignore")
@@ -141,29 +141,25 @@ def main(rebuild=False):
     order = ["old", "new", "flat"]
     fig, axes = plt.subplots(2, 3, figsize=(16, 9.2))
 
-    def _logticks(ax, lo, hi):
-        ticks = np.arange(np.ceil(np.log10(lo)), np.floor(np.log10(hi)) + 1)
-        ax.set_xticks(ticks)
-        ax.set_xticklabels([rf"$10^{{{int(t)}}}$" for t in ticks])
-
     def hist3(ax, key, lo, hi, nbins=55, logx=False, flat_key=None):
         # For log-x we histogram log10(x) on LINEAR bins -> density is dN/dlog x
         # (per dex). This is what makes a log-uniform draw appear FLAT.
-        def get(k):
-            return np.asarray(d[f"{k}_{flat_key}" if (k == "flat" and flat_key)
-                                else f"{k}_{key}"], float)
         if logx:
             bl = np.linspace(np.log10(lo), np.log10(hi), nbins)
             for k in order:
-                x = np.log10(np.clip(get(k), 10 ** bl[0], 10 ** bl[-1]))
+                values = np.asarray(d[f"{k}_{flat_key}" if (k == "flat" and flat_key) else f"{k}_{key}"], float)
+                x = np.log10(np.clip(values, 10 ** bl[0], 10 ** bl[-1]))
                 ax.hist(x, bins=bl, density=True, histtype="step", lw=2.0, color=COL[k])
             ax.set_xlim(bl[0], bl[-1])
-            _logticks(ax, lo, hi)
+            ticks = np.arange(np.ceil(np.log10(lo)), np.floor(np.log10(hi)) + 1)
+            ax.set_xticks(ticks)
+            ax.set_xticklabels([rf"$10^{{{int(t)}}}$" for t in ticks])
             ax.set_ylabel("density  (per dex)")
         else:
             bins = np.linspace(lo, hi, nbins)
             for k in order:
-                ax.hist(np.clip(get(k), bins[0], bins[-1]), bins=bins, density=True,
+                values = np.asarray(d[f"{k}_{flat_key}" if (k == "flat" and flat_key) else f"{k}_{key}"], float)
+                ax.hist(np.clip(values, bins[0], bins[-1]), bins=bins, density=True,
                         histtype="step", lw=2.0, color=COL[k])
             ax.set_ylabel("density")
         ax.grid(ls=":", alpha=0.5)

@@ -1,4 +1,4 @@
-"""Metrics comparing planet populations in mass-radius (puffy fraction, density, scatter, energy
+"""Metrics comparing planet populations in mass-radius (sub-Neptune fraction, density, scatter, energy
 distance, KDE likelihood). Pure numpy/scipy/sklearn, so safe to import anywhere.
 """
 
@@ -53,16 +53,6 @@ def logdensity_scatter(M, R) -> float:
     return float(d.std(ddof=1)) if d.size > 1 else np.nan
 
 
-def _skew(x):
-    s = x.std()
-    return float(((x - x.mean()) ** 3).mean() / s ** 3) if s > 0 else 0.0
-
-
-def _exkurt(x):
-    s = x.std()
-    return float(((x - x.mean()) ** 4).mean() / s ** 4 - 3) if s > 0 else 0.0
-
-
 def density_bimodality(M, R):
     """log10(density) bimodality. Returns (Sarle BC, GMM dBIC = BIC(1)-BIC(2)).
     BC > 0.555 hints bimodal (uniform=0.555, normal=0.333); dBIC > 0 favours 2 components."""
@@ -71,7 +61,9 @@ def density_bimodality(M, R):
     n = d.size
     if n < 20:
         return np.nan, np.nan
-    g, k = _skew(d), _exkurt(d)
+    s = d.std()
+    g = float(((d - d.mean()) ** 3).mean() / s ** 3) if s > 0 else 0.0
+    k = float(((d - d.mean()) ** 4).mean() / s ** 4 - 3) if s > 0 else 0.0
     bc = (g ** 2 + 1.0) / (k + 3.0 * (n - 1) ** 2 / ((n - 2) * (n - 3)))
     dbic = np.nan
     if GaussianMixture is not None:

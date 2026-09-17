@@ -1,6 +1,7 @@
 """Rocky-planet figures: FGKM detection-fraction maps from stacked Gaia-60pc Kepler/TESS catalogs
 with NASA rocky planets overlaid, plus the paper's rocky_mr_insolation_3panel / rocky_scatter_standalone.
-Run: python plotting/scripts/analysis/multi/rocky_scatter_gaia60pc.py
+Run: python plotting/scripts/analysis/multi/rocky_scatter_gaia60pc.py [--full]
+The paper figures need no universes. --full adds the maps, from the 10 Gaia-60pc universes run_sim.py writes (~3-4 h).
 """
 
 from __future__ import annotations
@@ -60,7 +61,7 @@ def _ppop_files(directory: Path, stem: str) -> list[Path]:
     if not present:
         raise FileNotFoundError(
             f"No P-Pop catalogs found in {directory} for stem '{stem}' "
-            f"(expected {stem}_0.csv .. {stem}_{N_UNIVERSES - 1}.csv)"
+            f"(expected {stem}_0.csv .. {stem}_{N_UNIVERSES - 1}.csv); run `python run/run_sim.py` first (~3-4 h)"
         )
     missing = [f.name for f in wanted if not f.exists()]
     if missing:
@@ -73,7 +74,7 @@ def _ppop_files(directory: Path, stem: str) -> list[Path]:
 REF_CURVE_PATH = Path(KEPLER_REF_CURVE)
 
 # Silicate mass-radius curve (silicon_curve.ddat; cols 0,1 = mass, radius in Earth units).
-# It is the rocky threshold that separates rocky from puffy planets throughout this script.
+# It is the rocky threshold that separates rocky planets from sub-Neptunes throughout this script.
 ROCKY_CURVE_PATH  = Path(SILICON_CURVE)
 ROCKY_CURVE_LABEL = "silicate rocky curve"
 
@@ -138,10 +139,6 @@ FACILITY_RELABEL = {
 }
 
 
-def short_facility(name: str) -> str:
-    return FACILITY_RELABEL.get(name, name)
-
-
 # ── General helpers ───────────────────────────────────────────────────────────
 
 def as_bool(s: pd.Series) -> pd.Series:
@@ -198,7 +195,7 @@ def restrict_science_window(df: pd.DataFrame) -> pd.DataFrame:
 
 def load_rocky_reference_curve():
     """Load the silicate curve (silicon_curve.ddat) as (mass, radius) sorted by mass.
-    It is the rocky threshold separating rocky from puffy planets.
+    It is the rocky threshold separating rocky planets from sub-Neptunes.
     """
     if not ROCKY_CURVE_PATH.exists():
         print(f"WARNING: {ROCKY_CURVE_PATH} not found — using toy power-law rocky curve.")
@@ -220,7 +217,7 @@ def compute_anchor_shift(m_ref: np.ndarray, r_ref: np.ndarray) -> float:
 
 
 def compute_rocky_threshold_shift(m_ref: np.ndarray, r_ref: np.ndarray) -> float:
-    """Rocky/puffy cutoff shift: 0.0, since the unshifted silicate curve is the cutoff.
+    """Rocky/sub-Neptune cutoff shift: 0.0, since the unshifted silicate curve is the cutoff.
     The LHS 1140 b anchor offset (~0) is only reported; compute_anchor_shift() still draws it.
     """
     r_at_lhs = float(np.interp(LHS1140B_MASS_MEARTH, m_ref, r_ref))
@@ -324,14 +321,15 @@ def load_and_filter_nasa(m_ref, r_ref, shift: float) -> tuple[pd.DataFrame, pd.D
         df = df[~df["mass_limit_flag"].fillna(0).ne(0)].copy()
         print(f"  remove mass limit flags: → {len(df):,}")
 
-    if EXCLUDE_CALCULATED_MASSES and "mass_provider" in df.columns:
-        calc = df["mass_provider"].astype(str).str.contains("M-R relationship|Calculated", case=False, na=False)
-        df = df[~calc].copy()
-        print(f"  remove M-R relationship / calculated masses: → {len(df):,}")
-    elif EXCLUDE_CALCULATED_MASSES and "mass_reference" in df.columns:
-        calc = df["mass_reference"].astype(str).str.contains("CALCULATED_VALUE|Calculated Value", case=False, na=False)
-        df = df[~calc].copy()
-        print(f"  remove calculated masses (via reflink): → {len(df):,}")
+    if EXCLUDE_CALCULATED_MASSES:
+        if "mass_provider" in df.columns:
+            calc = df["mass_provider"].astype(str).str.contains("M-R relationship|Calculated", case=False, na=False)
+            df = df[~calc].copy()
+            print(f"  remove M-R relationship / calculated masses: → {len(df):,}")
+        elif "mass_reference" in df.columns:
+            calc = df["mass_reference"].astype(str).str.contains("CALCULATED_VALUE|Calculated Value", case=False, na=False)
+            df = df[~calc].copy()
+            print(f"  remove calculated masses (via reflink): → {len(df):,}")
 
     if EXCLUDE_RADIUS_LIMITS:
         df = df[~df["radius_limit_flag"].fillna(0).ne(0)].copy()
@@ -536,14 +534,13 @@ def fraction_grid(df: pd.DataFrame, numerator: pd.Series, denominator: pd.Series
     return frac.T, total.T
 
 
-def _bin_centers(edges: np.ndarray) -> np.ndarray:
-    return np.sqrt(edges[:-1] * edges[1:])
-
-
 def _add_contours(ax, grid: np.ndarray):
     if not np.isfinite(grid).any():
         return
-    X, Y = np.meshgrid(_bin_centers(INSOLATION_BINS), _bin_centers(PLANET_RADIUS_BINS))
+    X, Y = np.meshgrid(
+        np.sqrt(INSOLATION_BINS[:-1] * INSOLATION_BINS[1:]),
+        np.sqrt(PLANET_RADIUS_BINS[:-1] * PLANET_RADIUS_BINS[1:]),
+    )
     try:
         cs = ax.contour(X, Y, grid, levels=[0.2, 0.5, 0.8],
                         colors="white", linewidths=0.8, alpha=0.8)
@@ -595,16 +592,25 @@ def fit_90pct_line(flux: np.ndarray, radius: np.ndarray, quantile: float = 0.90)
     # OLS as a starting guess / fallback.
     ols_slope, ols_intercept = np.polyfit(x, y, 1)
 
-    def pinball(params):
-        a, b = params
-        r = y - (a * x + b)
-        return np.sum(np.where(r >= 0, quantile * r, (quantile - 1.0) * r))
-
     try:
         from scipy.optimize import minimize
-        res = minimize(pinball, x0=[ols_slope, ols_intercept], method="Nelder-Mead",
-                       options={"xatol": 1e-6, "fatol": 1e-9, "maxiter": 5000})
-        if res.success or res.fun < pinball([ols_slope, np.quantile(y - ols_slope * x, quantile)]):
+        res = minimize(
+            lambda params: np.sum(np.where(
+                y - (params[0] * x + params[1]) >= 0,
+                quantile * (y - (params[0] * x + params[1])),
+                (quantile - 1.0) * (y - (params[0] * x + params[1])),
+            )),
+            x0=[ols_slope, ols_intercept],
+            method="Nelder-Mead",
+            options={"xatol": 1e-6, "fatol": 1e-9, "maxiter": 5000},
+        )
+        fallback_intercept = np.quantile(y - ols_slope * x, quantile)
+        fallback_resid = y - (ols_slope * x + fallback_intercept)
+        if res.success or res.fun < np.sum(np.where(
+            fallback_resid >= 0,
+            quantile * fallback_resid,
+            (quantile - 1.0) * fallback_resid,
+        )):
             return float(res.x[0]), float(res.x[1])
     except Exception:
         pass
@@ -684,7 +690,7 @@ def build_facility_styles(rocky_win: pd.DataFrame, contrast_overrides: bool = Fa
     color_map = {f: FACILITY_PALETTE[i % len(FACILITY_PALETTE)] for i, f in enumerate(major)}
     if contrast_overrides:
         for f in major:
-            override = FACILITY_COLOR_OVERRIDES.get(short_facility(f))
+            override = FACILITY_COLOR_OVERRIDES.get(FACILITY_RELABEL.get(f, f))
             if override:
                 color_map[f] = override
     return color_map, major, counts
@@ -692,7 +698,7 @@ def build_facility_styles(rocky_win: pd.DataFrame, contrast_overrides: bool = Fa
 
 OTHER_COLOR = "0.55"
 
-# The cold rocky desert candidates (relaxed cuts; paper_v2 Table 1), all starred
+# The cold super-Earth desert candidates (relaxed cuts; paper_v2 Table 1), all starred
 # equally in overlay panels — LHS 1140 b is not singled out.
 DESERT_CANDIDATE_PATTERNS = [
     r"LHS\s*1140\s*b", r"TOI-?1452\s*b", r"LHS\s*1903\s*e",
@@ -763,7 +769,7 @@ def plot_combined(kepler: pd.DataFrame, tess: pd.DataFrame,
                   color_map: dict, major: list[str], counts) -> Path:
     print("\nFacilities with > {} rocky planets in window:".format(FACILITY_MIN_COUNT))
     for f in major:
-        print(f"  {short_facility(f):<10s} N={counts[f]}")
+        print(f"  {FACILITY_RELABEL.get(f, f):<10s} N={counts[f]}")
     n_other = int(len(rocky_win) - sum(counts[f] for f in major))
     print(f"  Other      N={n_other}")
 
@@ -836,7 +842,7 @@ def plot_combined(kepler: pd.DataFrame, tess: pd.DataFrame,
     # Shared facility legend.
     handles = [
         Line2D([0], [0], marker="o", linestyle="", color=color_map[f],
-               markersize=7, label=f"{short_facility(f)}  (N={counts[f]})")
+               markersize=7, label=f"{FACILITY_RELABEL.get(f, f)}  (N={counts[f]})")
         for f in major
     ]
     if n_other > 0:
@@ -846,7 +852,7 @@ def plot_combined(kepler: pd.DataFrame, tess: pd.DataFrame,
         )
     handles.append(
         Line2D([0], [0], marker="*", linestyle="", color="gold",
-               markeredgecolor="darkred", markersize=12, label="Cold rocky desert candidates")
+               markeredgecolor="darkred", markersize=12, label="Cold super-Earth desert candidates")
     )
     handles.append(
         Line2D([0], [0], color="black", lw=2.0, ls="--",
@@ -934,7 +940,7 @@ def plot_mr_diagnostic(m_ref, r_ref, shift: float,
                   sub["radius_err_plus"].abs().fillna(0).values],
             fmt="o", ms=4, color=color_map[f], alpha=0.85,
             elinewidth=0.4, capsize=0, ecolor=color_map[f],
-            label=f"{short_facility(f)}  (N={counts[f]})", zorder=4,
+            label=f"{FACILITY_RELABEL.get(f, f)}  (N={counts[f]})", zorder=4,
         )
     other = rocky_win[~fac.isin(major)]
     if len(other) > 0:
@@ -1048,12 +1054,6 @@ MR_INSOL_PANELS = [
 ]
 
 
-def draw_cold_corner_band(ax, m_line, r_curve):
-    ax.fill_between(m_line, COLD_CORNER_RADIUS, r_curve,
-                    where=np.isfinite(r_curve) & (r_curve >= COLD_CORNER_RADIUS),
-                    color=COLD_CORNER_COLOR, alpha=0.35, lw=0, zorder=1)
-
-
 def plot_mr_insolation_panels(m_ref, r_ref, nasa_win: pd.DataFrame,
                               color_map: dict, major: list[str], counts) -> Path:
     """1x3 mass-radius panels by insolation (I<10, I<50, I>50) for the PSCompPars sample, colored by
@@ -1133,7 +1133,16 @@ def plot_mr_insolation_panels(m_ref, r_ref, nasa_win: pd.DataFrame,
                         va="center", fontsize=20, color="black", zorder=8)
 
         if draw_corner:
-            draw_cold_corner_band(ax, m_line, r_curve)
+            ax.fill_between(
+                m_line,
+                COLD_CORNER_RADIUS,
+                r_curve,
+                where=np.isfinite(r_curve) & (r_curve >= COLD_CORNER_RADIUS),
+                color=COLD_CORNER_COLOR,
+                alpha=0.35,
+                lw=0,
+                zorder=1,
+            )
 
         ax.set_xlim(*XLIM)
         ax.set_xticks(np.arange(XLIM[0], XLIM[1] + 1, 2))
@@ -1147,7 +1156,7 @@ def plot_mr_insolation_panels(m_ref, r_ref, nasa_win: pd.DataFrame,
 
     handles = [
         Line2D([0], [0], marker="o", linestyle="", color=color_map[f],
-               markersize=7, label=short_facility(f))
+               markersize=7, label=FACILITY_RELABEL.get(f, f))
         for f in major
     ]
     n_other = int(len(nasa_win) - sum(counts[f] for f in major))
@@ -1294,7 +1303,7 @@ def main():
     plot_rocky_scatter_standalone(rocky_win, shift)
 
     # 1x3 mass-radius insolation panels. Facility
-    # styles are built from the full in-window sample shown here (rocky + puffy).
+    # styles are built from the full in-window sample shown here (rocky + sub-Neptune).
     # Kepler and K2 are the same spacecraft, so they share one color here.
     mr_win = nasa_win.assign(discovery_facility=nasa_win["discovery_facility"].replace(
         {"Kepler": "Kepler and K2", "K2": "Kepler and K2"}))

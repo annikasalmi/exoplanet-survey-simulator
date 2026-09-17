@@ -1,10 +1,6 @@
 {
     "version": "0.2.0",
     "configurations": [
-    
-
-
-
         {
             "name": "Python Debugger: Current File",
             "type": "debugpy",
@@ -16,15 +12,9 @@
             "name": "P-pop.py",
             "type": "debugpy",
             "request": "launch",
-            "program": "P-pop/P-pop.py",
-            "console": "integratedTerminal"
-        },
-        {
-            "name": "integration.py",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "test/integration.py",
-            "console": "integratedTerminal"
+            "program": "${workspaceFolder}/PPop/P-pop.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}"
         },
         {
             "name": "run_sim.py",
@@ -41,45 +31,6 @@
             "program": "${workspaceFolder}/run/lifesim/lifesim_run_exoplanets.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}"
-        },
-        {
-            "name": "Sim: HWO (Gaia)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/run/run_sim.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}",
-            "args": ["--sim", "hwo", "--star_catalog", "Gaia", "--nruns", "500", "--run_anew", "${input:runAnew}"]
-        },
-        {
-            "name": "Sim: Lifesim (Gaia)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/run/run_sim.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}",
-            "args": ["--sim", "lifesim", "--star_catalog", "Gaia", "--nruns", "500", "--run_anew", "${input:runAnew}"]
-        },
-        {
-            "name": "Sim: Lifesim (LTC_3)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/run/run_sim.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}",
-            "args": ["--sim", "lifesim", "--star_catalog", "LTC_3", "--nruns", "500", "--run_anew", "${input:runAnew}"]
-        }
-    ],
-    "inputs": [
-        {
-            "id": "runAnew",
-            "type": "pickString",
-            "description": "Run simulation anew?",
-            "options": [
-                "true",
-                "false"
-            ],
-            "default": "false"
         }
     ]
 }

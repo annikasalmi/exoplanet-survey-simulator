@@ -5,9 +5,8 @@ import multiprocessing as mp
 import numpy as np
 from functools import partial
 
-from PPop.StarCatalogs import CrossfieldBrightSample, ExoCat_1, LTC_2, LTC_3, gaia
 from telescopes.hwo.detection_model import HWOData
-from run.ppop.ppop_generator import PPop
+from run.ppop.ppop_generator import PPop, set_star_catalog
 from tools.paths import HWO_DATA_DIR
 
 def run_single(i, star_catalog='Gaia'):
@@ -16,18 +15,7 @@ def run_single(i, star_catalog='Gaia'):
     '''
     print(f"Running HWO for run {i} with star catalog {star_catalog}")
     rng = np.random.default_rng(i)
-    PPopObj = PPop(rng=rng)
-
-    if star_catalog == 'CrossfieldBrightSample':
-        PPopObj.StarCatalog = CrossfieldBrightSample
-    elif star_catalog == 'ExoCat_1':
-        PPopObj.StarCatalog = ExoCat_1
-    elif star_catalog == 'LTC_3':
-        PPopObj.StarCatalog = LTC_3
-    elif star_catalog == 'LTC_2':
-        PPopObj.StarCatalog = LTC_2
-    elif star_catalog == 'Gaia':
-        PPopObj.StarCatalog = gaia
+    PPopObj = set_star_catalog(PPop(rng=rng), star_catalog)
 
     filename = f'test_runs_hwo_{i}'
     data_path = os.path.join(HWO_DATA_DIR, filename)

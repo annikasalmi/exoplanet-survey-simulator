@@ -6,9 +6,8 @@ from functools import partial
 import numpy as np
 import pandas as pd
 
-from PPop.StarCatalogs import CrossfieldBrightSample, ExoCat_1, LTC_2, LTC_3, gaia
 from telescopes.tess.detection_model import TESSData
-from run.ppop.ppop_generator import PPop
+from run.ppop.ppop_generator import PPop, set_star_catalog
 from tools.paths import TESS_DATA_DIR
 
 # A TESS worker holds CDPP tables, tess-point and an exozodi KDE on top of the
@@ -24,22 +23,6 @@ TESS_DEFAULTS = {
     "phase_mode": "random",
     "tmag_limit": 16.0,
 }
-
-def set_star_catalog(ppop_obj, star_catalog: str):
-    if star_catalog == "CrossfieldBrightSample":
-        ppop_obj.StarCatalog = CrossfieldBrightSample
-    elif star_catalog == "ExoCat_1":
-        ppop_obj.StarCatalog = ExoCat_1
-    elif star_catalog == "LTC_3":
-        ppop_obj.StarCatalog = LTC_3
-    elif star_catalog == "LTC_2":
-        ppop_obj.StarCatalog = LTC_2
-    elif star_catalog == "Gaia":
-        ppop_obj.StarCatalog = gaia
-    else:
-        raise ValueError(f"Unknown star catalog: {star_catalog}")
-    return ppop_obj
-
 
 def run_single(i, star_catalog='Gaia'):
     '''

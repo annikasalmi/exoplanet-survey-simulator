@@ -49,10 +49,6 @@ def _stype_from_teff(teff):
     return out
 
 
-def _logU(rng, lo, hi, n):
-    return 10.0 ** rng.uniform(np.log10(lo), np.log10(hi), n)
-
-
 # Mass-radius options (default "independent": log-uniform mass, decoupled from radius).
 # "mean": mass from the mean Chen2017/Forecaster relation + log-normal scatter.
 # "ppop": mass from P-Pop's full probabilistic Chen2017/Forecaster.
@@ -138,8 +134,8 @@ def generate_flat_catalog(
         batch = max(int((n_planets - have) * 1.8), 20000)
 
         radius_p = rng.uniform(radius_lims[0], radius_lims[1], batch)
-        mass_p = _logU(rng, mass_lims[0], mass_lims[1], batch)
-        p_orb = _logU(rng, period_lims[0], period_lims[1], batch)
+        mass_p = 10.0 ** rng.uniform(np.log10(mass_lims[0]), np.log10(mass_lims[1]), batch)
+        p_orb = 10.0 ** rng.uniform(np.log10(period_lims[0]), np.log10(period_lims[1]), batch)
         ecc_p = rng.uniform(ecc_lims[0], ecc_lims[1], batch)
         inc_p = np.arccos(rng.uniform(0.0, 1.0, batch))            # isotropic, [0, pi/2]
         teff_s = rng.uniform(teff_lims[0], teff_lims[1], batch)
@@ -160,24 +156,32 @@ def generate_flat_catalog(
         keep_L.append(l_sun[m]); keep_a.append(semimajor_p[m]); keep_F.append(flux_p[m])
         have += int(m.sum())
 
-    def cat(parts):
-        return np.concatenate(parts)[:n_planets]
-
-    teff = cat(keep_T)
+    radius_p = np.concatenate(keep_R)[:n_planets]
+    mass_p = np.concatenate(keep_M)[:n_planets]
+    p_orb = np.concatenate(keep_P)[:n_planets]
+    ecc_p = np.concatenate(keep_E)[:n_planets]
+    inc_p = np.concatenate(keep_inc)[:n_planets]
+    semimajor_p = np.concatenate(keep_a)[:n_planets]
+    flux_p = np.concatenate(keep_F)[:n_planets]
+    radius_s = np.concatenate(keep_Rs)[:n_planets]
+    mass_s = np.concatenate(keep_Ms)[:n_planets]
+    teff = np.concatenate(keep_T)[:n_planets]
+    l_sun = np.concatenate(keep_L)[:n_planets]
+    distance_s = np.concatenate(keep_D)[:n_planets]
     df = pd.DataFrame({
-        "radius_p": cat(keep_R),
-        "mass_p": cat(keep_M),
-        "p_orb": cat(keep_P),
-        "ecc_p": cat(keep_E),
-        "inc_p": cat(keep_inc),
-        "semimajor_p": cat(keep_a),
-        "flux_p": cat(keep_F),
-        "radius_s": cat(keep_Rs),
-        "mass_s": cat(keep_Ms),
+        "radius_p": radius_p,
+        "mass_p": mass_p,
+        "p_orb": p_orb,
+        "ecc_p": ecc_p,
+        "inc_p": inc_p,
+        "semimajor_p": semimajor_p,
+        "flux_p": flux_p,
+        "radius_s": radius_s,
+        "mass_s": mass_s,
         "teff_s": teff,
         "temp_s": teff,
-        "l_sun": cat(keep_L),
-        "distance_s": cat(keep_D),
+        "l_sun": l_sun,
+        "distance_s": distance_s,
     })
     # Sky position (flat) for any visibility model; detectors here use it loosely.
     df["ra"] = rng.uniform(0.0, 360.0, len(df))

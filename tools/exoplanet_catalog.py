@@ -63,7 +63,7 @@ def load_and_filter_exoplanets(csv_path, instrument='LIFE'):
         wavelength = 18.5e-6    # 18.5 microns (mid-IR)
     elif instrument.upper() == 'HWO':
         wavelength = 2.5e-6     # 2.5 microns (near-IR)
-    elif facility is not None:
+    elif instrument.upper() in facility_filters:
         wavelength = None
     else:
         raise ValueError(

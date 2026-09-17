@@ -1,6 +1,7 @@
-"""Puffy fraction of flat and P-Pop universes (A/B each) vs NASA under four cuts: all, M > 2,
+"""Sub-Neptune fraction of flat and P-Pop universes (A/B each) vs NASA under four cuts: all, M > 2,
 I < 50, both. Detection is transit+RV with NASA-like measurement error. Also loaded by
 flat_rocky_mr_vs_nasa.py. Run: python plotting/scripts/analysis/multi/puffy_cuts_flat.py
+Needs Kepler Gaia-60pc universe 0 from `python run/run_sim.py` (~3-4 h for all 20; see README). Not a paper figure.
 """
 
 from __future__ import annotations
@@ -11,8 +12,8 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 import sys
 from pathlib import Path
 
-from tools.paths import LIFESIM_OUTER_DIR, PSCOMPPARS_CSV, KEPLER_DATA_DIR, ANALYSIS_DIR
-ROOT = Path(LIFESIM_OUTER_DIR)
+from tools.paths import REPO_ROOT, PSCOMPPARS_CSV, KEPLER_DATA_DIR, ANALYSIS_DIR
+ROOT = Path(REPO_ROOT)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -74,6 +75,8 @@ def build_pool(population, m_sil, r_sil):
     if population == "flat":
         pool = generate_flat_catalog(n_planets=FLAT_N_POOL, seed=RNG_SEED)
     else:
+        if not PPOP_CATALOG.exists():
+            raise FileNotFoundError(f"{PPOP_CATALOG} not found; run `python run/run_sim.py` first (~3-4 h)")
         cols = ["radius_p", "mass_p", "p_orb", "inc_p", "ecc_p", "semimajor_p", "radius_s",
                 "mass_s", "temp_s", "teff_s", "distance_s", "l_sun", "flux_p", "detected"]
         pool = pd.read_csv(PPOP_CATALOG, usecols=lambda c: c in cols, low_memory=False)
@@ -242,14 +245,14 @@ def main():
             ax.plot(xs, gauss(xs, P["n_mu"], P["n_sd"]), color="tab:green", lw=2.4,
                     label=f"NASA: μ={P['n_mu']:.2f} σ={P['n_sd']:.3f} (N={P['n_nasa']})")
             ax.set_xlim(gx_lo, gx_hi); ax.set_ylim(0, gy_hi)
-            ax.set_title((f"{cut_label}\n" if ri == 0 else "") + f"{row_label} — puffy fraction", fontsize=10)
+            ax.set_title((f"{cut_label}\n" if ri == 0 else "") + f"{row_label} — sub-Neptune fraction", fontsize=10)
             ax.grid(alpha=0.2); ax.legend(fontsize=7.6, loc="upper left")
             if ci == 0:
                 ax.set_ylabel("density over repeated draws")
             if ri == 1:
-                ax.set_xlabel("puffy fraction")
+                ax.set_xlabel("sub-Neptune fraction")
 
-    fig.suptitle("Puffy fraction: which universe does NASA imply, under four cuts — FLAT (top) vs P-Pop (bottom)\n"
+    fig.suptitle("Sub-Neptune fraction: which universe does NASA imply, under four cuts — FLAT (top) vs P-Pop (bottom)\n"
                  "transit+RV detected, measurement-error propagated; closest bell to green NASA wins",
                  fontsize=12)
     fig.tight_layout(rect=[0, 0, 1, 0.93])

@@ -222,10 +222,14 @@ class PlotPlanetType(BasePlotter):
         
         # Add detected/total labels above each stellar type
         for idx, star in enumerate(STAR_ORDER):
-            def sum_count(df):
-                return df[df['stype'] == star]['count'].sum() if isinstance(df, pd.DataFrame) and 'stype' in df.columns and 'count' in df.columns else 0
-            total_count = sum_count(total_mean)
-            detected_count = sum_count(detected_mean)
+            total_count = (
+                total_mean[total_mean['stype'] == star]['count'].sum()
+                if isinstance(total_mean, pd.DataFrame) and 'stype' in total_mean.columns and 'count' in total_mean.columns else 0
+            )
+            detected_count = (
+                detected_mean[detected_mean['stype'] == star]['count'].sum()
+                if isinstance(detected_mean, pd.DataFrame) and 'stype' in detected_mean.columns and 'count' in detected_mean.columns else 0
+            )
             # Find the tallest bar for this star
             heights = [get_count(total_mean, star=star, bin_label=bin_label) + get_count(detected_mean, star=star, bin_label=bin_label) for bin_label in BIN_LABELS]
             max_height = max(heights) if heights else 0

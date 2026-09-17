@@ -132,10 +132,6 @@ class RVData:
             return data.copy()
         return pd.DataFrame(data).copy()
 
-    @staticmethod
-    def _num(s) -> pd.Series:
-        return pd.to_numeric(s, errors="coerce")
-
     def _infer_source(self, source: str) -> str:
         source = str(source).lower().strip()
         if source != "auto":
@@ -176,13 +172,13 @@ class RVData:
                 df = df.rename(columns={src_col: dst_col})
 
         if "st_lum_log10" in df.columns and "l_sun" not in df.columns:
-            df["l_sun"] = 10 ** self._num(df["st_lum_log10"])
+            df["l_sun"] = 10 ** pd.to_numeric(df["st_lum_log10"], errors="coerce")
 
         for col in ["mass_p", "msini_p", "radius_p", "p_orb", "semimajor_p", "inc_p",
                     "ecc_p", "radius_s", "mass_s", "teff_s", "l_sun", "distance_s",
                     "flux_p", "vmag", "gaiamag", "rv_amp_obs"]:
             if col in df.columns:
-                df[col] = self._num(df[col])
+                df[col] = pd.to_numeric(df[col], errors="coerce")
 
         df["dataset_source"] = {
             "pscomppars": "NASA_PSCompPars", "nasa": "NASA_PSCompPars", "koi": "NASA_KOI",
@@ -201,9 +197,9 @@ class RVData:
             )
         if "ecc_p" not in self.catalog.columns:
             self.catalog["ecc_p"] = 0.0
-        self.catalog["ecc_p"] = self._num(self.catalog["ecc_p"]).fillna(0.0).clip(0.0, 0.99)
+        self.catalog["ecc_p"] = pd.to_numeric(self.catalog["ecc_p"], errors="coerce").fillna(0.0).clip(0.0, 0.99)
         if "habitable" not in self.catalog.columns and "flux_p" in self.catalog.columns:
-            flux = self._num(self.catalog["flux_p"])
+            flux = pd.to_numeric(self.catalog["flux_p"], errors="coerce")
             self.catalog["habitable"] = (flux >= 0.25) & (flux <= 2.0)
 
     @staticmethod
@@ -243,13 +239,13 @@ class RVData:
 
         m_solar = pd.Series(np.nan, index=self.catalog.index)
         if "mass_s" in self.catalog.columns:
-            ms = self._num(self.catalog["mass_s"])
+            ms = pd.to_numeric(self.catalog["mass_s"], errors="coerce")
             plausible = ms.between(0.05, 3.0)
             m_solar = m_solar.where(~plausible, ms)
             src = src.where(~plausible, "mass_s_catalog")
 
         if "radius_s" in self.catalog.columns:
-            rs = self._num(self.catalog["radius_s"]).clip(lower=0.05, upper=3.0)
+            rs = pd.to_numeric(self.catalog["radius_s"], errors="coerce").clip(lower=0.05, upper=3.0)
             m_from_r = rs ** self.stellar_mass_radius_exponent
             need = m_solar.isna() & rs.notna()
             m_solar = m_solar.where(~need, m_from_r)
@@ -268,11 +264,11 @@ class RVData:
         """Apparent magnitude in a band from luminosity + distance + Teff-dependent BC."""
         if not {"l_sun", "distance_s"}.issubset(self.catalog.columns):
             return pd.Series(np.nan, index=self.catalog.index)
-        l = self._num(self.catalog["l_sun"]).clip(lower=1e-12)
-        d = self._num(self.catalog["distance_s"]).clip(lower=1e-6)
+        l = pd.to_numeric(self.catalog["l_sun"], errors="coerce").clip(lower=1e-12)
+        d = pd.to_numeric(self.catalog["distance_s"], errors="coerce").clip(lower=1e-6)
         m_bol = 4.74 - 2.5 * np.log10(l) + 5 * np.log10(d / 10.0)
         if "teff_s" in self.catalog.columns:
-            teff = self._num(self.catalog["teff_s"])
+            teff = pd.to_numeric(self.catalog["teff_s"], errors="coerce")
             bc = pd.Series(np.interp(teff.clip(2500, 8000).to_numpy(float), self._TEFF_GRID, bc_grid),
                            index=self.catalog.index)
             return m_bol - bc  # M_bol = M_band + BC_band
@@ -283,13 +279,13 @@ class RVData:
         v = pd.Series(np.nan, index=self.catalog.index)
         src = pd.Series("missing", index=self.catalog.index, dtype=object)
         if "vmag" in self.catalog.columns:
-            cv = self._num(self.catalog["vmag"])
+            cv = pd.to_numeric(self.catalog["vmag"], errors="coerce")
             v = v.where(cv.isna(), cv); src = src.where(cv.isna(), "vmag_catalog")
         m_v = self._mag_from_lum(self._BC_V_GRID)
         need = v.isna() & m_v.notna()
         v = v.where(~need, m_v); src = src.where(~need, "vmag_from_lum_distance_bc")
         if "gaiamag" in self.catalog.columns:
-            g = self._num(self.catalog["gaiamag"])
+            g = pd.to_numeric(self.catalog["gaiamag"], errors="coerce")
             need = v.isna() & g.notna()
             v = v.where(~need, g); src = src.where(~need, "gaiamag_proxy")
         self.catalog["rv_vmag"] = v
@@ -324,9 +320,9 @@ class RVData:
         """
         mass = None
         if "mass_p" in self.catalog.columns:
-            mass = self._num(self.catalog["mass_p"])
+            mass = pd.to_numeric(self.catalog["mass_p"], errors="coerce")
         if "msini_p" in self.catalog.columns:
-            msini = self._num(self.catalog["msini_p"])
+            msini = pd.to_numeric(self.catalog["msini_p"], errors="coerce")
             mass = msini if mass is None else mass.fillna(msini)
 
         if mass is None:
@@ -334,13 +330,13 @@ class RVData:
 
         sini = pd.Series(1.0, index=self.catalog.index)
         if self.apply_sini and "inc_p" in self.catalog.columns:
-            inc = self._num(self.catalog["inc_p"])
+            inc = pd.to_numeric(self.catalog["inc_p"], errors="coerce")
             # P-Pop inc_p is radians (0..pi); NASA pl_orbincl is degrees.
             inc_rad = inc if (inc.abs().max(skipna=True) or 0) <= 3.2 else np.deg2rad(inc)
             sini = np.sin(inc_rad).abs().clip(lower=0.0, upper=1.0)
             # If a projected mass (msini) was supplied, it already includes sin i.
             if "msini_p" in self.catalog.columns:
-                used_msini = self._num(self.catalog["msini_p"]).notna()
+                used_msini = pd.to_numeric(self.catalog["msini_p"], errors="coerce").notna()
                 sini = sini.where(~used_msini, 1.0)
 
         self.catalog["rv_sini_used"] = sini if self.apply_sini else 1.0
@@ -351,8 +347,8 @@ class RVData:
         m_signal_mearth = self.planet_mass_for_signal_mearth()
         m_jup = m_signal_mearth * self.M_EARTH_IN_M_JUP
         mstar = self.stellar_mass_msun()
-        p_yr = self._num(self.catalog["p_orb"]) / 365.25
-        ecc = self._num(self.catalog["ecc_p"]).fillna(0.0).clip(0.0, 0.99)
+        p_yr = pd.to_numeric(self.catalog["p_orb"], errors="coerce") / 365.25
+        ecc = pd.to_numeric(self.catalog["ecc_p"], errors="coerce").fillna(0.0).clip(0.0, 0.99)
 
         k = (
             self.K_CONST_MS
@@ -395,8 +391,8 @@ class RVData:
         k = self.calc_semiamplitude()
         self.calc_noise()  # populates rv_sigma_ms / rv_sigma_phot_ms / rv_sigma_jitter_ms
         f = self.jitter_red_frac
-        jit = self._num(self.catalog["rv_sigma_jitter_ms"]).fillna(0.0)
-        phot = self._num(self.catalog["rv_sigma_phot_ms"]).fillna(0.0)
+        jit = pd.to_numeric(self.catalog["rv_sigma_jitter_ms"], errors="coerce").fillna(0.0)
+        phot = pd.to_numeric(self.catalog["rv_sigma_phot_ms"], errors="coerce").fillna(0.0)
         white_var = self.sigma_instr_ms ** 2 + phot ** 2 + ((1.0 - f) * jit) ** 2
         red_floor_var = (f * jit) ** 2
         sigma_k = np.sqrt((2.0 / max(self.n_obs, 1)) * white_var + red_floor_var)
@@ -409,7 +405,7 @@ class RVData:
         return snr
 
     def bright_enough(self) -> pd.Series:
-        mag = self._num(self.catalog["rv_mag"]) if "rv_mag" in self.catalog.columns else self.apparent_band_mag()
+        mag = pd.to_numeric(self.catalog["rv_mag"], errors="coerce") if "rv_mag" in self.catalog.columns else self.apparent_band_mag()
         bright = mag.le(self.vmag_limit).fillna(False)
         self.catalog["rv_vmag_limit"] = self.vmag_limit
         self.catalog["rv_star_bright_enough"] = bright
@@ -417,10 +413,10 @@ class RVData:
 
     def classify_reasons(self) -> pd.Series:
         bright = self.catalog["rv_star_bright_enough"].astype(bool)
-        snr = self._num(self.catalog["rv_snr"]).fillna(0.0)
-        k = self._num(self.catalog["rv_k_ms"]).fillna(0.0)
-        jitter = self._num(self.catalog["rv_sigma_jitter_ms"]).fillna(0.0)
-        sigma = self._num(self.catalog["rv_sigma_ms"]).fillna(np.inf)
+        snr = pd.to_numeric(self.catalog["rv_snr"], errors="coerce").fillna(0.0)
+        k = pd.to_numeric(self.catalog["rv_k_ms"], errors="coerce").fillna(0.0)
+        jitter = pd.to_numeric(self.catalog["rv_sigma_jitter_ms"], errors="coerce").fillna(0.0)
+        sigma = pd.to_numeric(self.catalog["rv_sigma_ms"], errors="coerce").fillna(np.inf)
         detected = self.catalog["rv_detected"].astype(bool)
 
         reason = np.full(len(self.catalog), "signal_too_weak", dtype=object)

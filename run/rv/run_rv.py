@@ -6,29 +6,12 @@ from functools import partial
 import numpy as np
 import pandas as pd
 
-from PPop.StarCatalogs import CrossfieldBrightSample, ExoCat_1, LTC_2, LTC_3, gaia
 from run.ppop.flat_detect import run_rv_best
-from run.ppop.ppop_generator import PPop
+from run.ppop.ppop_generator import PPop, set_star_catalog
 from tools.paths import RV_DATA_DIR
 
 # Each universe peaks at 2-2.5 GB, as for Kepler; more workers than this swaps on 16 GB.
 MAX_WORKERS = 5
-
-
-def set_star_catalog(PPopObj, star_catalog: str):
-    if star_catalog == "CrossfieldBrightSample":
-        PPopObj.StarCatalog = CrossfieldBrightSample
-    elif star_catalog == "ExoCat_1":
-        PPopObj.StarCatalog = ExoCat_1
-    elif star_catalog == "LTC_3":
-        PPopObj.StarCatalog = LTC_3
-    elif star_catalog == "LTC_2":
-        PPopObj.StarCatalog = LTC_2
-    elif star_catalog == "Gaia":
-        PPopObj.StarCatalog = gaia
-    else:
-        raise ValueError(f"Unknown star catalog: {star_catalog}")
-    return PPopObj
 
 
 def run_single(i, star_catalog='Gaia'):

@@ -1,4 +1,4 @@
-"""Three-universe Bayesian comparison in the cold rocky desert over three insolation panels. Priors:
+"""Three-universe Bayesian comparison in the cold super-Earth desert over three insolation panels. Priors:
 rocky_formation (Otegi rocky, all kept), escape_only (minus rocky M>2), uniform (M independent of R);
 likelihood = transit+RV detection fraction. Scores NASA's volatile fraction per bin (binomial).
 """
@@ -11,8 +11,8 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 import sys
 from pathlib import Path
 
-from tools.paths import LIFESIM_OUTER_DIR, PSCOMPPARS_CSV, ANALYSIS_DIR
-ROOT = Path(LIFESIM_OUTER_DIR)
+from tools.paths import REPO_ROOT, PSCOMPPARS_CSV, ANALYSIS_DIR
+ROOT = Path(REPO_ROOT)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -47,14 +47,6 @@ _OUT_NAME = {"kepler": "bayesian_cold_rocky_desert",
              "tess": "42_bayesian_cold_rocky_desert_tess"}
 
 
-def _mlabel():
-    return _MISSION_LABEL[MISSION]
-
-
-def _out_dir():
-    return os.path.join(ANALYSIS_DIR, _OUT_NAME[MISSION])
-
-
 SILICATE_CURVE = Path(SILICON_CURVE)
 NASA_FILE = Path(PSCOMPPARS_CSV)
 
@@ -64,8 +56,8 @@ FLAT_N_POOL = 10_000_000       # 10x: the cold among-transiting denominator is t
 CHUNK = 2_000_000              # generate+detect in chunks to bound peak memory (~1.5 GB/chunk)
 RNG_SEED = 0
 RV_MAG_TARGET = 12.0
-MASS_MIN = 2.0                 # super-Earth threshold (cold rocky desert cut)
-COLD_MAX = 50.0                # cold rocky desert boundary [I_earth]
+MASS_MIN = 2.0                 # super-Earth threshold (cold super-Earth desert cut)
+COLD_MAX = 50.0                # cold super-Earth desert boundary [I_earth]
 OTEGI_C, OTEGI_BETA, OTEGI_SCATTER = 1.03, 0.29, 0.15
 MASS_FRAC_ERR = 0.20           # log-normal measurement noise (as in puffy_cuts_flat.py)
 RAD_FRAC_ERR = 0.046
@@ -74,8 +66,8 @@ NASA_RAD_PREC = 0.08
 N_FRAC_REP = 4000               # noise realizations for the predicted volatile fraction
                                 # (as in the main paper's Section-4.2 MC procedure)
 
-# Nested insolation panels, matching paper Figure 1 (rocky_mr_insolation_3panel): the cold
-# rocky desert is the I<50 panel, I<10 its extreme, I>50 the hot control.
+# Nested insolation panels, matching paper Figure 1 (rocky_mr_insolation_3panel): the cold super-Earth
+# desert is the I<50 panel, I<10 its extreme, I>50 the hot control.
 INSOL_BINS = [("I < 10", BOX["f_lo"], 10.0),
               ("I < 50", BOX["f_lo"], 50.0),
               ("I > 50", 50.0, BOX["f_hi"])]
@@ -189,7 +181,7 @@ def make_pool(mass_model, **kw):
     joint-detected mask, and the geometric transit mask (detected ⊂ transit)."""
     tag = "_".join([mass_model] + [f"{k}{v}" for k, v in sorted(kw.items())]
                    + [f"N{FLAT_N_POOL}", f"s{RNG_SEED}"])
-    cache = os.path.join(_out_dir(), f"pool_{tag}.npz")
+    cache = os.path.join(ANALYSIS_DIR, _OUT_NAME[MISSION], f"pool_{tag}.npz")
     if os.path.exists(cache):
         print(f"    loaded cached pool: {os.path.basename(cache)}")
         z = np.load(cache)
@@ -325,14 +317,14 @@ def save_stats_table(rows, tag):
             O_esc=round(r["post"]["escape_only"], 3),
             BF_esc_over_prim=Le / max(Lp, 1e-300)))
     df = pd.DataFrame(recs)
-    out = os.path.join(_out_dir(), "model_stats.csv")
+    out = os.path.join(ANALYSIS_DIR, _OUT_NAME[MISSION], "model_stats.csv")
     df.to_csv(out, index=False)
     print(f"--> Saved: {out}")
     return df
 
 
 def print_bayes_factors(rows):
-    print("\n  ---- pairwise Bayes factors (headline: I<50 cold rocky desert, M>2) ----")
+    print("\n  ---- pairwise Bayes factors (headline: I<50 cold super-Earth desert, M>2) ----")
     desert = next((r for r in rows if r["label"].startswith("I < 50")), None)
     if desert is None:
         return
@@ -392,16 +384,16 @@ def fig_likelihood_maps(univ, nasa):
         ax.set_title(f"{lbl} $I_\\oplus$", fontsize=12)
     axes[0].set_ylabel(r"planet radius [$R_\oplus$]")
     cb = fig.colorbar(axes[0].images[0], ax=axes, location="right", shrink=0.9)
-    cb.set_label(f"detected fraction among transiting  $\\ell_b(M,R)$  ({_mlabel()} transit + RV)")
+    cb.set_label(f"detected fraction among transiting  $\\ell_b(M,R)$  ({_MISSION_LABEL[MISSION]} transit + RV)")
     if sc is not None:
         cb2 = fig.colorbar(sc, ax=axes, location="bottom", shrink=0.45, pad=0.02, aspect=45)
         cb2.set_label(r"NASA planets: log(Insolation Flux [$I_\oplus$])")
-    fig.suptitle(f"Detectability (likelihood) on the MR plane — {_mlabel()} transit + RV, "
+    fig.suptitle(f"Detectability (likelihood) on the MR plane — {_MISSION_LABEL[MISSION]} transit + RV, "
                  "transiting only\n"
                  "viridis = detected fraction among transiting (uniform-parameter universe); "
                  "white contours",
                  fontsize=13)
-    out = os.path.join(_out_dir(), "likelihood_detection_maps.png")
+    out = os.path.join(ANALYSIS_DIR, _OUT_NAME[MISSION], "likelihood_detection_maps.png")
     fig.savefig(out, dpi=160, bbox_inches="tight")
     plt.close(fig)
     print(f"--> Saved: {out}")
@@ -453,12 +445,12 @@ def fig_posterior_predictive(univ, nasa, m_sil, r_sil):
     if sc is not None:
         cb2 = fig.colorbar(sc, ax=axes, location="bottom", shrink=0.4, pad=0.02, aspect=50)
         cb2.set_label(r"NASA planets: log(Insolation Flux [$I_\oplus$])")
-    fig.suptitle(f"Posterior-predictive detected density ({_mlabel()} transit + RV, viridis, "
+    fig.suptitle(f"Posterior-predictive detected density ({_MISSION_LABEL[MISSION]} transit + RV, viridis, "
                  f"transiting only, $M>{MASS_MIN:.0f}\\,M_\\oplus$) vs confirmed NASA planets "
                  "(points colored by log insolation, with error bars)\n"
                  "rows = universes (priors); columns = insolation panels; "
                  "black dashed = silicate line", fontsize=13)
-    out = os.path.join(_out_dir(), "posterior_predictive_maps.png")
+    out = os.path.join(ANALYSIS_DIR, _OUT_NAME[MISSION], "posterior_predictive_maps.png")
     fig.savefig(out, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"--> Saved: {out}")
@@ -478,12 +470,12 @@ def fig_model_odds(rows):
     ax.set_ylim(0, 1.05)
     ax.axhline(1 / len(UNIVERSES), color="0.6", ls=":", lw=1,
                label=f"even split (1/{len(UNIVERSES)})")
-    ax.set_title(f"Which universe does NASA prefer? ({_mlabel()} transit + RV; normalized "
+    ax.set_title(f"Which universe does NASA prefer? ({_MISSION_LABEL[MISSION]} transit + RV; normalized "
                  "binomial composition likelihood)\n"
-                 "headline = I<50 cold rocky desert (M>2); transiting planets only", fontsize=11)
+                 "headline = I<50 cold super-Earth desert (M>2); transiting planets only", fontsize=11)
     ax.grid(alpha=0.2, axis="y"); ax.legend(fontsize=9)
     fig.tight_layout()
-    out = os.path.join(_out_dir(), "model_odds.png")
+    out = os.path.join(ANALYSIS_DIR, _OUT_NAME[MISSION], "model_odds.png")
     fig.savefig(out, dpi=160, bbox_inches="tight")
     plt.close(fig)
     print(f"--> Saved: {out}")
@@ -533,10 +525,10 @@ def fig_model_stats(rows):
     ax2.grid(alpha=0.2, axis="y"); ax2.legend(fontsize=9)
     ax2.set_title(r"Binomial likelihoods $L_k$ (log axis): the small $f$ gap becomes orders "
                   "of magnitude", fontsize=11)
-    fig.suptitle(f"Why the odds saturate — {_mlabel()} transit + RV, precision-cut sample",
+    fig.suptitle(f"Why the odds saturate — {_MISSION_LABEL[MISSION]} transit + RV, precision-cut sample",
                  fontsize=12)
     fig.tight_layout()
-    out = os.path.join(_out_dir(), "model_stats.png")
+    out = os.path.join(ANALYSIS_DIR, _OUT_NAME[MISSION], "model_stats.png")
     fig.savefig(out, dpi=160, bbox_inches="tight")
     plt.close(fig)
     print(f"--> Saved: {out}")
@@ -545,11 +537,11 @@ def fig_model_stats(rows):
 def main(mission="kepler"):
     global MISSION
     MISSION = mission
-    os.makedirs(_out_dir(), exist_ok=True)
+    os.makedirs(os.path.join(ANALYSIS_DIR, _OUT_NAME[MISSION]), exist_ok=True)
     m_sil, r_sil = load_silicate()
     rng = np.random.default_rng(RNG_SEED)
 
-    print(f"=== Cold rocky desert Bayesian comparison — transit mission: {_mlabel()} ===")
+    print(f"=== Cold super-Earth desert Bayesian comparison — transit mission: {_MISSION_LABEL[MISSION]} ===")
     univ = build_universes(m_sil, r_sil)
 
     # Table-6 reconciliation targets are Kepler-derived; only meaningful for the Kepler run.
@@ -565,8 +557,8 @@ def main(mission="kepler"):
                   f"[paper Table 6: {ref}]")
 
     rows_prec, nasa_prec = None, None
-    for precision, tag in [(True, f"{_mlabel()} — precision-cut NASA (primary)"),
-                           (False, f"{_mlabel()} — full measured-mass NASA (sensitivity)")]:
+    for precision, tag in [(True, f"{_MISSION_LABEL[MISSION]} — precision-cut NASA (primary)"),
+                           (False, f"{_MISSION_LABEL[MISSION]} — full measured-mass NASA (sensitivity)")]:
         nasa = load_nasa(precision)
         print(f"\n--> {tag}: N={nasa['n']} in box")
         rows = desert_table(univ, nasa, m_sil, r_sil, rng, tag)

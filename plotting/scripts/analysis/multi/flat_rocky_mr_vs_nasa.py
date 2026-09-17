@@ -1,5 +1,5 @@
 """Which rocky M-R relation (Chen & Kipping 2017, Otegi 2020, Edmondson 2023, Müller 2024), imposed
-on the flat universe, best matches NASA's volatile ("puffy") fraction? Makes the 2x4 grids and the
+on the flat universe, best matches NASA's volatile (sub-Neptune) fraction? Makes the 2x4 grids and the
 paper's Otegi panels. Run: python plotting/scripts/analysis/multi/flat_rocky_mr_vs_nasa.py
 """
 
@@ -11,8 +11,8 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 import sys
 from pathlib import Path
 
-from tools.paths import LIFESIM_OUTER_DIR, ANALYSIS_DIR, PAPER_FIGURES_DIR
-ROOT = Path(LIFESIM_OUTER_DIR)
+from tools.paths import REPO_ROOT, ANALYSIS_DIR, PAPER_FIGURES_DIR
+ROOT = Path(REPO_ROOT)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -155,11 +155,6 @@ def true_sample(arrays, cut, n, rng, above_line_only=False):
     return mass[idx], radius[idx]
 
 
-def _frac_err_bars(x, frac_sd):
-    """1-sigma bars for a log-normal fractional error: [lower, upper] offsets."""
-    return np.array([x * (1 - np.exp(-frac_sd)), x * (np.exp(frac_sd) - 1)])
-
-
 SCATTER_LABELS = ("Escape-only (kept)", "Primordial-rocky: rocky super-Earths (M>2)")
 
 
@@ -194,8 +189,11 @@ def _draw_scatter(ax, arr, cut, nasa, m_sil, r_sil, rng, title,
                 (True, N_SURVEY_BLUE, "tab:blue", labels[0], 4),
                 (False, N_SURVEY_ORANGE, "tab:orange", labels[1], 3)]:
             mt, rt = true_sample(arr, cut, n, rng, above_line_only=above_only)
-            ax.errorbar(mt, rt, xerr=_frac_err_bars(mt, puffy_cuts.MASS_FRAC_ERR),
-                        yerr=_frac_err_bars(rt, puffy_cuts.RAD_FRAC_ERR),
+            ax.errorbar(mt, rt,
+                        xerr=np.array([mt * (1 - np.exp(-puffy_cuts.MASS_FRAC_ERR)),
+                                       mt * (np.exp(puffy_cuts.MASS_FRAC_ERR) - 1)]),
+                        yerr=np.array([rt * (1 - np.exp(-puffy_cuts.RAD_FRAC_ERR)),
+                                       rt * (np.exp(puffy_cuts.RAD_FRAC_ERR) - 1)]),
                         fmt="o", ms=4, color=colour, alpha=0.6, elinewidth=0.6,
                         capsize=0, zorder=z, label=lbl)
     else:

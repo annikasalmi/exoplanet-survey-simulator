@@ -1,11 +1,11 @@
 import os
 
-LIFESIM_OUTER_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-LIFESIM_INNER_DIR = os.path.join(LIFESIM_OUTER_DIR, "lifesim")
-PPOP_DIR = os.path.join(LIFESIM_OUTER_DIR, "PPop")
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+LIFESIM_DIR = os.path.join(REPO_ROOT, "lifesim")
+PPOP_DIR = os.path.join(REPO_ROOT, "PPop")
 PPOP_DATA_DIR = os.path.join(PPOP_DIR, "data")
 PPOP_STAR_DIR = os.path.join(PPOP_DIR, "StarCatalogs")
-DATA_DIR = os.path.join(LIFESIM_OUTER_DIR, "data")
+DATA_DIR = os.path.join(REPO_ROOT, "data")
 
 # ---------------------------------------------------------------------------
 # Everything the pipelines generate lives under results/. Keeping it out of the
@@ -13,7 +13,7 @@ DATA_DIR = os.path.join(LIFESIM_OUTER_DIR, "data")
 # and a new pipeline cannot leak a multi-hundred-MB catalogue into a commit by
 # someone forgetting to add another.
 # ---------------------------------------------------------------------------
-RESULTS_DIR = os.path.join(LIFESIM_OUTER_DIR, "results")
+RESULTS_DIR = os.path.join(REPO_ROOT, "results")
 
 CATALOGS_DIR = os.path.join(RESULTS_DIR, "catalogs")
 KEPLER_DATA_DIR = os.path.join(CATALOGS_DIR, "kepler")
@@ -41,4 +41,4 @@ EXOPLANETS_ALL_2025_CSV = os.path.join(EXOPLANET_CSV_DIR, "exoplanets_all_2025.c
 KOI_CUMULATIVE_CSV = os.path.join(EXOPLANET_CSV_DIR, "koi_cumulative_stellar.csv")
 EXOFOP_TOI_CSV = os.path.join(EXOPLANET_CSV_DIR, "exofop_toi.csv")
 PSCOMPPARS_CSV = os.path.join(EXOPLANET_CSV_DIR, "pscomppars_2026.csv")
-KEPLER_REF_CURVE = os.path.join(LIFESIM_OUTER_DIR, "telescopes", "kepler", "reference_curves", "ref.ddat")
+KEPLER_REF_CURVE = os.path.join(REPO_ROOT, "telescopes", "kepler", "reference_curves", "ref.ddat")

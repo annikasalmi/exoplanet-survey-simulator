@@ -12,12 +12,12 @@ figures/
   calibration/  plotting/scripts/calibration/: detectors against real mission
                 data, and the three planet generators against each other
   other/        the standalone scripts in plotting/scripts/
-paper/        publication figures
+paper/        publication figures (README.md "Paper figures" says which script makes each)
 logs/         per-run logs written by run_sim
 ```
 
 Catalogs are large — a single Gaia-60pc universe is roughly 300 MB per pipeline,
-and regenerating one takes about 25 minutes. Input data is not here; it lives in
+and regenerating one takes about 20 minutes. Input data is not here; it lives in
 `data/` and is tracked.
 
 Paths come from `tools.paths`, not from string literals, so this layout can be

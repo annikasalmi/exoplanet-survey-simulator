@@ -13,4 +13,5 @@ GitPython>=3.1.32
 requests
 spectres
 h5py
-alphashapetess-point
+alphashape
+tess-point

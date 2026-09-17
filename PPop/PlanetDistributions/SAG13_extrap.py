@@ -63,7 +63,7 @@ class PlanetDistribution():
         else:
             print('--> WARNING: '+str(Scenario)+' is an unknown scenario')
             Scenario = 'baseline'
-            self.F0 = [2.42, 0.25]
+            self.F0 = [7.10, 2.20]
             self.Gamma = [0.38, 0.73]
             self.alpha = [-0.19, -1.18]
             self.beta = [0.26, 0.59]

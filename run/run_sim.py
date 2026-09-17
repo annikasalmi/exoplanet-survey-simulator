@@ -9,7 +9,7 @@ import logging
 # Add the project root to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from tools.paths import LOGGING, LIFESIM_OUTER_DIR, EXOPLANETS_2026_CSV
+from tools.paths import LOGGING, EXOPLANETS_2026_CSV
 from telescopes.hwo.detection_model import HWOData
 from telescopes.kepler.detection_model import KeplerData
 from telescopes.tess.detection_model import TESSData
@@ -215,17 +215,18 @@ if __name__ == "__main__":
     # sparse from a single universe. Stacking N seeded universes (same fixed
     # star catalog, different RNG seed = independent Monte-Carlo realizations)
     # multiplies planets-per-bin by N and smooths the FGK detection background.
-    # 10 universes on 5 workers = 2 batches (~10 h).
+    # One universe takes ~20 min. Kepler runs 5 at a time and TESS 2, so this
+    # file takes roughly 3-4 h in total. See the README.
     NRUNS = np.arange(10)
 
     # Run exoplanet plotting
     # run_exoplanet_plotting(name='HWO_exoplanets', star_catalog='Gaia', plot=True)
 
     run_sim(func=main_kepler, name = 'kepler', parallel=True, nruns=NRUNS, star_catalog='Gaia', run_anew=True, plot=True) # Gaia 60pc
-    print('Completed Lifesim kepler')
+    print('Completed Kepler')
 
     run_sim(func=main_tess, name = 'TESS', parallel=True, nruns=NRUNS, star_catalog='Gaia', run_anew=True, plot=True) # Gaia 60pc
-    print('Completed Lifesim tess')
+    print('Completed TESS')
     
     # run_sim(func=main_hwo, name = 'hwo', parallel=False, nruns=NRUNS, star_catalog='Gaia', run_anew=True) # CHANGED run_anew to TRUE to re-run HWO with Gaia catalog
     # # print('Completed HWO')

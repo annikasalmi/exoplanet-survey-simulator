@@ -5,7 +5,7 @@ import numpy as np
 # Add the lifesim directory to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 import lifesim
-from run.ppop.ppop_generator import PPop
+from run.ppop.ppop_generator import PPop, set_star_catalog
 import multiprocessing as mp
 import time
 import pandas as pd
@@ -13,7 +13,6 @@ import numpy as np
 from functools import partial
 
 from tools.paths import PPOP_DATA_DIR, LIFESIM_DATA_DIR
-from PPop.StarCatalogs import ExoCat_1,LTC_3, gaia
 from plotting.plot import plot_all
 
 RUN_PPOP = False
@@ -22,14 +21,7 @@ def run_lifesim_single(i, star_catalog='Gaia'):
     print(f"Running LIFEsim for run {i} with star catalog {star_catalog}")
     rng = np.random.default_rng(i)
     # ----- Generate new planet population -----
-    PPopObj = PPop(rng=rng)
-
-    if star_catalog == 'ExoCat_1':
-        PPopObj.StarCatalog = ExoCat_1
-    elif star_catalog == 'LTC_3':
-        PPopObj.StarCatalog = LTC_3
-    elif star_catalog == 'Gaia':
-        PPopObj.StarCatalog = gaia
+    PPopObj = set_star_catalog(PPop(rng=rng), star_catalog)
 
     filename = f'test_runs_lifesim_{i}'
     data_path = os.path.join(PPOP_DATA_DIR, filename)

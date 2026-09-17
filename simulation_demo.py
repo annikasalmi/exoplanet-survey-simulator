@@ -15,7 +15,7 @@ STAR_CATALOG = 'Gaia'        # or 'ExoCat_1'
 SIM_NAME = 'flat_universe'   # 'flat_universe', 'kepler', 'tess', 'rv', 'hwo', 'lifesim'
 
 # flat_universe draws its own planets and takes under a minute. The others build a
-# P-Pop universe per run, which takes about 30 minutes each.
+# P-Pop universe per run, which takes about 20 minutes each.
 sim_funcs = {
     'hwo': main_hwo,
     'lifesim': main_lifesim,

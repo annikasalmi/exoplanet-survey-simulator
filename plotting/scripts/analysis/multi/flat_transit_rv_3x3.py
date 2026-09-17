@@ -26,8 +26,8 @@ try:
 except Exception:
     pass
 
-from tools.paths import LIFESIM_OUTER_DIR, ANALYSIS_DIR, PAPER_FIGURES_DIR
-ROOT = Path(LIFESIM_OUTER_DIR)
+from tools.paths import REPO_ROOT, ANALYSIS_DIR, PAPER_FIGURES_DIR
+ROOT = Path(REPO_ROOT)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -167,7 +167,7 @@ def fraction_grid(panel: pd.DataFrame, test: str, xbins: np.ndarray):
 
 
 def window_stats(panel: pd.DataFrame, test: str):
-    """Detected among transiting rocky planets in the Cold Rocky Desert (S<50, R>1.4)."""
+    """Detected among transiting rocky planets in the Cold Super-Earth Desert (S<50, R>1.4)."""
     panel = panel[panel["main"]]  # map-only supplementary draws are excluded
     region = ((panel["flux_p"] < rocky_scatter.COLD_CORNER_INSOL)
               & (panel["radius_p"] > rocky_scatter.COLD_CORNER_RADIUS)
@@ -214,7 +214,7 @@ def main(paper_copy: bool = True):
     fig, axes = plt.subplots(3, 3, figsize=(17, 15), sharex="col", sharey=True,
                              constrained_layout=True)
     mesh = None
-    print("\nCold Rocky Desert detected fraction (S<50, R>1.4, among transiting):")
+    print("\nCold Super-Earth Desert detected fraction (S<50, R>1.4, among transiting):")
     for j, stype in enumerate(COLUMNS):
         panel = panels[stype]
         r = rocky_win[rocky_win["stype_clean"] == stype]
@@ -252,7 +252,7 @@ def main(paper_copy: bool = True):
             xlo = xbins[0]
             ax.fill_between([xlo, rocky_scatter.COLD_CORNER_INSOL], rocky_scatter.COLD_CORNER_RADIUS,
                             Y_LIMS[1], color="red", alpha=0.15, zorder=1.5, lw=0)
-            # Bold Cold Rocky Desert outline: bottom edge (R=1.4) + right edge (S=50).
+            # Bold Cold Super-Earth Desert outline: bottom edge (R=1.4) + right edge (S=50).
             ax.plot([xlo, rocky_scatter.COLD_CORNER_INSOL], [rocky_scatter.COLD_CORNER_RADIUS] * 2,
                     color="red", lw=2.6, zorder=6)
             ax.plot([rocky_scatter.COLD_CORNER_INSOL, rocky_scatter.COLD_CORNER_INSOL],

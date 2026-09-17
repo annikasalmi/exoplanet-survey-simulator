@@ -18,7 +18,7 @@ from plotting.scripts.analysis.multi import bayesian_cold_rocky_desert as bayes
 import numpy as np
 import matplotlib.pyplot as plt
 
-from tools.paths import ANALYSIS_DIR
+from tools.paths import ANALYSIS_DIR, PAPER_FIGURES_DIR
 
 OUT_DIR = os.path.join(ANALYSIS_DIR, "mc_comparison_statistic")
 
@@ -129,7 +129,9 @@ def main():
     fig.suptitle("MCMC runs of distribution compared to observed exoplanets", fontsize=30)
     out = os.path.join(OUT_DIR, f"mc_comparison_statistic_{N_DRAWS}.png")
     fig.savefig(out, dpi=150, bbox_inches="tight")
-    print(f"--> Saved: {out}  ({time.time()-t0:.0f}s)")
+    os.makedirs(PAPER_FIGURES_DIR, exist_ok=True)
+    fig.savefig(os.path.join(PAPER_FIGURES_DIR, os.path.basename(out)), dpi=150, bbox_inches="tight")
+    print(f"--> Saved: {out}  ({time.time()-t0:.0f}s), plus a copy in {PAPER_FIGURES_DIR}")
 
 
 if __name__ == "__main__":

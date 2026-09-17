@@ -25,9 +25,9 @@ try:
 except Exception:
     pass
 
-from tools.paths import LIFESIM_OUTER_DIR, EXOFOP_TOI_CSV, PAPER_FIGURES_DIR, CALIBRATION_DIR, TESS_DATA_DIR
+from tools.paths import REPO_ROOT, EXOFOP_TOI_CSV, PAPER_FIGURES_DIR, CALIBRATION_DIR, TESS_DATA_DIR
 from tools.exoplanet_catalog import read_nasa_csv
-ROOT = Path(LIFESIM_OUTER_DIR)
+ROOT = Path(REPO_ROOT)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 

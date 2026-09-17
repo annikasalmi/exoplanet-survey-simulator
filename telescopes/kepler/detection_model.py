@@ -152,7 +152,7 @@ class KeplerData:
         return "ppop"
 
     @staticmethod
-    def standardize_catalog_columns(df: pd.DataFrame, source: str = "auto") -> pd.DataFrame:
+    def standardize_catalog_columns(df: pd.DataFrame, source: str) -> pd.DataFrame:
         """Rename NASA / KOI / P-Pop columns to the shared internal names: mass_p, radius_p [Earth],
         flux_p [Earth insolation], radius_s [Sun], semimajor_p [AU], p_orb [d], inc_p [deg], kepmag.
         """
@@ -229,11 +229,8 @@ class KeplerData:
         elif source == "ppop":
             df["dataset_source"] = "P-Pop_simulated"
 
-        elif source == "auto":
-            df["dataset_source"] = "unknown_auto"
-
         else:
-            raise ValueError("source must be one of: auto, ppop, pscomppars, nasa, ps, koi")
+            raise ValueError("source must be one of: ppop, pscomppars, nasa, ps, koi")
 
         # Apply generic aliases after source-specific renaming.
         rename_map = {k: v for k, v in generic_map.items() if k in df.columns and v not in df.columns}
@@ -368,12 +365,6 @@ class KeplerData:
             self.catalog.get("dataset_source", pd.Series([""])).iloc[0]
         ).startswith("NASA")
 
-    def _find_first_existing_column(self, possible_names):
-        for name in possible_names:
-            if name in self.catalog.columns:
-                return name
-        return None
-
     # ============================================================
     # Transit / depth / brightness calculations
     # ============================================================
@@ -409,7 +400,10 @@ class KeplerData:
             self.catalog["transiting_source"] = "tran_flag"
             return transiting.fillna(False)
 
-        inc_col = self._find_first_existing_column(["inc_p", "inclination", "pl_orbincl", "koi_incl"])
+        inc_col = next(
+            (name for name in ["inc_p", "inclination", "pl_orbincl", "koi_incl"] if name in self.catalog.columns),
+            None,
+        )
         if inc_col is None:
             raise ValueError(
                 "No inclination column found. Need inc_p for P-Pop geometry, "

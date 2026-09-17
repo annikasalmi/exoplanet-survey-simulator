@@ -19,6 +19,7 @@ setup(
     author='Annika Salmi',
     author_email='annikaksalmi@gmail.com',
     url='https://github.com/annikasalmi/exoplanet-survey-simulator',
+    # Clone + editable install only: code expects the repo layout.
     # `lifesim/` is listed by hand so the inherited tree needs no added
     # __init__.py files. It is frozen at a2b8eeb, so the list will not drift.
     packages=find_packages(exclude=['tests', 'tests.*', 'docs', 'docs.*', 'data', 'data.*',

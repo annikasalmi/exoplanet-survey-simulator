@@ -38,7 +38,7 @@ class PlanetDetectionPlotterLTC3(PlanetDetectionPlotter):
         title = f"Rocky Planets in Habitable Zone\nTotal: {total_planets:.1f}, Detected: {detected_planets:.1f}"
         ax2 = self._setup_bar_and_efficiency_axes(ax, bin_centers, total_counts, detected_counts, efficiency, x_label, title, bins)
         
-        handles, labels = self._collect_legend_handles(ax)
+        handles, labels = ax.get_legend_handles_labels()
         ax.legend(handles, labels, loc='upper left', fontsize=14)
         ax.set_ylabel("Number of Planets")
         ax2.set_ylabel("Detection Efficiency")
@@ -398,4 +398,4 @@ def plot_by_type_LTC3(df, nruns=1, star_catalog='LTC_3', name='LIFEsim'):
     
     # Also run detection efficiency analysis
     detection_plotter = PlanetDetectionPlotterLTC3(df, nruns, star_catalog, name)
-    detection_plotter.plot_detection_efficiency_by_planet_type() 
+    detection_plotter.plot_detection_efficiency_by_planet_type()

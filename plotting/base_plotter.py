@@ -13,13 +13,15 @@ class BasePlotter:
     Provides shared initialization, data handling, and plotting utilities.
     """
     
+    DEFAULT_NAME = 'kepler'
+
     def __init__(self, df: pd.DataFrame, nruns: int = 1,
-                 star_catalog: str = 'Gaia', name: str = 'kepler'):
+                 star_catalog: str = 'Gaia', name: Optional[str] = None):
         """Initialize base plotter with common parameters."""
         self.df = df.copy()
         self.nruns = nruns
         self.star_catalog = star_catalog
-        self.name = name
+        self.name = self.DEFAULT_NAME if name is None else name
         self.data_dir = os.path.join(PLOTS_DIR, str(self.name)+'_'+str(self.nruns)+'_'+str(self.star_catalog))
         
         # Create plots directory if it doesn't exist

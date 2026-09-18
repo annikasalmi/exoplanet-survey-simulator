@@ -223,14 +223,10 @@ def run_detector(df: pd.DataFrame) -> pd.DataFrame:
     if not CDPP_DIR.exists():
         raise FileNotFoundError(f"SPOC CDPP CSVs not found in {CDPP_DIR}")
 
-    def run(cal):
-        return TESSData(
-            df, source="auto", min_transits=2, snr_threshold=SNR_THRESHOLD, tmag_limit=16.0,
-            use_catalog_sectors=True, phase_mode="expected", cdpp_dir=CDPP_DIR,
-            snr_calibration=cal, validate_for_detection=True,
-        )
-
-    raw = run(1.0).determine_detectable()
+    settings = dict(source="auto", min_transits=2, snr_threshold=SNR_THRESHOLD, tmag_limit=16.0,
+                    use_catalog_sectors=True, phase_mode="expected", cdpp_dir=CDPP_DIR,
+                    validate_for_detection=True)
+    raw = TESSData(df, snr_calibration=1.0, **settings).determine_detectable()
     official = pd.to_numeric(raw["official_snr"], errors="coerce")
     in_range = official.between(*CAL_SNR_RANGE)
     cal = float(1.0 / (raw.loc[in_range, "tess_snr"] / official[in_range]).median())
@@ -238,7 +234,7 @@ def run_detector(df: pd.DataFrame) -> pd.DataFrame:
           f"with official SNR {CAL_SNR_RANGE[0]:g}-{CAL_SNR_RANGE[1]:g}); "
           f"TESSData.SNR_OFFICIAL_CALIBRATION is {TESSData.SNR_OFFICIAL_CALIBRATION}")
 
-    td = run(cal)
+    td = TESSData(df, snr_calibration=cal, **settings)
     out = td.determine_detectable()
     out["toy_over_official_snr"] = (
         pd.to_numeric(out["tess_snr"], errors="coerce") /

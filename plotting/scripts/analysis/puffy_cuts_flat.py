@@ -15,15 +15,15 @@ ROOT = Path(REPO_ROOT)
 
 import numpy as np
 import pandas as pd
+from scipy.stats import norm
 
-from tools.paths import SILICON_CURVE
 from tools.exoplanet_catalog import read_nasa_csv
 import matplotlib.pyplot as plt
 
-from science.populations.universes import flat_superearths_subneptunes, is_super_earth
-from science.telescopes.detection import run_kepler, run_rv_best
+from science.populations.universes.flat_curves import flat_curves, is_super_earth, load_silicate
+from science.telescopes.kepler.detection_model import KeplerData
+from science.telescopes.detection import run_rv_best
 
-SILICATE_CURVE = Path(SILICON_CURVE)
 PPOP_CATALOG = Path(KEPLER_DATA_DIR) / "Gaia" / "kepler_catalog_0.csv"
 NASA_FILE = Path(PSCOMPPARS_CSV)
 OUT_DIR = os.path.join(ANALYSIS_DIR, "puffy_cuts_flat")
@@ -47,20 +47,14 @@ CUTS = [("all (no cut)", {}),
         ("mass>2 & insol<50", dict(mass_min=2.0, insol_max=50.0))]
 
 
-def load_silicate():
-    d = np.loadtxt(SILICATE_CURVE, comments="#")
-    m, r = d[:, 0].astype(float), d[:, 1].astype(float)
-    o = np.argsort(m)
-    return m[o], r[o]
-
-
 def puffy_frac(m_obs, r_obs, m_sil, r_sil):
+    """Fraction above the pure-silicate curve, classified as volatile-rich."""
     return float((r_obs > np.interp(m_obs, m_sil, r_sil)).mean())
 
 
 def build_pool(population, m_sil, r_sil):
     if population == "flat":
-        pool = flat_superearths_subneptunes(FLAT_N_POOL, seed=RNG_SEED)
+        pool = flat_curves(FLAT_N_POOL, seed=RNG_SEED)
     else:
         if not PPOP_CATALOG.exists():
             raise FileNotFoundError(f"{PPOP_CATALOG} not found; run the Kepler/TESS lines in `sim.py` first (~3-4 h)")
@@ -78,7 +72,7 @@ def build_pool(population, m_sil, r_sil):
     flux = pd.to_numeric(pool["flux_p"], errors="coerce").to_numpy(float)
     puffy = radius > np.interp(mass, m_sil, r_sil)
     if population == "flat":
-        td = run_kepler(pool)["detected"].to_numpy(bool)
+        td = KeplerData(pool.copy(), source="ppop").determine_detectable()["detected"].to_numpy(bool)
     else:
         td = pd.to_numeric(pool["detected"], errors="coerce").fillna(0).astype(bool).to_numpy()
     rd = run_rv_best(pool, mag_target=RV_MAG_TARGET)["detected"].to_numpy(bool)
@@ -159,10 +153,6 @@ def mc_nasa(nasa, cut, m_sil, r_sil, rng, n_repeats=N_REPEATS):
     return out[good], n_eff
 
 
-def gauss(x, mu, sd):
-    return np.exp(-0.5 * ((x - mu) / sd) ** 2) / (sd * np.sqrt(2 * np.pi)) if sd > 0 else np.zeros_like(x)
-
-
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     m_sil, r_sil = load_silicate()
@@ -211,9 +201,9 @@ def main():
         for _, _, s, _, _ in P["series"]:
             if s.size:
                 y_max = max(y_max, np.histogram(s, bins=edges, density=True)[0].max(),
-                            gauss(xs, s.mean(), s.std()).max())
+                            (norm.pdf(xs, loc=s.mean(), scale=s.std()) if s.std() > 0 else np.zeros_like(xs)).max())
         y_max = max(y_max, np.histogram(P["nv"], bins=edges, density=True)[0].max(),
-                    gauss(xs, P["n_mu"], P["n_sd"]).max())
+                    (norm.pdf(xs, loc=P["n_mu"], scale=P["n_sd"]) if P["n_sd"] > 0 else np.zeros_like(xs)).max())
     gy_hi = y_max * 1.06
 
     # ---- pass 2: plot every panel on the shared x/y axes ----
@@ -226,10 +216,10 @@ def main():
                 if s.size == 0:
                     continue
                 ax.hist(s, bins=edges, density=True, color=colour, alpha=0.30)
-                ax.plot(xs, gauss(xs, s.mean(), s.std()), color=colour, lw=2.0,
+                ax.plot(xs, (norm.pdf(xs, loc=s.mean(), scale=s.std()) if s.std() > 0 else np.zeros_like(xs)), color=colour, lw=2.0,
                         label=f"{label}: μ={s.mean():.2f} σ={s.std():.3f} ({tens:.1f}σ)")
             ax.hist(P["nv"], bins=edges, density=True, color="tab:green", alpha=0.34)
-            ax.plot(xs, gauss(xs, P["n_mu"], P["n_sd"]), color="tab:green", lw=2.4,
+            ax.plot(xs, (norm.pdf(xs, loc=P["n_mu"], scale=P["n_sd"]) if P["n_sd"] > 0 else np.zeros_like(xs)), color="tab:green", lw=2.4,
                     label=f"NASA: μ={P['n_mu']:.2f} σ={P['n_sd']:.3f} (N={P['n_nasa']})")
             ax.set_xlim(gx_lo, gx_hi); ax.set_ylim(0, gy_hi)
             ax.set_title((f"{cut_label}\n" if ri == 0 else "") + f"{row_label} — sub-Neptune fraction", fontsize=10)

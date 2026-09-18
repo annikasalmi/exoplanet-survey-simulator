@@ -15,33 +15,26 @@ ROOT = Path(REPO_ROOT)
 import numpy as np
 import pandas as pd
 
-from tools.paths import SILICON_CURVE
 from tools.exoplanet_catalog import read_nasa_csv
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 from scipy.stats import binom
 from scipy.ndimage import gaussian_filter
 
-from science.populations.flat import generate_flat_catalog
-from science.populations.universes import (flat_superearths_subneptunes, is_super_earth,
-                                           SUPER_EARTH_MIN_MASS)
-from science.telescopes.detection import run_kepler, run_rv_best, run_tess
+from science.populations.universes.flat_baseline import flat_baseline
+from science.populations.universes.flat_curves import flat_curves, is_super_earth, load_silicate, SUPER_EARTH_MIN_MASS
+from science.telescopes.kepler.detection_model import KeplerData
+from science.telescopes.tess.detection_model import TESSData
+from science.telescopes.detection import run_rv_best
 
 # Transit leg of the joint detector; main("tess") switches it to TESS.
 MISSION = "kepler"
-_TRANSIT = {"kepler": run_kepler, "tess": run_tess}
+_TRANSIT = {"kepler": KeplerData, "tess": TESSData}
 _MISSION_LABEL = {"kepler": "Kepler", "tess": "TESS"}
-_OUT_NAME = {"kepler": "bayesian_cold_rocky_desert",
-             "tess": "bayesian_cold_rocky_desert_tess"}
+OUT_DIRS = {"kepler": os.path.join(ANALYSIS_DIR, "bayesian_cold_rocky_desert"),
+            "tess": os.path.join(ANALYSIS_DIR, "bayesian_cold_rocky_desert_tess")}
 
 
-def _out_dir(mission=None):
-    """Return the analysis output directory without creating it."""
-    mission = MISSION if mission is None else mission
-    return os.path.join(ANALYSIS_DIR, _OUT_NAME[mission])
-
-
-SILICATE_CURVE = Path(SILICON_CURVE)
 NASA_FILE = Path(PSCOMPPARS_CSV)
 
 BOX = dict(r_lo=0.5, r_hi=2.2, m_lo=0.1, m_hi=12.0, f_lo=1e-2, f_hi=1e4)
@@ -79,14 +72,8 @@ R_CENT = 0.5 * (R_EDGES[:-1] + R_EDGES[1:])
 MIN_CELL = 5                   # display gate; at 10M even the sparsest cold cell has >=~10 samples
 
 
-def load_silicate():
-    d = np.loadtxt(SILICATE_CURVE, comments="#")
-    m, r = d[:, 0].astype(float), d[:, 1].astype(float)
-    o = np.argsort(m)
-    return m[o], r[o]
-
-
 def is_volatile(mass, radius, m_sil, r_sil):
+    """Planets above the pure-silicate radius at their mass are volatile-rich."""
     return radius > np.interp(mass, m_sil, r_sil)
 
 
@@ -135,32 +122,38 @@ def load_nasa(precision: bool):
         keep = keep & (me / m <= NASA_MASS_PREC) & (re / r <= NASA_RAD_PREC)
     k = keep.to_numpy(bool)
 
-    def fill(err, base, frac):
-        return np.where(np.isfinite(err) & (err > 0), err, frac * base)[k]
-
+    errors = {}
+    for name, err, base, frac in (
+            ("me", me, m, MASS_FRAC_ERR), ("re", re, r, RAD_FRAC_ERR),
+            ("me1", me1, m, MASS_FRAC_ERR), ("me2", me2, m, MASS_FRAC_ERR),
+            ("re1", re1, r, RAD_FRAC_ERR), ("re2", re2, r, RAD_FRAC_ERR)):
+        errors[name] = np.where(np.isfinite(err) & (err > 0), err, frac * base)[k]
     return dict(
         m=m.to_numpy(float)[k], r=r.to_numpy(float)[k], ins=ins.to_numpy(float)[k],
-        me=fill(me, m, MASS_FRAC_ERR), re=fill(re, r, RAD_FRAC_ERR),
-        me1=fill(me1, m, MASS_FRAC_ERR), me2=fill(me2, m, MASS_FRAC_ERR),
-        re1=fill(re1, r, RAD_FRAC_ERR), re2=fill(re2, r, RAD_FRAC_ERR),
-        n=int(k.sum()))
+        **errors, n=int(k.sum()))
 
 
 # make_pool's pools: universe B (A derives from it) and the mass-independent map pool.
-POOLS = {"universe_B": flat_superearths_subneptunes, "uniform": generate_flat_catalog}
+POOLS = {"universe_B": flat_curves, "uniform": flat_baseline}
 
 
 def _detect_chunk(pool_name, n, seed, mission=None):
     """Generate n planets -> box cut -> joint Kepler+RV detection. Per-row detectors, so this is
     equivalent to processing one big pool but with bounded memory."""
-    pool = POOLS[pool_name](n, seed=seed)
+    # The map alone decouples mass from radius to measure detectability across the box.
+    kw = {"mass_model": "independent"} if pool_name == "uniform" else {}
+    pool = POOLS[pool_name](n, seed=seed,
+                            radius_lims=(BOX["r_lo"], BOX["r_hi"]),
+                            mass_lims=(BOX["m_lo"], BOX["m_hi"]), **kw)
     r = pd.to_numeric(pool["radius_p"], errors="coerce")
     m = pd.to_numeric(pool["mass_p"], errors="coerce")
     f = pd.to_numeric(pool["flux_p"], errors="coerce")
     keep = (r.between(BOX["r_lo"], BOX["r_hi"]) & m.between(BOX["m_lo"], BOX["m_hi"])
             & f.between(BOX["f_lo"], BOX["f_hi"]))
     pool = pool[keep].copy()
-    kep = _TRANSIT[mission or MISSION](pool)
+    transit_mission = mission or MISSION
+    transit_options = {"use_cdpp_tables": False} if transit_mission == "tess" else {}
+    kep = _TRANSIT[transit_mission](pool.copy(), source="ppop", **transit_options).determine_detectable()
     rd = run_rv_best(pool, mag_target=RV_MAG_TARGET)["detected"].to_numpy(bool)
     return dict(
         mass=pd.to_numeric(pool["mass_p"], errors="coerce").to_numpy(float),
@@ -179,7 +172,7 @@ def make_pool(pool_name, *, pool_size=None, chunk_size=None, cache_dir=None, mis
     pool_size = FLAT_N_POOL if pool_size is None else int(pool_size)
     chunk_size = CHUNK if chunk_size is None else int(chunk_size)
     mission = MISSION if mission is None else mission
-    cache_dir = _out_dir(mission) if cache_dir is None else os.fspath(cache_dir)
+    cache_dir = OUT_DIRS[mission] if cache_dir is None else os.fspath(cache_dir)
     tag = f"{pool_name}_N{pool_size}_s{RNG_SEED}"
     cache = os.path.join(cache_dir, f"pool_{tag}.npz")
     if os.path.exists(cache):
@@ -316,7 +309,7 @@ def save_stats_table(rows, tag):
             O_esc=round(r["post"]["escape_only"], 3),
             BF_esc_over_prim=Le / max(Lp, 1e-300)))
     df = pd.DataFrame(recs)
-    out = os.path.join(ANALYSIS_DIR, _OUT_NAME[MISSION], "model_stats.csv")
+    out = os.path.join(OUT_DIRS[MISSION], "model_stats.csv")
     df.to_csv(out, index=False)
     print(f"--> Saved: {out}")
     return df
@@ -392,7 +385,7 @@ def fig_likelihood_maps(univ, nasa):
                  "viridis = detected fraction among transiting (uniform-parameter universe); "
                  "white contours",
                  fontsize=13)
-    out = os.path.join(ANALYSIS_DIR, _OUT_NAME[MISSION], "likelihood_detection_maps.png")
+    out = os.path.join(OUT_DIRS[MISSION], "likelihood_detection_maps.png")
     fig.savefig(out, dpi=160, bbox_inches="tight")
     plt.close(fig)
     print(f"--> Saved: {out}")
@@ -449,7 +442,7 @@ def fig_posterior_predictive(univ, nasa, m_sil, r_sil):
                  "(points colored by log insolation, with error bars)\n"
                  "rows = universes (priors); columns = insolation panels; "
                  "black dashed = silicate line", fontsize=13)
-    out = os.path.join(ANALYSIS_DIR, _OUT_NAME[MISSION], "posterior_predictive_maps.png")
+    out = os.path.join(OUT_DIRS[MISSION], "posterior_predictive_maps.png")
     fig.savefig(out, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"--> Saved: {out}")
@@ -474,7 +467,7 @@ def fig_model_odds(rows):
                  "headline = I<50 cold super-Earth desert (M>2); transiting planets only", fontsize=11)
     ax.grid(alpha=0.2, axis="y"); ax.legend(fontsize=9)
     fig.tight_layout()
-    out = os.path.join(ANALYSIS_DIR, _OUT_NAME[MISSION], "model_odds.png")
+    out = os.path.join(OUT_DIRS[MISSION], "model_odds.png")
     fig.savefig(out, dpi=160, bbox_inches="tight")
     plt.close(fig)
     print(f"--> Saved: {out}")
@@ -527,7 +520,7 @@ def fig_model_stats(rows):
     fig.suptitle(f"Why the odds saturate — {_MISSION_LABEL[MISSION]} transit + RV, precision-cut sample",
                  fontsize=12)
     fig.tight_layout()
-    out = os.path.join(ANALYSIS_DIR, _OUT_NAME[MISSION], "model_stats.png")
+    out = os.path.join(OUT_DIRS[MISSION], "model_stats.png")
     fig.savefig(out, dpi=160, bbox_inches="tight")
     plt.close(fig)
     print(f"--> Saved: {out}")
@@ -536,7 +529,7 @@ def fig_model_stats(rows):
 def main(mission="kepler"):
     global MISSION
     MISSION = mission
-    os.makedirs(os.path.join(ANALYSIS_DIR, _OUT_NAME[MISSION]), exist_ok=True)
+    os.makedirs(OUT_DIRS[MISSION], exist_ok=True)
     m_sil, r_sil = load_silicate()
     rng = np.random.default_rng(RNG_SEED)
 

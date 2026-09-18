@@ -399,10 +399,13 @@ class TESSData:
                     continue
                 r = tab[0]
                 self.catalog.at[idx, "ticid"] = self._get_table_value(r, ["ID", "TICID", "ticid"])
-                self.catalog.at[idx, "tess_tmag"] = self._coalesce(row.get("tess_tmag"), self._get_table_value(r, ["Tmag", "tmag"]))
-                self.catalog.at[idx, "radius_s"] = self._coalesce(row.get("radius_s"), self._get_table_value(r, ["rad", "radius"]))
-                self.catalog.at[idx, "mass_s"] = self._coalesce(row.get("mass_s"), self._get_table_value(r, ["mass"]))
-                self.catalog.at[idx, "teff_s"] = self._coalesce(row.get("teff_s"), self._get_table_value(r, ["Teff", "teff"]))
+                for column, names in (("tess_tmag", ["Tmag", "tmag"]),
+                                      ("radius_s", ["rad", "radius"]),
+                                      ("mass_s", ["mass"]),
+                                      ("teff_s", ["Teff", "teff"])):
+                    value = self._get_table_value(r, names)
+                    if pd.isna(row.get(column)) and not pd.isna(value):
+                        self.catalog.at[idx, column] = value
                 self.catalog.at[idx, "tess_tmag_source"] = "TIC_MAST"
                 self.catalog.at[idx, "tic_query_status"] = "matched"
             except Exception as exc:
@@ -417,10 +420,6 @@ class TESSData:
             except Exception:
                 pass
         return default
-
-    @staticmethod
-    def _coalesce(a, b):
-        return b if pd.isna(a) and not pd.isna(b) else a
 
     # Visibility produces self._pairs, one row per (catalog row, sector) the star is observed in.
     # Sectors < 0 are assumed ones (fixed count, or filled for stars the pointings missed); their

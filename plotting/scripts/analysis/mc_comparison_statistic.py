@@ -8,6 +8,7 @@ import os
 import time
 
 from plotting.scripts.analysis import bayesian_cold_rocky_desert as bayes
+from science.populations.universes.flat_curves import load_silicate
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -62,7 +63,7 @@ def nasa_frac_draws(nasa, lo, hi, rng, m_sil, r_sil, n_rep=N_DRAWS):
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     t0 = time.time()
-    m_sil, r_sil = bayes.load_silicate()
+    m_sil, r_sil = load_silicate()
     nasa = bayes.load_nasa(precision=True)
 
     print("--> building universe B pool (rocky_formation; escape_only is universe A)")

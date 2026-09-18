@@ -3,7 +3,7 @@ import os
 from tools.paths import DEMO_DIR
 import lifesim
 import numpy as np
-from science.populations.ppop import PPop
+from science.populations.universes.ppop import PPop
 
 i = 0
 rng = np.random.default_rng(i)

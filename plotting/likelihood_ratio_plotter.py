@@ -1,6 +1,7 @@
 """TEST LR: does NASA's catalog look like flat universe A (cold rocky M>2 corner removed) or B (kept)?
 Both pass the same Kepler+RV detectors and noise; a classifier learns p_B/p_A per planet, and
-NASA's summed log-ratio is compared to resampled A and B catalogs. Run via the flat_ab line in sim.py.
+NASA's summed log-ratio is compared to resampled A and B catalogs.
+Run: python -m plotting.likelihood_ratio_plotter
 """
 
 from __future__ import annotations
@@ -11,8 +12,9 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 import sys
 from pathlib import Path
 
-from tools.paths import REPO_ROOT, SILICON_CURVE, PSCOMPPARS_CSV, ANALYSIS_DIR
+from tools.paths import REPO_ROOT, PSCOMPPARS_CSV, ANALYSIS_DIR
 from tools.exoplanet_catalog import read_nasa_csv
+from science.populations.universes.flat_curves import load_silicate
 ROOT = Path(REPO_ROOT)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -34,9 +36,8 @@ try:
 except Exception:
     pass
 
-from science.telescopes.detection import run_kepler, run_rv_best
 
-SILICATE_CURVE = Path(SILICON_CURVE)
+
 NASA_FILE = Path(PSCOMPPARS_CSV)
 OUT_DIR = os.path.join(ANALYSIS_DIR, "likelihood_ratio_catalog")
 
@@ -68,13 +69,6 @@ CLF_KW = dict(max_iter=200, learning_rate=0.08, min_samples_leaf=60,
               l2_regularization=1.0, early_stopping=False, random_state=42)
 
 CONFIGS = [("precision", True, 11), ("full", False, 12)]   # (name, precision cut, noise seed)
-
-
-def load_silicate():
-    d = np.loadtxt(SILICATE_CURVE, comments="#")
-    m, r = d[:, 0].astype(float), d[:, 1].astype(float)
-    o = np.argsort(m)
-    return m[o], r[o]
 
 
 def _sigma_log(err_hi, err_lo, value, floor, missing):
@@ -689,5 +683,5 @@ def main(df):
 
 
 if __name__ == "__main__":
-    from run.flat_universe.run_flat_universe import main as run_flat
-    main(run_flat(seed=RNG_SEED, n_planets=FLAT_N_POOL, run_anew=False))
+    from run.flat_universe import run_flat_universe
+    main(run_flat_universe.main(seed=RNG_SEED, n_planets=FLAT_N_POOL, run_anew=False))

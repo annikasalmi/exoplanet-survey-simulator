@@ -69,6 +69,6 @@ def test_analysis_imports_do_not_override_dependency_configuration():
     assert puffy.N_REPEATS == repeats_before
 
     bayes = importlib.import_module("plotting.scripts.analysis.bayesian_cold_rocky_desert")
-    bayes_before = (bayes.FLAT_N_POOL, bayes.CHUNK, bayes._out_dir)
+    bayes_before = (bayes.FLAT_N_POOL, bayes.CHUNK, bayes.OUT_DIRS.copy())
     importlib.import_module("plotting.scripts.analysis.mc_comparison_statistic")
-    assert (bayes.FLAT_N_POOL, bayes.CHUNK, bayes._out_dir) == bayes_before
+    assert (bayes.FLAT_N_POOL, bayes.CHUNK, bayes.OUT_DIRS) == bayes_before

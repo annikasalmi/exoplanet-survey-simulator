@@ -4,6 +4,7 @@ import multiprocessing as mp
 from numbers import Integral
 import time
 from functools import partial
+from pathlib import Path
 
 import pandas as pd
 
@@ -17,19 +18,27 @@ def normalize_nruns(nruns):
     return list(nruns)
 
 
-def run_universes(run_single, load_single, nruns, star_catalog, run_anew, parallel, max_workers):
-    """run_single(i) (or load_single(i) if not run_anew) per universe i in nruns; returns them
-    stacked with a 'run' column."""
+def run_universes(run_single, *, nruns=1, star_catalog='Gaia', run_anew=True,
+                  parallel=False, max_workers=1, cache_dir=None, cache_prefix=None,
+                  load_single=None):
+    """Generate or reload seeded catalogs and stack them with a run column.
+
+    CSV caches use cache_dir/star_catalog/{cache_prefix}_catalog_{i}.csv.
+    Supply load_single only for a different format, such as LIFEsim's HDF catalog.
+    """
     nruns = normalize_nruns(nruns)
     start = time.time()
-    runner = partial(run_single if run_anew else load_single, star_catalog=star_catalog)
-
-    if parallel:
-        # spawn on every OS, so workers start clean as on macOS and Windows.
-        with mp.get_context('spawn').Pool(processes=min(len(nruns), max_workers)) as pool:
-            results = pool.map(runner, nruns)
+    if not run_anew and load_single is None:
+        results = [pd.read_csv(Path(cache_dir) / star_catalog / f'{cache_prefix}_catalog_{i}.csv')
+                   for i in nruns]
     else:
-        results = [runner(i) for i in nruns]
+        runner = partial(run_single if run_anew else load_single, star_catalog=star_catalog)
+        if parallel:
+            # spawn on every OS, so workers start clean as on macOS and Windows.
+            with mp.get_context('spawn').Pool(processes=min(len(nruns), max_workers)) as pool:
+                results = pool.map(runner, nruns)
+        else:
+            results = [runner(i) for i in nruns]
 
     df_concat = pd.concat(results, keys=nruns).reset_index(level=0).rename(columns={'level_0': 'run'}).reset_index(drop=True)
     print(f"Total time: {time.time() - start:.2f} seconds")

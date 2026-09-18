@@ -42,11 +42,6 @@ class PlanetDetectionPlotter(BasePlotter):
         
         return total_counts, detected_counts, efficiency, mask_best
 
-    def _collect_legend_handles(self, ax):
-        """Helper to collect legend handles and labels from two axes."""
-        h1, l1 = ax.get_legend_handles_labels()
-        return h1, l1 
-
     def _setup_bar_and_efficiency_axes(self, ax, bin_centers, total_counts, detected_counts, efficiency, x_label, title, bins):
         """Helper to setup bar plot and efficiency overlay."""
         # Plot bars
@@ -124,7 +119,7 @@ class PlanetDetectionPlotter(BasePlotter):
                     ax2.set_xlim([bins[0], 305])
             
             # Add a single legend for the whole figure using the first subplot and its twin axis
-            handles, labels = self._collect_legend_handles(axs[0])
+            handles, labels = axs[0].get_legend_handles_labels()
             axs[0].legend(handles, labels, loc='upper left', fontsize=14)
             
             # Finalize plot

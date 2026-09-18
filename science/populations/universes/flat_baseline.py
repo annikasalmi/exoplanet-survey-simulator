@@ -1,17 +1,18 @@
-"""Flat planet catalog (no occurrence rates): radius, log mass, log period, eccentricity, Teff and
-distance drawn flat; star R/M from Teff. Analyses use it through universes.py.
-"""
+"""Uniform-radius flat universe with configurable mass-radius and analysis bounds."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from tools.paths import REPO_ROOT
-
-ROOT = Path(REPO_ROOT)
-
 import numpy as np
 import pandas as pd
+
+from tools.paths import PPOP_DIR
+
+OTEGI_ROCKY = dict(mr_C=1.03, mr_beta=0.29)      # R = 1.03 M^0.29 (Otegi et al. 2020)
+MR_SCATTER_DEX = 0.15             # log-normal mass scatter around the rocky relation
+BASELINE_RADIUS_LIMS = (0.0, 12.0) # R_earth, README baseline uniform radius prior
+BASELINE_MASS_LIMS = (0.1, 50_000.0) # M_earth, keeps R=12 rocky draws with scatter
 
 # Default parameter box (P-Pop bounds, small planets).
 DEFAULTS = dict(
@@ -47,9 +48,6 @@ def _stype_from_teff(teff):
     return out
 
 
-# Mass-radius options (default "independent": log-uniform mass, decoupled from radius).
-# "mean": mass from the mean Chen2017/Forecaster relation + log-normal scatter.
-# "ppop": mass from P-Pop's full probabilistic Chen2017/Forecaster.
 _MEAN_MR_CURVE = None       # cached (R_grid, M_grid) for the mean-relation inverse R->M
 
 
@@ -58,7 +56,7 @@ def _mean_forecaster_curve():
     global _MEAN_MR_CURVE
     if _MEAN_MR_CURVE is None:
         import h5py
-        hp = ROOT / "PPop" / "MassModels" / "Forecaster" / "fitting_parameters.h5"
+        hp = Path(PPOP_DIR) / "MassModels" / "Forecaster" / "fitting_parameters.h5"
         with h5py.File(hp, "r") as h5:
             mu = h5["hyper_posterior"][:].mean(0)          # mean of posterior hyperparameters
         c0, slope, trans = mu[0], mu[1:5], mu[9:12]        # [c0, slope(4), sigma(4), trans(3)]
@@ -77,7 +75,7 @@ def _mean_forecaster_curve():
     return _MEAN_MR_CURVE
 
 
-def _mass_from_radius(radius, mass_model, rng, mass_lims, scatter_dex, mr_C=1.0, mr_beta=0.28):
+def _mass_from_radius(radius, mass_model, rng, mass_lims, scatter_dex, mr_C, mr_beta):
     if mass_model == "mean":
         Rg, Mg = _mean_forecaster_curve()
         logm = np.log10(np.interp(radius, Rg, Mg))
@@ -95,32 +93,34 @@ def _mass_from_radius(radius, mass_model, rng, mass_lims, scatter_dex, mr_C=1.0,
         mass = MassModel(rng).RadiusToMass(np.asarray(radius, float))
     else:
         raise ValueError(f"unknown mass_model {mass_model!r}")
-    # Clip only the floor; generate_flat_catalog drops masses above the box.
+    # Clip only the floor; flat_baseline drops masses above the box.
     return np.maximum(mass, mass_lims[0])
 
 
-def generate_flat_catalog(
-    n_planets: int = 200000,
+def flat_baseline(
+    n_planets: int = 150_000,
     seed: int = 0,
     *,
-    radius_lims=DEFAULTS["radius_lims"],
-    mass_lims=DEFAULTS["mass_lims"],
+    radius_lims=BASELINE_RADIUS_LIMS,
+    mass_lims=BASELINE_MASS_LIMS,
     period_lims=DEFAULTS["period_lims"],
     ecc_lims=DEFAULTS["ecc_lims"],
     teff_lims=DEFAULTS["teff_lims"],
     distance_lims=DEFAULTS["distance_lims"],
     insol_lims=DEFAULTS["insol_lims"],
-    mass_model: str = "independent",
-    mass_scatter_dex: float = 0.05,
-    mr_C: float = 1.0,
-    mr_beta: float = 0.28,
+    mass_model: str = "powerlaw",
+    mass_scatter_dex: float = MR_SCATTER_DEX,
+    mr_C: float = OTEGI_ROCKY["mr_C"],
+    mr_beta: float = OTEGI_ROCKY["mr_beta"],
 ) -> pd.DataFrame:
-    """Build a fully flat synthetic planet catalog (see module docstring). Returns a DataFrame with
-    radius_p, mass_p, p_orb, ecc_p, inc_p, semimajor_p, flux_p, radius_s, mass_s, teff_s, temp_s,
-    l_sun, distance_s, ra, dec, stype, nstar, id.
+    """Draw uniform radii and Otegi rocky masses with scatter, plus flat orbital/host priors.
+
+    radius_lims and mass_lims restrict analysis windows. mass_model="independent"
+    gives a log-uniform mass grid for detectability maps; "mean" and "ppop" use
+    the mean or probabilistic Forecaster relation. Mass cuts can reduce the row count.
     """
     rng = np.random.default_rng(seed)
-    keep_R, keep_M, keep_P, keep_E, keep_I = [], [], [], [], []
+    keep_R, keep_M, keep_P, keep_E = [], [], [], []
     keep_inc, keep_T, keep_Rs, keep_Ms, keep_D, keep_L, keep_a, keep_F = ([] for _ in range(8))
 
     have = 0
@@ -192,11 +192,3 @@ def generate_flat_catalog(
         # Drop masses above the box, so fewer than n_planets rows can come back.
         df = df[df["mass_p"] <= mass_lims[1]].reset_index(drop=True)
     return df
-
-
-if __name__ == "__main__":
-    df = generate_flat_catalog(n_planets=200000, seed=0)
-    print("Rows:", len(df))
-    print(df[["radius_p", "mass_p", "p_orb", "flux_p", "semimajor_p",
-              "teff_s", "radius_s", "distance_s"]].describe().round(3).to_string())
-    print("stype counts:\n", df["stype"].value_counts().to_string())

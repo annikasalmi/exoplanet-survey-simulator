@@ -14,9 +14,7 @@ class PlanetRejectionPlotter(BasePlotter):
     Handles HWO logic for detected_best/detected_worst columns.
     """
     
-    def __init__(self, df: pd.DataFrame, nruns: int = 1, star_catalog: str = 'Gaia', name: str = 'HWO'):
-        """Initialize with data and metadata. Allow any name."""
-        super().__init__(df, nruns, star_catalog, name)
+    DEFAULT_NAME = 'HWO'
 
     def plot_all(self, plot_percentages=True) -> None:
         """Generate all rejection/failure plots."""
@@ -151,16 +149,6 @@ class PlanetRejectionPlotter(BasePlotter):
             bins = 40
         return bins
 
-    def _get_pass_fail_column(self, reason):
-        """Get the appropriate pass/fail column name for a given reason."""
-        column_mapping = {
-            '# photons hitting detector': 'min_photons_pass_best',
-            'Flux Ratio': 'flux_pass_best',
-            'IWA': 'iwa_pass_best',
-            'Exozodi': 'z_pass_best'
-        }
-        return column_mapping.get(reason)
-
     def _calculate_rejection_percentage(self, df, reason, pass_col_best):
         """Calculate rejection percentage for a given reason."""
         if reason == 'Exozodi':
@@ -253,14 +241,6 @@ class PlanetRejectionPlotter(BasePlotter):
                 ax.axvline(worst_threshold, color='red', linestyle='--', alpha=0.7, 
                           label=f'{worst_threshold:.2e}')
 
-    def _get_edgecolor(self, reason):
-        """Return edgecolor for a given rejection reason."""
-        return {
-            'Flux Ratio': 'red',
-            'IWA': 'blue',
-            'Exozodi': 'gold',
-        }.get(reason, 'black')
-
     def _get_x_label(self, reason):
         if reason == 'IWA':
             return 'Maximum angular separation'
@@ -271,13 +251,13 @@ class PlanetRejectionPlotter(BasePlotter):
         else:
             return reason.replace('_', ' ').capitalize()
 
-    def _plot_histogram(self, ax, df, reason, col, bins):
-        edgecolor = self._get_edgecolor(reason)
-        ax.hist(df[col], bins=bins, color='lightgray', alpha=0.7, edgecolor=edgecolor,
-                    log=True)
-
     def _add_rejection_percentages(self, ax, df, reason):
-        pass_col_best = self._get_pass_fail_column(reason)
+        pass_col_best = {
+            '# photons hitting detector': 'min_photons_pass_best',
+            'Flux Ratio': 'flux_pass_best',
+            'IWA': 'iwa_pass_best',
+            'Exozodi': 'z_pass_best',
+        }.get(reason)
         if pass_col_best in df.columns:
             pct_best = self._calculate_rejection_percentage(df, reason, pass_col_best)
             pct_worst = self._calculate_worst_case_percentage(df, reason)
@@ -306,7 +286,8 @@ class PlanetRejectionPlotter(BasePlotter):
                 print(f"Warning: Column '{col}' not found in DataFrame. Available columns: {list(df.columns)}")
                 continue
             bins = self._get_bins_for_reason(reason, df, col)
-            self._plot_histogram(ax, df, reason, col, bins)
+            ax.hist(df[col], bins=bins, color='lightgray', alpha=0.7, log=True,
+                    edgecolor={'Flux Ratio': 'red', 'IWA': 'blue', 'Exozodi': 'gold'}.get(reason, 'black'))
             self._add_rejection_percentages(ax, df, reason)
             hwo_best = HWOConstants('best')
             hwo_worst = HWOConstants('worst')
@@ -343,7 +324,8 @@ class PlanetRejectionPlotter(BasePlotter):
                 print(f"Warning: Column '{col}' not found in DataFrame. Available columns: {list(df.columns)}")
                 continue
             bins = self._get_bins_for_reason(reason, df, col)
-            self._plot_histogram(ax, df, reason, col, bins)
+            ax.hist(df[col], bins=bins, color='lightgray', alpha=0.7, log=True,
+                    edgecolor={'Flux Ratio': 'red', 'IWA': 'blue', 'Exozodi': 'gold'}.get(reason, 'black'))
             self._add_rejection_percentages(ax, df, reason)
             hwo_best = HWOConstants('best')
             hwo_worst = HWOConstants('worst')

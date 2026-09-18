@@ -1,19 +1,14 @@
 import os
 
 import numpy as np
-import pandas as pd
 
-from science.populations.ppop import PPop, set_star_catalog
+from science.populations.universes.ppop import PPop
 from science.telescopes.tess.detection_model import TESSData
 from run.multi_run import run_universes
 from tools.paths import TESS_DATA_DIR
 
-# A TESS worker holds CDPP tables, tess-point and an exozodi KDE on top of the
-# universe, 2.5-4 GB each; four or more ran out of memory on 16 GB.
 MAX_WORKERS = 2
 
-# Every star gets TESSData's default coverage (5 consecutive sectors) and noise
-# from the binned SPOC CDPP table in science/telescopes/tess/data. P-Pop stars have no TIC IDs, so the per-TIC CDPP CSVs would go unused.
 TESS_DEFAULTS = {
     "use_cdpp_tables": False,
     "min_transits": 2,
@@ -22,38 +17,26 @@ TESS_DEFAULTS = {
     "tmag_limit": 16.0,
 }
 
+
 def run_single(i, star_catalog='Gaia'):
-    '''
-    Runs a single instance of the PPop simulation and TESS data analysis.
-    '''
     print(f"Running TESS for run {i} with star catalog {star_catalog}")
     rng = np.random.default_rng(i)
-    PPopObj = set_star_catalog(PPop(rng=rng), star_catalog)
+    population = PPop(rng=rng, star_catalog=star_catalog)
 
     data_path = os.path.join(TESS_DATA_DIR, f'test_runs_tess_{i}')
-    df = PPopObj.run_ppop(data_path=data_path)
-    PPopObj.catalog_from_ppop(data_path, df=df)
-    PPopObj.catalog_remove_distance(stype='A', mode='larger', dist=0.0)
+    df = population.run_ppop(data_path=data_path)
+    population.catalog_from_ppop(data_path, df=df)
+    population.catalog_remove_distance(stype='A', mode='larger', dist=0.0)
 
-    # random_seed fixes each run's transit phases, so reruns reproduce.
-    tess_data = TESSData(PPopObj.catalog, source="ppop", random_seed=i, **TESS_DEFAULTS)
-    tess_data.determine_detectable()
+    tess_data = TESSData(population.catalog, source="ppop", random_seed=i, **TESS_DEFAULTS)
+    df = tess_data.determine_detectable()
 
-    df = tess_data.catalog
     save_dir = os.path.join(TESS_DATA_DIR, star_catalog)
     os.makedirs(save_dir, exist_ok=True)
     df.to_csv(os.path.join(save_dir, f'tess_catalog_{i}.csv'), index=False)
-
     return df
-
-def run_tess_import_catalog(i, star_catalog):
-    df = pd.read_csv(os.path.join(TESS_DATA_DIR, star_catalog, f'tess_catalog_{i}.csv'))
-    return df
-
-def main(parallel=False, nruns=np.arange(1), star_catalog='Gaia', run_anew=True):
-    return run_universes(run_single, run_tess_import_catalog, nruns, star_catalog,
-                         run_anew, parallel, MAX_WORKERS)
 
 
 if __name__ == '__main__':
-    main()
+    run_universes(run_single, cache_dir=TESS_DATA_DIR,
+                  cache_prefix='tess', max_workers=MAX_WORKERS)

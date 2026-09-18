@@ -124,11 +124,11 @@ class PlotPlanetType(BasePlotter):
         # Get detection mask BEFORE any further filtering to ensure alignment
         mask_best, _ = self._get_detection_masks()
         if hasattr(mask_best, 'reindex'):
-            mask_best = mask_best.reindex(self.df.index, fill_value=False)
-        detected_df = self.df[mask_best]
+            mask_best = mask_best.reindex(df.index, fill_value=False)
+        detected_df = df[mask_best]
 
         # Total stats - simple groupby and sum across runs
-        total_per_run = self.df.groupby(['run', 'stype', 'radius_bin']).size().reset_index()
+        total_per_run = df.groupby(['run', 'stype', 'radius_bin']).size().reset_index()
         total_per_run.columns = ['run', 'stype', 'radius_bin', 'count']
         total_pivot = total_per_run.pivot_table(index=['stype', 'radius_bin'], columns='run', values='count', fill_value=0)
         total_mean = total_pivot.mean(axis=1)

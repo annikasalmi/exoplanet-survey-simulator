@@ -1,6 +1,6 @@
 """Which rocky M-R relation (Chen & Kipping 2017, Otegi 2020, Edmondson 2023, Müller 2024), imposed
-on flat_nonphysical, best matches NASA's volatile (sub-Neptune) fraction? Makes the 2x4 grids and the
-paper's Otegi panels. Run: python plotting/scripts/analysis/flat_rocky_mr_vs_nasa.py
+on the flat baseline, best matches NASA's volatile (sub-Neptune) fraction? Makes the 2x4 grids and
+the paper's Otegi panels. Run: python plotting/scripts/analysis/flat_rocky_mr_vs_nasa.py
 """
 
 from __future__ import annotations
@@ -14,11 +14,13 @@ ROOT = Path(REPO_ROOT)
 
 import numpy as np
 import pandas as pd
+from scipy.stats import norm
 import matplotlib.pyplot as plt
 
-from science.populations.universes import (flat_nonphysical, flat_superearths_subneptunes,
-                                           MR_SCATTER_DEX, is_super_earth)
-from science.telescopes.detection import run_kepler, run_rv_best
+from science.populations.universes.flat_baseline import flat_baseline, MR_SCATTER_DEX
+from science.populations.universes.flat_curves import flat_curves, is_super_earth, load_silicate
+from science.telescopes.kepler.detection_model import KeplerData
+from science.telescopes.detection import run_rv_best
 from plotting.scripts.analysis import puffy_cuts_flat as puffy_cuts
 
 OUT_DIR = os.path.join(ANALYSIS_DIR, "flat_rocky_mr_vs_nasa")
@@ -31,6 +33,8 @@ FIGURE_STYLE = {
 FLAT_N = 150000
 SEED = 0
 MC_REPEATS = 4000
+RADIUS_LIMS = (puffy_cuts.BOX["r_lo"], puffy_cuts.BOX["r_hi"])
+MASS_LIMS = (puffy_cuts.BOX["m_lo"], puffy_cuts.BOX["m_hi"])
 
 # (name, equation, applies-over, {mr_C, mr_beta})   R = C·M^β  (R in R⊕, M in M⊕)
 RELATIONS = [
@@ -42,12 +46,12 @@ RELATIONS = [
 
 
 def build_arrays(cat, m_sil, r_sil):
-    """Kepler+RV detected pool from one flat catalog (flat_nonphysical or universe B)."""
+    """Kepler+RV detected pool from one flat catalog (flat baseline or universe B)."""
     mass = cat["mass_p"].to_numpy(float)
     radius = cat["radius_p"].to_numpy(float)
     flux = cat["flux_p"].to_numpy(float)
     puffy = radius > np.interp(mass, m_sil, r_sil)
-    td = run_kepler(cat)["detected"].to_numpy(bool)
+    td = KeplerData(cat.copy(), source="ppop").determine_detectable()["detected"].to_numpy(bool)
     rd = run_rv_best(cat, mag_target=puffy_cuts.RV_MAG_TARGET)["detected"].to_numpy(bool)
     return mass, radius, flux, puffy, td & rd
 
@@ -224,21 +228,21 @@ def _draw_bells(ax, arr, cut, nasa, m_sil, r_sil, rng, tag=""):
     bw = edges[1] - edges[0]
     # Taller of the bars and the fitted curves, so no curve runs off the top.
     y_max = max(max(np.histogram(b, bins=edges)[0].max(),
-                    puffy_cuts.gauss(b.mean(), b.mean(), b.std()) * b.size * bw) for b in all_bell)
+                    (norm.pdf(b.mean(), loc=b.mean(), scale=b.std()) if b.std() > 0 else np.zeros_like(b.mean())) * b.size * bw) for b in all_bell)
     for lbl, s, ne, colour in [("Escape-only", sA, nA, "tab:orange"),
                                ("Primordial-rocky", sB, nB, "tab:blue")]:
         if s.size == 0:
             continue
         tens = abs(s.mean() - n_mu) / np.sqrt(s.std() ** 2 + n_sd ** 2)
         ax.hist(s, bins=edges, color=colour, alpha=0.30)
-        ax.plot(gx, puffy_cuts.gauss(gx, s.mean(), s.std()) * s.size * bw, color=colour, lw=2.0,
+        ax.plot(gx, (norm.pdf(gx, loc=s.mean(), scale=s.std()) if s.std() > 0 else np.zeros_like(gx)) * s.size * bw, color=colour, lw=2.0,
                 label=f"{lbl}: $\\mu$={s.mean():.2f} $\\sigma$={s.std():.3f} "
                       f"({tens:.1f}$\\sigma$), N$_p$={ne:.0f}")
         if tag:
             print(f"    {tag} {lbl}: mu={s.mean():.3f} sd={s.std():.3f} "
                   f"tension={tens:.1f}sigma N_planets={ne:.0f} N_draws={s.size}")
     ax.hist(nv, bins=edges, color="tab:green", alpha=0.34)
-    ax.plot(gx, puffy_cuts.gauss(gx, n_mu, n_sd) * nv.size * bw, color="tab:green", lw=2.4,
+    ax.plot(gx, (norm.pdf(gx, loc=n_mu, scale=n_sd) if n_sd > 0 else np.zeros_like(gx)) * nv.size * bw, color="tab:green", lw=2.4,
             label=f"NASA: $\\mu$={n_mu:.2f} $\\sigma$={n_sd:.3f}, N$_p$={n_nasa}")
     ax.set_xlim(gx[0], gx[-1]); ax.set_ylim(0, y_max * 1.15)
     ax.grid(alpha=0.2); ax.legend(fontsize=9, loc="upper left")
@@ -320,14 +324,14 @@ def _draw_density_1x2(ax, arr, cut, nasa, m_sil, r_sil, rng, tag=""):
     for lbl, s, colour in [("Sub-Neptunes only", sA, "tab:blue"),
                            ("Sub-Neptunes and super-Earths", sB, "tab:orange")]:
         heights, _, _ = ax.hist(s, bins=edges, density=True, color=colour, alpha=0.30)
-        pdf = puffy_cuts.gauss(gx, s.mean(), s.std())
+        pdf = (norm.pdf(gx, loc=s.mean(), scale=s.std()) if s.std() > 0 else np.zeros_like(gx))
         ax.plot(gx, pdf, color=colour, lw=2.0,
                 label=f"{lbl}: $\\mu$={s.mean():.2f} $\\sigma$={s.std():.3f}")
         y_max = max(y_max, heights.max(), pdf.max())
         tens = abs(s.mean() - n_mu) / np.sqrt(s.std() ** 2 + n_sd ** 2)
         print(f"    {tag} {lbl}: mu={s.mean():.3f} sd={s.std():.3f} "
               f"tension={tens:.1f}sigma N_draws={s.size}")
-    pdf = puffy_cuts.gauss(gx, n_mu, n_sd)
+    pdf = (norm.pdf(gx, loc=n_mu, scale=n_sd) if n_sd > 0 else np.zeros_like(gx))
     ax.fill_between(gx, pdf, color="tab:green", alpha=0.30, lw=0)
     ax.plot(gx, pdf, color="tab:green", lw=2.4,
             label=f"Measured exoplanets: $\\mu$={n_mu:.2f} $\\sigma$={n_sd:.3f}")
@@ -345,7 +349,7 @@ def make_otegi_1x2(nasa, m_sil, r_sil, rng):
     """
     print("\n--> Otegi 1x2 (cold super-Earth cut; universes A and B):")
     cut_label, cut = OTEGI_2X2_CUTS[1]
-    arr = build_arrays(flat_superearths_subneptunes(FLAT_N, seed=SEED), m_sil, r_sil)
+    arr = build_arrays(flat_curves(FLAT_N, seed=SEED), m_sil, r_sil)
     fig, axes = plt.subplots(1, 2, figsize=(17.0, 7.5))
     ax_hist, ax_mr = axes      # histograms on the left, the illustration on the right
     # The mass-radius draw runs first so the histogram draws use the same random
@@ -408,30 +412,29 @@ def make_paper_2col(pools, nasa, m_sil, r_sil, rng):
     print(f"--> Saved paper copy: {PAPER_FIG_DIR / 'flat_rocky_mr_2col_chen_otegi_cold.png'}")
 
 
-def _main():
-    os.makedirs(OUT_DIR, exist_ok=True)
-    m_sil, r_sil = puffy_cuts.load_silicate()
-    rng = np.random.default_rng(SEED)
-    nasa = puffy_cuts.load_nasa()
-
-    print(f"--> building {len(RELATIONS)} rocky-relation pools + detectors "
-          f"(mass scatter = {MR_SCATTER_DEX} dex)...")
-    pools = [(name, eq, applies, build_arrays(flat_nonphysical(FLAT_N, seed=SEED, **kw), m_sil, r_sil))
-             for name, eq, applies, kw in RELATIONS]
-
-    for cut_label, cut, fname in CUTS:
-        make_figure(cut_label, cut, fname, pools, nasa, m_sil, r_sil, rng)
-
-    otegi_arr = next(arr for name, eq, applies, arr in pools if "Otegi" in name)
-    make_otegi_2x2(otegi_arr, nasa, m_sil, r_sil, rng)
-    make_otegi_2x1(otegi_arr, nasa, m_sil, r_sil, rng)
-    make_paper_2col(pools, nasa, m_sil, r_sil, rng)
-    make_otegi_1x2(nasa, m_sil, r_sil, rng)
-
-
 def main():
     with plt.rc_context(FIGURE_STYLE):
-        return _main()
+        os.makedirs(OUT_DIR, exist_ok=True)
+        m_sil, r_sil = load_silicate()
+        rng = np.random.default_rng(SEED)
+        nasa = puffy_cuts.load_nasa()
+
+        print(f"--> building {len(RELATIONS)} rocky-relation pools + detectors "
+              f"(mass scatter = {MR_SCATTER_DEX} dex)...")
+        pools = [(name, eq, applies,
+                  build_arrays(flat_baseline(FLAT_N, seed=SEED, radius_lims=RADIUS_LIMS,
+                                             mass_lims=MASS_LIMS, **kw),
+                               m_sil, r_sil))
+                 for name, eq, applies, kw in RELATIONS]
+
+        for cut_label, cut, fname in CUTS:
+            make_figure(cut_label, cut, fname, pools, nasa, m_sil, r_sil, rng)
+
+        otegi_arr = next(arr for name, eq, applies, arr in pools if "Otegi" in name)
+        make_otegi_2x2(otegi_arr, nasa, m_sil, r_sil, rng)
+        make_otegi_2x1(otegi_arr, nasa, m_sil, r_sil, rng)
+        make_paper_2col(pools, nasa, m_sil, r_sil, rng)
+        make_otegi_1x2(nasa, m_sil, r_sil, rng)
 
 
 if __name__ == "__main__":

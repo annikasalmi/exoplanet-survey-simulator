@@ -28,7 +28,7 @@ Treat the toy models as selection-effect experiments, not absolute mission-yield
 
 ## Workflow
 
-1. Draw a controlled "flat" population of exoplanets (from given exoplanet priors) or a science-based universe ("P-Pop").
+1. Draw one of the two flat universes or the science-based P-Pop universe.
 2. Apply the selected transit, radial-velocity, coronagraph, or interferometer model.
 3. Add measurement uncertainties and analysis cuts.
 4. Compare the recovered population with observed exoplanet catalogues.
@@ -57,19 +57,38 @@ Data files in the repo are recorded in [`data/manifest.json`](data/manifest.json
 python sim.py
 ```
 
-`sim.py` draws a flat universe, runs the Kepler, TESS and RV detectors through
-`run_sim`, and saves the catalogs and plots under `results/`.
-
-There are other simulations that can be run as well.
+`sim.py` draws the baseline flat universe, runs the Kepler, TESS and RV detectors,
+and saves the catalog and plots under `results/`.
 
 There are two main types of flat universes:
-- the radius prior is uniformly drawn from 0 to 12 R_Earth
-- or radius prior is drawn from a silicate curve or a volatile curve
-All the masses are taken from this radius and propagated forward with the Otegi (2020) mass radius relation
-with some error.
+- baseline flat: radius is uniformly drawn from 0 to 12 R_Earth
+- curve-based flat: planets are placed around the silicate curve or volatile curve
 
-The main simulations support in the second one:
-- that all planets exists on both curves, or some planets only exist on the volatile curve and not the raidu scurve
+P-Pop is the separate science-based universe from the vendored P-Pop model.
+
+The flat-universe masses are taken from radius and propagated forward with the
+Otegi (2020) mass-radius relation with scatter.
+
+The three implementations live in `science/populations/universes/flat_baseline.py`,
+`flat_curves.py`, and `ppop.py`. Import each generator directly from its module.
+`sim.py` selects one, generates the catalog, then applies the telescope detectors.
+Analysis plots, including the
+transit/RV 3x3 map, call these same generators with their paper-specific bounds.
+
+The curve-based flat simulations support:
+- universe B, where planets exist on either the silicate or volatile curve
+- universe A, where the super-Earths on the silicate curve are removed
+
+```bash
+python sim.py --universe flat_baseline --n-planets 20000 --seed 0
+python sim.py --universe flat_curves --variant B
+python sim.py --universe flat_curves --variant A
+python sim.py --universe ppop --star-catalog LTC_2
+```
+
+The batch pipelines under `run/` retain their catalog caching and multi-run
+support, including the paired A/B comparison and the HWO and LIFEsim models.
+Run the paired A/B likelihood analysis with `python -m plotting.likelihood_ratio_plotter`.
 
 ## Reproducing the paper's analysis figures
 

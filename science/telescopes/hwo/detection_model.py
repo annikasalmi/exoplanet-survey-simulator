@@ -180,9 +180,6 @@ class HWOData():
             raise ValueError("case must be 'best' or 'worst'")
         return photons
     
-    def calc_iwa_constraint(self):
-        iwa_constraint = self.catalog.maxangsep
-        return iwa_constraint
     def determine_detectable(self):
         """
         Evaluate individual constraints and determine detectability. 
@@ -192,7 +189,7 @@ class HWOData():
         cases = ['best', 'worst']
 
         for c in cases:
-            iwa_condition = self.calc_iwa_constraint() >= HWO(c).iwa
+            iwa_condition = self.catalog['maxangsep'] >= HWO(c).iwa
             flux_condition = self.calc_flux_ratio(c) >= HWO(c).min_planet_flux_star_ratio
             min_photon_rate_condition = self.calc_photons(c) <= HWO(c).min_photons
             z_condition = self.catalog['z'] <= HWO(c).max_z
@@ -210,6 +207,5 @@ class HWOData():
             condition = iwa_condition & flux_condition & min_photon_rate_condition & z_condition
             self.catalog['detected_' + c] = condition
         return self.catalog
-
 
 

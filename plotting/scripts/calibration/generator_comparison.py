@@ -1,4 +1,4 @@
-"""Compare the three planet generators (old P-Pop SAG13, new P-Pop Bergsten2022, flat_nonphysical) on
+"""Compare the three planet generators (old P-Pop SAG13, new P-Pop Bergsten2022, flat baseline) on
 generation time and per-parameter distributions (three_generators_comparison.png).
 Run: python plotting/scripts/calibration/generator_comparison.py [--rebuild to re-time P-Pop]
 """
@@ -30,8 +30,7 @@ from PPop.StabilityModels import He2019
 from PPop.OrbitModels import Random
 from PPop.AlbedoModels import Uniform
 from PPop.ExozodiModels import Ertel2020
-from science.populations.flat import DEFAULTS
-from science.populations.universes import flat_nonphysical
+from science.populations.universes.flat_baseline import DEFAULTS, flat_baseline
 
 N_STARS = 1200
 SUBSET_SEED = 12345
@@ -44,7 +43,7 @@ CACHE = os.path.join(OUT_DIR, "three_generators_data.npz")
 COL = {"old": "#d1495b", "new": "#1f77b4", "flat": "#6c757d"}
 LAB = {"old": "old P-Pop  (SAG13 / Kopparapu 2018, Annika)",
        "new": "new P-Pop  (Bergsten 2022, ours)",
-       "flat": "flat_nonphysical  (uniform box, Otegi mass)"}
+       "flat": "flat baseline  (uniform box, Otegi mass)"}
 _SUN_T = 5772.0
 
 
@@ -83,9 +82,10 @@ def flat_raw_sampled(n=N_FLAT, seed=1):
 
 
 def generate_flat():
-    """flat_nonphysical, timed, plus its as-sampled radius and Teff. Seconds, so not cached."""
+    """Flat Otegi baseline, timed, plus its as-sampled radius and Teff. Seconds, so not cached."""
     t0 = time.perf_counter()
-    df_flat = flat_nonphysical(TARGET, seed=0)
+    df_flat = flat_baseline(TARGET, seed=0, radius_lims=DEFAULTS["radius_lims"],
+                            mass_lims=DEFAULTS["mass_lims"])
     t_flat = time.perf_counter() - t0
     n_flat = len(df_flat)
     df_flat = df_flat.iloc[:N_FLAT]

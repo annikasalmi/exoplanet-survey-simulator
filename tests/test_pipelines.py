@@ -1,4 +1,4 @@
-"""End-to-end checks for every pipeline run_sim can drive, on a small star catalog so CI
+"""End-to-end checks for the batch pipelines, on a small star catalog so CI
 finishes in minutes. Each P-Pop pipeline must run, plot, reload its saved catalogs, and
 reproduce a seeded universe. All output goes to a temp dir, never to results/.
 """
@@ -6,22 +6,27 @@ reproduce a seeded universe. All output goes to a temp dir, never to results/.
 import matplotlib
 matplotlib.use('Agg')
 
+import runpy
+import sys
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
 
 import plotting.base_plotter as base_plotter
 import plotting.likelihood_ratio_plotter as likelihood_ratio_plotter
-from plotting.plot_flat_universe import plot_flat_universe
+from plotting.plot import plot_all
 import run.flat_universe.run_flat_universe as flat
-from science.populations.universes import is_super_earth
+from science.populations.universes.flat_curves import is_super_earth
 import run.hwo.run_hwo as hwo
 import run.kepler.run_kepler as kepler
 import run.lifesim.run_lifesim as lifesim
 import run.rv.run_rv as rv
 import run.tess.run_tess as tess
-from science.populations.ppop import PPop
-import sim
+from science.populations.universes.ppop import PPop
+from run.multi_run import normalize_nruns, run_universes
+from tools import paths
 
 # Gaia stars within 10 pc: ~220 stars and ~700 planets per universe, a few seconds
 # each, and still enough planets that Kepler and TESS detect some.
@@ -82,18 +87,20 @@ def sandbox(tmp_path_factory):
         (root / 'flat_universe').mkdir()
         mp.setattr(base_plotter, 'PLOTS_DIR', str(root / 'figures'))
         mp.setattr(likelihood_ratio_plotter, 'OUT_DIR', str(root / 'likelihood_ratio'))
-        mp.setattr(sim, 'LOGGING', str(root / 'logs'))
         yield root
 
 
 @pytest.fixture(scope='session', params=list(PPOP_PIPELINES))
 def ppop_run(request, sandbox):
-    """One run_sim call per pipeline (two universes, with plots), shared by the tests below."""
+    """Generate and plot two universes per pipeline, shared by the tests below."""
     name = request.param
-    module, _, detected_col = PPOP_PIPELINES[name]
-    df = sim.run_sim(func=module.main, name=name, parallel=False, nruns=NRUNS,
-                                star_catalog='Gaia', run_anew=True, plot=True)
-    return name, module, detected_col, df
+    module, dir_attrs, detected_col = PPOP_PIPELINES[name]
+    settings = dict(run_single=module.run_single, star_catalog='Gaia',
+                    cache_dir=getattr(module, dir_attrs[-1]), cache_prefix=name,
+                    load_single=lifesim.run_lifesim_import_catalog if name == 'lifesim' else None)
+    df = run_universes(**settings, nruns=NRUNS)
+    plot_all(df, sim_name=name, nruns=len(NRUNS), star_catalog='Gaia', use_multiprocessing=False)
+    return name, settings, detected_col, df
 
 
 def test_ppop_pipeline_runs(ppop_run):
@@ -116,24 +123,22 @@ def test_ppop_pipeline_plots(ppop_run, sandbox):
 
 
 def test_ppop_pipeline_reloads_saved_catalogs(ppop_run):
-    name, module, _, df = ppop_run
-    reloaded = module.main(parallel=False, nruns=NRUNS, star_catalog='Gaia', run_anew=False)
-    got, expected = _csv_comparable(reloaded, df.drop(columns='radius_bin'))
+    name, settings, _, df = ppop_run
+    reloaded = run_universes(**settings, nruns=NRUNS, run_anew=False)
+    got, expected = _csv_comparable(reloaded, df)
     pd.testing.assert_frame_equal(got, expected, check_dtype=False)
 
 
 def test_ppop_pipeline_is_seeded(ppop_run):
-    name, module, _, df = ppop_run
-    again = module.main(parallel=False, nruns=NRUNS[1:], star_catalog='Gaia', run_anew=True)
-    got, expected = _csv_comparable(again, df[df['run'] == NRUNS[1]].drop(columns='radius_bin'))
+    name, settings, _, df = ppop_run
+    again = run_universes(**settings, nruns=NRUNS[1:])
+    got, expected = _csv_comparable(again, df[df['run'] == NRUNS[1]])
     pd.testing.assert_frame_equal(got, expected)
 
 
 def test_flat_universe(sandbox):
     n_planets = 20_000
-    df = sim.run_sim(func=flat.main, name='flat_ab', parallel=False,
-                                nruns=np.arange(1), run_anew=True, plot=False,
-                                seed=0, n_planets=n_planets)
+    df = flat.main(seed=0, n_planets=n_planets, run_anew=True)
 
     a, b = df[df['universe_type'] == 'A'], df[df['universe_type'] == 'B']
     assert 0 < len(a) < len(b) <= n_planets
@@ -149,11 +154,10 @@ def test_flat_universe(sandbox):
         pd.read_csv(path).head(10).to_csv(path, index=False)
     assert len(flat.main(seed=0, n_planets=n_planets, run_anew=False)) == 20
     regenerated = flat.main(seed=0, n_planets=n_planets, run_anew=True)
-    df = df.drop(columns='radius_bin')
     pd.testing.assert_frame_equal(cached, df, check_dtype=False)
     pd.testing.assert_frame_equal(regenerated, df, check_dtype=False)
 
-    plot_flat_universe(df)
+    likelihood_ratio_plotter.main(df)
     assert list((sandbox / 'likelihood_ratio').glob('*.png'))
 
 
@@ -165,16 +169,21 @@ def test_kepler_on_nasa_pscomppars(sandbox):
     assert 0 < df['detected'].sum() < len(df)
 
 
-def test_kepler_rejects_unknown_population():
-    with pytest.raises(ValueError):
-        kepler.main(population='not_a_population')
+def test_integer_nruns():
+    assert normalize_nruns(3) == [0, 1, 2]
 
 
-def test_run_sim_accepts_integer_nruns(sandbox):
-    def fake_pipeline(**kwargs):
-        assert kwargs["nruns"] == [0, 1, 2]
-        return pd.DataFrame({"radius_p": [1.0, 2.0], "run": [0, 1]})
+def test_ppop_quickstart(tmp_path, monkeypatch):
+    import science.populations.universes.ppop as ppop
+    import plotting.plot_population as plotter
 
-    df = sim.run_sim(func=fake_pipeline, name="fake", parallel=False, nruns=3, plot=False)
+    monkeypatch.setattr(ppop, 'PPop', SmallPPop)
+    monkeypatch.setattr(paths, 'CATALOGS_DIR', str(tmp_path / 'catalogs'))
+    monkeypatch.setattr(plotter, 'PLOTS_DIR', str(tmp_path / 'plots'))
+    monkeypatch.setattr(sys, 'argv', ['sim.py', '--universe', 'ppop', '--star-catalog', 'Gaia'])
+    runpy.run_path(str(Path(paths.REPO_ROOT) / 'sim.py'), run_name='__main__')
 
-    assert list(df["radius_bin"].astype(str)) == ["<1.5", "1.5–3.0"]
+    df = pd.read_csv(tmp_path / 'catalogs' / 'ppop' / 'ppop_Gaia_seed0.csv')
+    assert len(df) > 0
+    assert df[['kepler_detected', 'tess_detected', 'rv_detected']].any().all()
+    assert {p.name for p in (tmp_path / 'plots').rglob('*.png')} == {'population.png', 'detections.png'}

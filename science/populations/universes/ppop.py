@@ -1,76 +1,49 @@
-'''
-Modified from P-pop.py: creating a function to be used to be called multiple times
-'''
+"""P-Pop occurrence-rate universe and catalog conversion."""
 
-import warnings
 import os
-import numpy as np
 import sys
-import pandas as pd
-from astropy.io import fits
-from astropy.coordinates import SkyCoord, BarycentricMeanEcliptic
-from astropy.table import vstack as astropy_vstack
+import warnings
 
-from lifesim.util.habitable import single_habitable_zone
-from lifesim.util.options import Options
+import numpy as np
+import pandas as pd
+
 from tools.paths import PPOP_DATA_DIR
 
-# Import your own catalogs, distributions and models here.
-import PPop.SystemGenerator as SystemGenerator
-from PPop.StarCatalogs import CrossfieldBrightSample, ExoCat_1, LTC_2, LTC_3, gaia
-from PPop.PlanetDistributions import Fressin2013, Burke2015, Dressing2015, SAG13,\
-                                Weiss2018, Weiss2018KDE, HabitableNominal, \
-                                HabitablePessimistic, Fernandes2019symm
-from PPop.PlanetDistributions import Bergsten2022, SAG13_extrap, SAG13_rv, EarthTwin
-from PPop.ScalingModels import BinarySuppression
-from PPop.MassModels import Chen2017
-from PPop.EccentricityModels import Circular
-from PPop.StabilityModels import He2019
-from PPop.OrbitModels import Random
-from PPop.AlbedoModels import Uniform
-from PPop.ExozodiModels import Ertel2020
-
-M_STAR_BOOST = 1  # 1 = off. The Gaia-60pc catalog is already M-dwarf-complete
-                  # (~73% M dwarfs), so artificially duplicating M stars would
-                  # over-represent them relative to the real nearby universe.
-
-STAR_CATALOGS = {
-    "CrossfieldBrightSample": CrossfieldBrightSample,
-    "ExoCat_1": ExoCat_1,
-    "LTC_3": LTC_3,
-    "LTC_2": LTC_2,
-    "Gaia": gaia,
-}
+M_STAR_BOOST = 1  # Gaia-60pc is already M-dwarf-complete; 1 disables duplication.
 
 
-def set_star_catalog(ppop_obj, star_catalog: str):
-    """Point ppop_obj at the star catalog named star_catalog (a key of STAR_CATALOGS)."""
-    if star_catalog not in STAR_CATALOGS:
-        raise ValueError(f"Unknown star catalog: {star_catalog}")
-    ppop_obj.StarCatalog = STAR_CATALOGS[star_catalog]
-    return ppop_obj
-
-
-class PPop():
-    '''
-    This class sets up the parameters for the planet population generator.
-    '''
-    def __init__(self, rng, use_combined_sample=False, control_fraction=0.15):
+class PPop:
+    """P-Pop occurrence-rate universe and its catalog conversion."""
+    def __init__(self, rng, use_combined_sample=False, control_fraction=0.15, star_catalog='LTC_3'):
         '''
         This function sets up the parameters for the planet population generator.
         '''
+        from lifesim.util.options import Options
+        from PPop.StarCatalogs import CrossfieldBrightSample, ExoCat_1, LTC_2, LTC_3, gaia
+        from PPop.PlanetDistributions import Bergsten2022, Dressing2015, SAG13
+        from PPop.ScalingModels import BinarySuppression
+        from PPop.MassModels import Chen2017
+        from PPop.EccentricityModels import Circular
+        from PPop.StabilityModels import He2019
+        from PPop.OrbitModels import Random
+        from PPop.AlbedoModels import Uniform
+        from PPop.ExozodiModels import Ertel2020
+
+        catalogs = {"CrossfieldBrightSample": CrossfieldBrightSample, "ExoCat_1": ExoCat_1,
+                    "LTC_2": LTC_2, "LTC_3": LTC_3, "Gaia": gaia}
+        if star_catalog not in catalogs:
+            raise ValueError(f"Unknown star catalog: {star_catalog}")
         self.rng=rng
         self.use_combined_sample = use_combined_sample
         self.control_fraction = control_fraction
 
-        #StarCatalog = ExoCat_1 # used by NASA
-        self.StarCatalog = LTC_3 # LIFE Target Catalog (version 3)
+        self.StarCatalog = catalogs[star_catalog]
         self.Stypes = ['A', 'F', 'G', 'K', 'M'] # list of str
         self.Dist_min = 0
         self.Dist_range = [0., 60.] # pc, list of float, [min, max]
         self.Dec_range = [-90., 90.] # deg, list of float, [min, max]
 
-        # Select the planet distributions, the scenario, and the scaling model which should be used here. 
+        # Select the planet distributions, the scenario, and the scaling model which should be used here.
         # A different planet distribution can be assigned to each spectral type.
         # dict, StarCatalog.Stype as keys, PlanetDistribution as data
         # SEE MORE options in gp.py
@@ -100,12 +73,14 @@ class PPop():
 
         self.options.set_scenario('baseline')
         # set options manually
-        self.options.set_manual(diameter=4.)        
+        self.options.set_manual(diameter=4.)
         # self.options.set_manual(output_path='data')
-        # self.options.set_manual(output_filename=self.Name)    
+        # self.options.set_manual(output_filename=self.Name)
 
-    def run_ppop(self, data_path='test_planet_pop.txt'):
-        # Don't modify the following code.
+    def run_ppop(self, data_path=os.path.join(PPOP_DATA_DIR, 'test_planet_pop.txt')):
+        from PPop import SystemGenerator
+        from astropy.table import vstack as astropy_vstack
+
         ntest=1
         nuniverses=1
         SysGen = SystemGenerator.SystemGenerator(self.StarCatalog,
@@ -162,6 +137,10 @@ class PPop():
         ValueError
             If the data class already has an initialized catalog and overwrite is set to False.
         """
+        from astropy.io import fits
+        from astropy.coordinates import SkyCoord, BarycentricMeanEcliptic
+        from lifesim.util.habitable import single_habitable_zone
+
         # turn df data into the correct format
         if df is not None:
             columns_to_drop = [
@@ -526,7 +505,7 @@ class PPop():
         # TODO: Definition of stype here is wrong. It should be an int not a string.
         #   Think about this a bit more. It is important to keep the ints in the DataFrame, but that
         #   decreases usability. Maybe an option is to use intermediate masks for the stellar types.
-        
+
 ################################################################## Added for richer Ppop samples!##################################################################
     def _apply_combined_sample(self):
         """

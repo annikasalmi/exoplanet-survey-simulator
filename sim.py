@@ -1,127 +1,52 @@
-"""Run the quickstart or select a full simulation pipeline under ``__main__``."""
+"""Choose a universe, apply telescope detectors, and save the catalog and plots."""
 
-import time
-import os
+import argparse
+from pathlib import Path
+
 import numpy as np
-import pandas as pd
-from datetime import datetime
-import logging
 
-from tools.paths import LOGGING
-
-from run.kepler.run_kepler import main as main_kepler
-from run.tess.run_tess import main as main_tess
-from run.rv.run_rv import main as main_rv
-from run.hwo.run_hwo import main as main_hwo
-from run.lifesim.run_lifesim import main as main_lifesim
-from run.flat_universe.run_flat_universe import main as main_flat_ab
-from run.multi_run import normalize_nruns
-
-from plotting.plot import plot_all
-from plotting.plot_flat_universe import plot_flat_universe
-
-def run_with_progress(func, name, estimated_minutes=12, *args, **kwargs):
-    # Logs to file and runs func. Real progress comes from the per-star tqdm bar
-    # inside the generator (and the per-universe "Running ... for run i" prints),
-    # not from a fake wall-clock estimate.
-    log_path = os.path.join(LOGGING, name, "run_log" + datetime.now().strftime("_%Y%m%d_%H%M%S") + ".txt")
-    log_dir = os.path.dirname(log_path)
-    if not os.path.isdir(log_dir):
-        os.makedirs(log_dir)
-    print(f"Writing log to: {log_path}")
-    logging.basicConfig(filename=log_path, filemode='w', level=logging.INFO, format='%(asctime)s - %(message)s')
-    def log(msg):
-        print(msg)
-        logging.info(msg)
-    try:
-        log(f"Starting function '{func.__name__}'...")
-        result = func(*args, **kwargs)
-        log(f"Function '{func.__name__}' completed successfully.")
-    except Exception as e:
-        log(f"Error during '{func.__name__}': {e}")
-        raise
-    return result
-
-def run_sim(func=main_kepler, name='kepler', parallel=True, nruns=500,
-            star_catalog='Gaia', run_anew=True, plot=True, **kwargs):
-    nruns = normalize_nruns(nruns)
-    start_time = time.time()
-    print(f"Starting simulation: {name} with {len(nruns)} universe(s)...")
-    try:
-        df_concat = run_with_progress(
-            func,
-            name=name,
-            estimated_minutes=12,
-            parallel=parallel,
-            nruns=nruns,
-            star_catalog=star_catalog,
-            run_anew=run_anew,
-            **kwargs
-        )
-    finally:
-        elapsed = time.time() - start_time
-        hours = int(elapsed // 3600)
-        minutes = int((elapsed % 3600) // 60)
-        seconds = int(elapsed % 60)
-        print(f"\nSimulation completed in: {hours}:{minutes:02d}:{seconds:02d}")
-    if 'radius_bin' not in df_concat.columns:
-        bins = [0, 1.5, 3.0, 6.0]
-        labels = ['<1.5', '1.5–3.0', '3.0–6.0']
-        df_concat['radius_bin'] = pd.cut(df_concat['radius_p'], bins=bins, labels=labels, include_lowest=True)
-
-    if plot:
-        plot_start_time = time.time()
-        print(f"Starting plotting...")
-
-        # Universes A and B have their own plotter
-        if name.lower() == 'flat_ab':
-            plot_flat_universe(df=df_concat, nruns=len(nruns), use_multiprocessing=False)
-        else:
-            plot_all(df=df_concat, sim_name=name, nruns=len(nruns), star_catalog=star_catalog, use_multiprocessing=False)
-
-        plot_end_time = time.time()
-        plot_elapsed = plot_end_time - plot_start_time
-        plot_hours = int(plot_elapsed // 3600)
-        plot_minutes = int((plot_elapsed % 3600) // 60)
-        plot_seconds = int(plot_elapsed % 60)
-        print(f"Time taken to plot: {plot_hours}:{plot_minutes:02d}:{plot_seconds:02d}")
-    return df_concat
+from science.populations.universes.ppop import PPop
+from science.populations.universes.flat_baseline import flat_baseline
+from science.populations.universes.flat_curves import flat_curves
+from science.telescopes.kepler.detection_model import KeplerData
+from science.telescopes.tess.detection_model import TESSData
+from science.telescopes.detection import run_rv_best
+from plotting.plot_population import plot_population
+from tools.paths import CATALOGS_DIR
 
 
-def run_flat_nonphysical():
-    """Flat-population analysis used for a paper figure (not the quickstart)."""
-    print("\nRunning flat_nonphysical: rocky planets around G, K and M stars through the "
-          "TESS transit and HARPS/NIRPS RV detection models.\n")
-    # Imported here so the P-Pop runs skip the paper-figure code.
-    from plotting.scripts.analysis import flat_transit_rv_3x3
-    flat_transit_rv_3x3.main(paper_copy=False)
-
-
-# The guard is required: parallel runs start worker processes that re-import this file.
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--universe", choices=("flat_baseline", "flat_curves", "ppop"),
+                        default="flat_baseline")
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--n-planets", type=int, default=20_000, help="Flat-universe draw count")
+    parser.add_argument("--variant", choices=("A", "B"), default="B", help="Curve-based flat variant")
+    parser.add_argument("--star-catalog", default="Gaia", help="P-Pop star catalog")
+    args = parser.parse_args()
 
-    # Universe i uses seed i. The Gaia-60pc catalog (~54k stars, ~73% M dwarfs) gives ~100k
-    # planets per universe, so the diagnostics stack 10 to fill the sparse F/G/K bins.
-    NRUNS = np.arange(1)
-    STAR_CATALOG = 'Gaia'  # or 'ExoCat_1', 'LTC_2', 'LTC_3', 'CrossfieldBrightSample'
+    out_dir = Path(CATALOGS_DIR) / args.universe
+    out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Quickstart: flat universes A and B through Kepler, TESS and RV detection.
-    run_sim(func=main_flat_ab, name='flat_ab', parallel=False, nruns=np.arange(1),
-            run_anew=True, plot=True, seed=0, n_planets=20_000)
+    if args.universe == "flat_baseline":
+        catalog = flat_baseline(args.n_planets, seed=args.seed)
+        name = f"flat_baseline_seed{args.seed}_n{args.n_planets}"
+    elif args.universe == "flat_curves":
+        catalog = flat_curves(args.n_planets, seed=args.seed, variant=args.variant)
+        name = f"flat_curves_{args.variant}_seed{args.seed}_n{args.n_planets}"
+    else:
+        name = f"ppop_{args.star_catalog}_seed{args.seed}"
+        population = PPop(rng=np.random.default_rng(args.seed), star_catalog=args.star_catalog)
+        raw = population.run_ppop(data_path=str(out_dir / name))
+        population.catalog_from_ppop(df=raw)
+        population.catalog_remove_distance(stype="A", mode="larger", dist=0.0)
+        catalog = population.catalog
 
-    # Optional P-Pop quickstart: comment out the flat run above and uncomment this line.
-    # run_sim(func=main_kepler, name='kepler_ppop', parallel=False, nruns=np.arange(1), star_catalog='LTC_2', run_anew=True, plot=True)
+    catalog["kepler_detected"] = KeplerData(catalog.copy(), source="ppop").determine_detectable()["detected"]
+    catalog["tess_detected"] = TESSData(catalog.copy(), source="ppop", use_cdpp_tables=False).determine_detectable()["detected"]
+    catalog["rv_detected"] = run_rv_best(catalog, mag_target=12.0)["detected"]
 
-    # Full P-Pop diagnostics: set NRUNS = np.arange(10), comment out the quickstart,
-    # and uncomment both lines. Each Gaia-60pc universe takes about 20 minutes; 10 Kepler
-    # plus 10 TESS universes take roughly 3-4 hours and feed the optional --full analyses.
-    # run_sim(func=main_kepler, name='kepler', parallel=True, nruns=NRUNS, star_catalog=STAR_CATALOG, run_anew=True, plot=True)
-    # run_sim(func=main_tess, name='TESS', parallel=True, nruns=NRUNS, star_catalog=STAR_CATALOG, run_anew=True, plot=True)
-
-    # Other pipelines:
-    # run_sim(func=main_rv, name='rv', parallel=True, nruns=NRUNS, star_catalog=STAR_CATALOG, run_anew=True, plot=True)
-    # run_sim(func=main_hwo, name='hwo', parallel=False, nruns=NRUNS, star_catalog=STAR_CATALOG, run_anew=True, plot=True)
-    # run_sim(func=main_lifesim, name='lifesim', parallel=False, nruns=NRUNS, star_catalog=STAR_CATALOG, run_anew=True, plot=True)
-    # run_sim(func=main_flat_ab, name='flat_ab', parallel=False, nruns=np.arange(1), run_anew=True, plot=True)  # universes A and B, ~1 min
-
-    print('done')
+    output = out_dir / f"{name}.csv"
+    catalog.to_csv(output, index=False)
+    print(f"Saved {len(catalog):,} planets: {output}")
+    plot_population(catalog, name=name)

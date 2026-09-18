@@ -67,11 +67,15 @@ def test_bolometric_flux(monkeypatch):
     result = hwo.bolometric_flux(300)
     assert isinstance(result, float)
 
-def test_calc_iwa_constraint():
-    df = minimal_catalog()
+def test_iwa_threshold(monkeypatch):
+    from science.telescopes.hwo import detection_model
+    monkeypatch.setattr(detection_model, 'HWO', DummyHWO)
+    df = pd.concat([minimal_catalog()] * 3, ignore_index=True)
+    df['maxangsep'] = [0.09, 0.1, 0.11]
     hwo = HWOData(df)
-    result = hwo.calc_iwa_constraint()
-    assert np.allclose(result, df['maxangsep'])
+    result = hwo.determine_detectable()
+    for case in ('best', 'worst'):
+        assert result[f'iwa_pass_{case}'].tolist() == [False, True, True]
 
 def test_photon_energy(monkeypatch):
     df = minimal_catalog()

@@ -1,49 +1,20 @@
-# Python
-__pycache__/
-*.py[cod]
-*.egg-info/
-build/
-dist/
-.venv/
-venv/
-.pytest_cache/
-.coverage
-htmlcov/
 
-# Editor / OS
+.venv/*
+.claude/*
 .DS_Store
 .vscode/*
-!.vscode/launch.json
-!.vscode/settings.json
-.idea/
 
-# Everything generated lives under results/ -- one rule, so a new
-# pipeline cannot leak a catalogue into a commit by being forgotten here.
-# results/README.md is re-included at the bottom, after the *.md rule.
+# Generated files that should not be tracked (too large/frequently regenerated)
+__pycache__/*
+*/__pycache__/*
+*/*/__pycache__/*
+*/*/*/__pycache__/*
 /results/*
 /logs/
-
-# PPop generated
 /PPop/data/
 /PPop/Figures/
 /PPop/TestPlanetPopulation.out
 TestPlanetPopulation.txt
-
-# Personal Claude Code overrides (not shared)
-/CLAUDE.local.md
-
 PPop/StarCatalogs/*.csv
-# The default catalogue every P-Pop pipeline reads; without it a clone cannot simulate.
 !PPop/StarCatalogs/gaia_within_60pc.csv
-
-# Paper drafting
-overleaf_packages/
-paper.zip
-texput.log
-
-# `*.md` is deliberate, but these record who wrote what and must ship
-*.md
-!README.md
-!PPop/UPSTREAM.md
-!lifesim/UPSTREAM.md
-!results/README.md
+!PPop/StarCatalogs/LTC_3.csv

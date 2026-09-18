@@ -13,19 +13,6 @@ instruments, selection cuts, and comparison statistics to be changed without rew
 full pipeline. Included detection models cover Kepler, TESS, HARPS/NIRPS-like
 radial-velocity observations, HWO, and LIFE.
 
-This table summarizes the detectors:
-## Instrument model fidelity
-
-| Instrument | Modeled | Approximation/calibration | Omitted |
-|---|---|---|---|
-| Kepler | Transit geometry, depth, duration, count, brightness, CDPP and 7.1 MES | Magnitude-scaled fallback CDPP; 0.84 factor calibrated to DR25 MES | DR25 depth/window maps, injection recovery, cadence gaps, dilution and vetting |
-| TESS | Transit geometry, phase, sector windows, CDPP, optional dilution and 7.1 S/N | Five sectors and binned SPOC CDPP by default; 0.80 factor calibrated to SPOC TOIs | Target completeness, detailed gaps, injection recovery and vetting |
-| HARPS/NIRPS-like RV | Keplerian amplitude, V/J brightness, noise/jitter, 100 epochs and 5-sigma threshold | Population-level magnitudes, masses and jitter; checked against published amplitudes | Real schedules, aliases, multi-planet fits, activity mitigation and target allocation |
-| HWO | IWA, blackbody flux ratio, photon rate and exozodi best/worst cuts | Fixed wavelength endpoints and thresholds; uncalibrated | Phase completeness, reflected light, contrast curves, exposure S/N, systematics and scheduling |
-| LIFE | Nulling transmission, planet signal, photon backgrounds, baseline and time optimization | LIFEsim baseline with 4 m diameter | Empirical completeness and unconfigured hardware/systematic noise |
-
-Treat the toy models as selection-effect experiments, not absolute mission-yield predictions.
-
 ## Workflow
 
 1. Draw one of the two flat universes or the science-based P-Pop universe.
@@ -57,44 +44,38 @@ Data files in the repo are recorded in [`data/manifest.json`](data/manifest.json
 python sim.py
 ```
 
-`sim.py` draws the baseline flat universe, runs the Kepler, TESS and RV detectors,
-and saves the catalog and plots under `results/`.
+This generates 20,000 planets in the default `flat_nonphysical` universe, applies
+the Kepler, TESS, and RV detectors, and writes a CSV to
+`results/catalogs/flat_nonphysical/` plus plots to `results/figures/simulation/`.
 
-There are two main types of flat universes:
-- baseline flat: radius is uniformly drawn from 0 to 12 R_Earth
-- curve-based flat: planets are placed around the silicate curve or volatile curve
-
-P-Pop is the separate science-based universe from the vendored P-Pop model.
-
-The flat-universe masses are taken from radius and propagated forward with the
-Otegi (2020) mass-radius relation with scatter.
-
-The three implementations live in `science/populations/universes/flat_baseline.py`,
-`flat_curves.py`, and `ppop.py`. Import each generator directly from its module.
-`sim.py` selects one, generates the catalog, then applies the telescope detectors.
-Analysis plots, including the
-transit/RV 3x3 map, call these same generators with their paper-specific bounds.
-
-The curve-based flat simulations support:
-- universe B, where planets exist on either the silicate or volatile curve
-- universe A, where the super-Earths on the silicate curve are removed
+Select a universe or change the draw settings with:
 
 ```bash
-python sim.py --universe flat_baseline --n-planets 20000 --seed 0
-python sim.py --universe flat_curves --variant B
-python sim.py --universe flat_curves --variant A
-python sim.py --universe ppop --star-catalog LTC_2
+python sim.py --universe flat_nonphysical --n-planets 20000 --seed 0
+python sim.py --universe flat_radii_curves --variant superearths_supneptunes
+python sim.py --universe flat_radii_curves --variant only_subneptunes
 ```
 
-The batch pipelines under `run/` retain their catalog caching and multi-run
-support, including the paired A/B comparison and the HWO and LIFEsim models.
-Run the paired A/B likelihood analysis with `python -m plotting.likelihood_ratio_plotter`.
+The valid universes are `flat_nonphysical`, `flat_radii_curves`, and `ppop`.
+The curve-based variants are `superearths_supneptunes` and `only_subneptunes`.
 
 ## Reproducing the paper's analysis figures
 
 ```bash
 python run/make_paper_figures.py
 ```
+This table summarizes the detectors:
+## Instrument model fidelity
+
+| Instrument | Modeled | Approximation/calibration | Omitted |
+|---|---|---|---|
+| Kepler | Transit geometry, depth, duration, count, brightness, CDPP and 7.1 MES | Magnitude-scaled fallback CDPP; 0.84 factor calibrated to DR25 MES | DR25 depth/window maps, injection recovery, cadence gaps, dilution and vetting |
+| TESS | Transit geometry, phase, sector windows, CDPP, optional dilution and 7.1 S/N | Five sectors and binned SPOC CDPP by default; 0.80 factor calibrated to SPOC TOIs | Target completeness, detailed gaps, injection recovery and vetting |
+| HARPS/NIRPS-like RV | Keplerian amplitude, V/J brightness, noise/jitter, 100 epochs and 5-sigma threshold | Population-level magnitudes, masses and jitter; checked against published amplitudes | Real schedules, aliases, multi-planet fits, activity mitigation and target allocation |
+| HWO | IWA, blackbody flux ratio, photon rate and exozodi best/worst cuts | Fixed wavelength endpoints and thresholds; uncalibrated | Phase completeness, reflected light, contrast curves, exposure S/N, systematics and scheduling |
+| LIFE | Nulling transmission, planet signal, photon backgrounds, baseline and time optimization | LIFEsim baseline with 4 m diameter | Empirical completeness and unconfigured hardware/systematic noise |
+
+Treat the toy models as selection-effect experiments, not absolute mission-yield predictions.
 
 ## Credit and licence
 

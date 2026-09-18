@@ -51,6 +51,19 @@ HARPS/NIRPS-like RV models, and writes a detection-fraction map under
 Set `SIM_NAME` in `simulation_demo.py` to run `kepler`, `tess`, `rv`, `hwo`, or `lifesim`.
 These options build a P-Pop universe and take about 20 minutes per universe.
 
+## Flat universes
+
+The flat analyses use no occurrence rates. They draw planets from `science/populations/universes.py`:
+
+| Function | Planets | Used by |
+|---|---|---|
+| `flat_nonphysical()` | Uniform radius, 0.5–2.2 R⊕; mass from Otegi's rocky relation (R = 1.03 M^0.29, 0.15 dex scatter) | 3x3 selection map, M-R relation grids, generator comparison |
+| `flat_superearths_subneptunes()` (universe B) | `flat_nonphysical` with radii redrawn and masses kept. Super-Earths (on or below the silicate line, M > 2 M⊕) get a 20% normal around the silicate line; the rest get one around Otegi's volatile-rich relation (R = 0.70 M^0.63) | A/B pipeline, likelihood-ratio plot, Otegi 1x2, puffy cuts, Bayesian comparison, MC comparison statistic |
+| `flat_subneptunes_only()` (universe A) | Universe B without its super-Earths | same as B |
+
+Each script sets its own size, seed and parameter ranges. `bayesian_cold_rocky_desert.py` also
+draws a pool with mass independent of radius, only to map detection probability.
+
 ## Analysis figures
 
 ```bash
@@ -81,9 +94,15 @@ TESS SPOC CDPP tables from MAST. Downloads are cached under `results/catalogs/`.
 
 `run/run_sim.py` orchestrates multiple P-Pop universes and plotting. As configured, it
 builds 10 Kepler and 10 TESS universes on the Gaia 60 pc catalogue; LIFE and HWO runs can
-be enabled in the same file. One universe takes about 20 minutes. Outputs go to `results/`.
+be enabled in the same file. Outputs go to `results/`.
 
-## Repository layout
+One universe takes about 20 minutes, almost all of it drawing the planets: 21 min for
+Kepler and 20 min for TESS on an 11-core, 18 GB Mac. Kepler runs 5 universes at a time and
+TESS 2 (memory limits, see `MAX_WORKERS` in `run/kepler/run_kepler.py` and
+`run/tess/run_tess.py`), so the whole file takes roughly 3-4 hours. That total is
+extrapolated from single universes, not timed end to end.
+
+These read the universes it writes, and none of their output is in the paper:
 
 - `rocky_scatter_gaia60pc.py --full`: the Kepler/TESS detection-fraction maps, from all 10 of each
 - `puffy_cuts_flat.py`: Kepler universe 0
@@ -91,7 +110,7 @@ be enabled in the same file. One universe takes about 20 minutes. Outputs go to 
 
 ## Terms
 
-- **Universe A / B**: two flat universes, where A drops rocky planets above 2 Earth masses and B keeps them.
+- **Universe A / B**: two flat universes (see "Flat universes"). B holds super-Earths and sub-Neptunes; A drops the super-Earths.
 - **Otegi**: the Otegi et al. (2020) mass-radius relations, R = 1.03 M^0.29 (rocky) and R = 0.70 M^0.63 (volatile-rich).
 
 ## Layout

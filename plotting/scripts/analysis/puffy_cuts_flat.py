@@ -20,7 +20,7 @@ from tools.paths import SILICON_CURVE
 from tools.exoplanet_catalog import read_nasa_csv
 import matplotlib.pyplot as plt
 
-from science.populations.flat import generate_flat_catalog
+from science.populations.universes import flat_superearths_subneptunes, is_super_earth
 from science.telescopes.detection import run_kepler, run_rv_best
 
 SILICATE_CURVE = Path(SILICON_CURVE)
@@ -30,7 +30,6 @@ OUT_DIR = os.path.join(ANALYSIS_DIR, "puffy_cuts_flat")
 
 N_SAMPLE = 20000
 N_REPEATS = 10000
-MASS_THRESHOLD = 2.0
 MASS_FRAC_ERR = 0.20
 RAD_FRAC_ERR = 0.046
 NASA_MASS_PREC = 0.25           # keep NASA planets with fractional mass error <= this
@@ -61,7 +60,7 @@ def puffy_frac(m_obs, r_obs, m_sil, r_sil):
 
 def build_pool(population, m_sil, r_sil):
     if population == "flat":
-        pool = generate_flat_catalog(n_planets=FLAT_N_POOL, seed=RNG_SEED)
+        pool = flat_superearths_subneptunes(FLAT_N_POOL, seed=RNG_SEED)
     else:
         if not PPOP_CATALOG.exists():
             raise FileNotFoundError(f"{PPOP_CATALOG} not found; run `python run/run_sim.py` first (~3-4 h)")
@@ -88,7 +87,7 @@ def build_pool(population, m_sil, r_sil):
 
 def mc_universe(arrays, drop, cut, m_sil, r_sil, rng, n_repeats=N_REPEATS):
     mass, radius, flux, puffy, det = arrays
-    keep = ~((~puffy) & (mass > MASS_THRESHOLD)) if drop else np.ones(len(mass), bool)
+    keep = ~is_super_earth(mass, radius) if drop else np.ones(len(mass), bool)
     if cut.get("insol_max"):
         keep = keep & (flux < cut["insol_max"])
     idx = np.flatnonzero(keep)

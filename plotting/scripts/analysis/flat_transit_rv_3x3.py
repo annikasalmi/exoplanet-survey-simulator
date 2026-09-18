@@ -1,5 +1,5 @@
 """Paper selection map (flat_transit_rv_3x3_otegi.png): rows = TESS transit, RV mass (best of
-HARPS/NIRPS), both; columns = G, K, M hosts. Background = rocky flat-universe planets (Otegi masses).
+HARPS/NIRPS), both; columns = G, K, M hosts. Background = rocky planets from flat_nonphysical.
 Run: python plotting/scripts/analysis/flat_transit_rv_3x3.py
 """
 
@@ -18,7 +18,7 @@ from matplotlib.ticker import FuncFormatter
 from tools.paths import REPO_ROOT, ANALYSIS_DIR, PAPER_FIGURES_DIR
 ROOT = Path(REPO_ROOT)
 
-from science.populations.flat import generate_flat_catalog
+from science.populations.universes import flat_nonphysical
 from science.telescopes.detection import TESSData, run_kepler, run_rv, run_tess
 from plotting.scripts.analysis import rocky_scatter_gaia60pc as rocky_scatter
 
@@ -34,8 +34,6 @@ FIGURE_STYLE = {
 # "Kepler" (appendix comparison).
 TRANSIT_MISSION = "TESS"
 
-OTEGI = dict(mr_C=1.03, mr_beta=0.29)      # R = 1.03 M^0.29 (Otegi et al. 2020)
-MR_SCATTER_DEX = 0.15
 PERIOD_LIMS = (0.2, 20000.0)               # 0.2 d reaches the USP corner of the map
 RADIUS_LIMS = (0.5, 2.2)
 RV_MAG_TARGET = 12.0
@@ -111,11 +109,10 @@ def rocky_transiting(cat: pd.DataFrame, m_ref, r_ref, r_min: float) -> pd.DataFr
 
 def build_column(stype: str, m_ref, r_ref) -> pd.DataFrame:
     cfg = COLUMNS[stype]
-    cat = generate_flat_catalog(
+    cat = flat_nonphysical(
         cfg["n"], seed=cfg["seed"],
         radius_lims=RADIUS_LIMS, period_lims=PERIOD_LIMS,
         teff_lims=cfg["teff"], insol_lims=cfg["insol"],
-        mass_model="powerlaw", mass_scatter_dex=MR_SCATTER_DEX, **OTEGI,
     )
     # Catalogue floor stays at the paper's 0.6 R_earth: the detectors draw random
     # numbers per planet, so changing the catalogue would shift the numbers.
@@ -129,11 +126,10 @@ def build_column(stype: str, m_ref, r_ref) -> pd.DataFrame:
     if cfg.get("map_extra_n"):
         # Map-only planets (main=False): they fill sparse bins of the background
         # map but are left out of the desert percentages, which stay as published.
-        extra = generate_flat_catalog(
+        extra = flat_nonphysical(
             cfg["map_extra_n"], seed=cfg["map_extra_seed"],
             radius_lims=RADIUS_LIMS, period_lims=PERIOD_LIMS,
             teff_lims=cfg["teff"], insol_lims=cfg["insol"],
-            mass_model="powerlaw", mass_scatter_dex=MR_SCATTER_DEX, **OTEGI,
         )
         extra = rocky_transiting(extra, m_ref, r_ref, rocky_scatter.RADIUS_LIMITS[0])
         panel = pd.concat([panel, detect(extra).assign(main=False)], ignore_index=True)
@@ -281,7 +277,7 @@ def _main(paper_copy: bool = True):
 
     handles = [
         Line2D([0], [0], marker="o", linestyle="", color=color_map[f], markersize=10,
-               label=rocky_scatter.short_facility(f))
+               label=rocky_scatter.FACILITY_RELABEL.get(f, f))
         for f in major
     ]
     if len(rocky_win) > sum(counts[f] for f in major):

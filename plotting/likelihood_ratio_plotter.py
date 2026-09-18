@@ -34,7 +34,6 @@ try:
 except Exception:
     pass
 
-from science.populations.flat import generate_flat_catalog
 from science.telescopes.detection import run_kepler, run_rv_best
 
 SILICATE_CURVE = Path(SILICON_CURVE)
@@ -130,7 +129,7 @@ def load_nasa(precision: bool):
 def get_detected_pool(df):
     """TRUE parameters of joint (Kepler AND RV) detected planets, from the
     flat universe produced by run_flat_universe. Universe B is the keep-all
-    population; universe A drops rocky M>2 and is not the pool used here."""
+    population; universe A drops its super-Earths and is not the pool used here."""
     pool = df[df["universe_type"] == "B"]
     joint = (pool["kepler_detected"].to_numpy(bool)
              & pool["rv_detected"].to_numpy(bool))

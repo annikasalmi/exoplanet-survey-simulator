@@ -1,6 +1,4 @@
-"""Flat A/B pipeline: generates flat catalogs (A drops rocky M > 2, B keeps all), runs
-Kepler/TESS/RV detection, and caches by seed and size so plots rerun fast.
-"""
+"""Flat A/B pipeline: builds universes A and B, runs Kepler/TESS/RV detection, caches the result."""
 
 from __future__ import annotations
 
@@ -14,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in os.sys.path:
     os.sys.path.insert(0, str(ROOT))
 
-from science.populations.flat import generate_flat_catalog
+from science.populations.universes import flat_superearths_subneptunes, is_super_earth
 from science.telescopes.detection import run_kepler, run_tess, run_rv_best
 from tools.paths import FLAT_UNIVERSE_DATA_DIR
 
@@ -23,34 +21,31 @@ FLAT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 SEED = 0
 N_PLANETS = 150_000
+CACHE_NAMES = {"A": "flat_subneptunes_only", "B": "flat_superearths_subneptunes"}
 
-def _get_or_generate_universe(seed, n_planets, universe_type, run_anew):
-    """Load the cached flat universe, or generate it if run_anew or no cache exists.
-    universe_type: 'A' (drop rocky M>2) or 'B' (all)."""
-    cache_file = FLAT_CACHE_DIR / f"flat_universe_{universe_type}_seed{seed}_n{n_planets}.csv"
 
-    if not run_anew and cache_file.exists():
-        print(f"  Loading cached {universe_type}: {cache_file.name}")
-        return pd.read_csv(cache_file)
+def _get_or_generate_universes(seed, n_planets, run_anew):
+    """Load cached A and B, or build them. A is detected B minus its super-Earths."""
+    cache = {u: FLAT_CACHE_DIR / f"{name}_seed{seed}_n{n_planets}.csv" for u, name in CACHE_NAMES.items()}
 
-    print(f"  Generating universe {universe_type} (seed={seed}, n={n_planets:,})...")
-    df = generate_flat_catalog(n_planets=n_planets, seed=seed)
+    if not run_anew and all(f.exists() for f in cache.values()):
+        for f in cache.values():
+            print(f"  Loading cached {f.name}")
+        return {u: pd.read_csv(f) for u, f in cache.items()}
 
-    # Universe A: drop rocky planets with TRUE mass > 2 M_earth
-    if universe_type == 'A':
-        df = df[df['mass_p'] <= 2.0].copy()
-        print(f"    → {len(df):,} planets after dropping M>2")
+    print(f"  Generating universe B (seed={seed}, n={n_planets:,})...")
+    b = flat_superearths_subneptunes(n_planets, seed=seed)
+    b['kepler_detected'] = run_kepler(b)['detected']
+    b['tess_detected'] = run_tess(b)['detected']
+    b['rv_detected'] = run_rv_best(b, mag_target=12.0)['detected']
+    a = b[~is_super_earth(b['mass_p'], b['radius_p'])].reset_index(drop=True)
+    print(f"    B: {len(b):,} planets; A: {len(a):,} after dropping super-Earths")
 
-    df['kepler_detected'] = run_kepler(df)['detected']
-    df['tess_detected'] = run_tess(df)['detected']
-    df['rv_detected'] = run_rv_best(df, mag_target=12.0)['detected']
-    df['universe_type'] = universe_type
-
-    # Cache
-    df.to_csv(cache_file, index=False)
-    print(f"  Cached: {cache_file.name}")
-
-    return df
+    universes = {"A": a.assign(universe_type="A"), "B": b.assign(universe_type="B")}
+    for u, df in universes.items():
+        df.to_csv(cache[u], index=False)
+        print(f"  Cached: {cache[u].name}")
+    return universes
 
 
 def main(
@@ -61,30 +56,19 @@ def main(
     star_catalog=None,
     run_anew=True,
 ):
-    """Flat-universe (A and B) detection pipeline; returns both concatenated with kepler_/tess_/rv_detected,
-    universe_type and run columns. run_anew=True regenerates and overwrites the cache; False reuses it.
-    parallel, nruns and star_catalog are unused, accepted so run_sim can call this like the telescope pipelines.
-    """
+    """A and B concatenated with detection, universe_type and run columns. run_anew=False reuses the
+    cache. parallel, nruns and star_catalog are unused; they match run_sim's pipeline signature."""
     start = time.time()
     print(f"Flat universe: seed={seed}, n_planets={n_planets:,}")
 
-    results = []
-    for universe_type in ['A', 'B']:
-        print(f"\nUniverse {universe_type}:")
-        df = _get_or_generate_universe(
-            seed=seed,
-            n_planets=n_planets,
-            universe_type=universe_type,
-            run_anew=run_anew,
-        )
-        df['run'] = 0
-        results.append(df)
+    universes = _get_or_generate_universes(seed=seed, n_planets=n_planets, run_anew=run_anew)
+    results = [universes[u].assign(run=0) for u in ("A", "B")]
 
     df_concat = pd.concat(results, ignore_index=True)
 
     elapsed = time.time() - start
     print(f"\nFlat universe complete in {elapsed:.1f}s")
-    print(f"  Total: {len(df_concat):,} planets ({len(df_concat)//2:,} per universe)")
+    print(f"  Total: {len(df_concat):,} planets (A {len(results[0]):,}, B {len(results[1]):,})")
 
     return df_concat
 

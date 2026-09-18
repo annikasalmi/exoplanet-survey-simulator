@@ -1,6 +1,6 @@
-"""Three-universe Bayesian comparison in the cold super-Earth desert over three insolation panels. Priors:
-rocky_formation (Otegi rocky, all kept), escape_only (minus rocky M>2), uniform (M independent of R);
-likelihood = transit+RV detection fraction. Scores NASA's volatile fraction per bin (binomial).
+"""Bayesian comparison in the cold super-Earth desert over three insolation panels. Priors:
+rocky_formation (universe B), escape_only (universe A); a uniform pool (M independent of R) only maps
+detectability. Likelihood = transit+RV detection fraction. Scores NASA's volatile fraction per bin (binomial).
 """
 
 from __future__ import annotations
@@ -23,16 +23,16 @@ from scipy.stats import binom
 from scipy.ndimage import gaussian_filter
 
 from science.populations.flat import generate_flat_catalog
+from science.populations.universes import (flat_superearths_subneptunes, is_super_earth,
+                                           SUPER_EARTH_MIN_MASS)
 from science.telescopes.detection import run_kepler, run_rv_best, run_tess
 
-# Transit leg of the joint detector. This module IS the Kepler analysis; the parallel TESS
-# analysis (42_bayesian_cold_rocky_desert_tess.py) imports this module and calls main("tess").
-# Everything downstream reads MISSION at call time, so the wrapper only sets this one global.
+# Transit leg of the joint detector; main("tess") switches it to TESS.
 MISSION = "kepler"
 _TRANSIT = {"kepler": run_kepler, "tess": run_tess}
 _MISSION_LABEL = {"kepler": "Kepler", "tess": "TESS"}
 _OUT_NAME = {"kepler": "bayesian_cold_rocky_desert",
-             "tess": "42_bayesian_cold_rocky_desert_tess"}
+             "tess": "bayesian_cold_rocky_desert_tess"}
 
 
 def _out_dir(mission=None):
@@ -50,9 +50,8 @@ FLAT_N_POOL = 10_000_000       # 10x: the cold among-transiting denominator is t
 CHUNK = 2_000_000              # generate+detect in chunks to bound peak memory (~1.5 GB/chunk)
 RNG_SEED = 0
 RV_MAG_TARGET = 12.0
-MASS_MIN = 2.0                 # super-Earth threshold (cold super-Earth desert cut)
+MASS_MIN = SUPER_EARTH_MIN_MASS  # cold super-Earth desert cut
 COLD_MAX = 50.0                # cold super-Earth desert boundary [I_earth]
-OTEGI_C, OTEGI_BETA, OTEGI_SCATTER = 1.03, 0.29, 0.15
 MASS_FRAC_ERR = 0.20           # log-normal measurement noise (as in puffy_cuts_flat.py)
 RAD_FRAC_ERR = 0.046
 NASA_MASS_PREC = 0.25
@@ -147,10 +146,14 @@ def load_nasa(precision: bool):
         n=int(k.sum()))
 
 
-def _detect_chunk(mass_model, n, seed, mission=None, **kw):
+# make_pool's pools: universe B (A derives from it) and the mass-independent map pool.
+POOLS = {"universe_B": flat_superearths_subneptunes, "uniform": generate_flat_catalog}
+
+
+def _detect_chunk(pool_name, n, seed, mission=None):
     """Generate n planets -> box cut -> joint Kepler+RV detection. Per-row detectors, so this is
     equivalent to processing one big pool but with bounded memory."""
-    pool = generate_flat_catalog(n_planets=n, seed=seed, mass_model=mass_model, **kw)
+    pool = POOLS[pool_name](n, seed=seed)
     r = pd.to_numeric(pool["radius_p"], errors="coerce")
     m = pd.to_numeric(pool["mass_p"], errors="coerce")
     f = pd.to_numeric(pool["flux_p"], errors="coerce")
@@ -169,16 +172,15 @@ def _detect_chunk(mass_model, n, seed, mission=None, **kw):
     )
 
 
-def make_pool(mass_model, *, pool_size=None, chunk_size=None, cache_dir=None, mission=None, **kw):
-    """Uniform-parameter pool -> box cut -> joint Kepler+RV detection (cached to npz), built in
+def make_pool(pool_name, *, pool_size=None, chunk_size=None, cache_dir=None, mission=None):
+    """POOLS[pool_name] -> box cut -> joint Kepler+RV detection (cached to npz), built in
     CHUNK-sized pieces (distinct per-chunk seeds) to bound peak memory. Returns TRUE arrays, the
     joint-detected mask, and the geometric transit mask (detected ⊂ transit)."""
     pool_size = FLAT_N_POOL if pool_size is None else int(pool_size)
     chunk_size = CHUNK if chunk_size is None else int(chunk_size)
     mission = MISSION if mission is None else mission
     cache_dir = _out_dir(mission) if cache_dir is None else os.fspath(cache_dir)
-    tag = "_".join([mass_model] + [f"{k}{v}" for k, v in sorted(kw.items())]
-                   + [f"N{pool_size}", f"s{RNG_SEED}"])
+    tag = f"{pool_name}_N{pool_size}_s{RNG_SEED}"
     cache = os.path.join(cache_dir, f"pool_{tag}.npz")
     if os.path.exists(cache):
         print(f"    loaded cached pool: {os.path.basename(cache)}")
@@ -187,7 +189,7 @@ def make_pool(mass_model, *, pool_size=None, chunk_size=None, cache_dir=None, mi
     parts, done, ci = [], 0, 0
     while done < pool_size:
         n = min(chunk_size, pool_size - done)
-        parts.append(_detect_chunk(mass_model, n, RNG_SEED + ci, mission=mission, **kw))
+        parts.append(_detect_chunk(pool_name, n, RNG_SEED + ci, mission=mission))
         done += n
         ci += 1
         print(f"      chunk {ci}: {done:>9d}/{pool_size} generated+detected")
@@ -196,19 +198,18 @@ def make_pool(mass_model, *, pool_size=None, chunk_size=None, cache_dir=None, mi
     return result
 
 
-def build_universes(m_sil, r_sil):
-    print(f"--> building Otegi (rocky-formation) pool N={FLAT_N_POOL} ...")
-    otegi = make_pool("powerlaw", mr_C=OTEGI_C, mr_beta=OTEGI_BETA, mass_scatter_dex=OTEGI_SCATTER)
+def universes_ab(b):
+    """rocky_formation = universe B pool; escape_only = universe A (B minus its super-Earths)."""
+    keep = ~is_super_earth(b["mass"], b["radius"])
+    return {"rocky_formation": b,
+            "escape_only": {k: (v[keep] if isinstance(v, np.ndarray) else v) for k, v in b.items()}}
+
+
+def build_universes():
+    print(f"--> building universe B pool N={FLAT_N_POOL} ...")
+    univ = universes_ab(make_pool("universe_B"))
     print(f"--> building independent (uniform) pool N={FLAT_N_POOL} ...")
-    indep = make_pool("independent")
-
-    rocky_true = ~is_volatile(otegi["mass"], otegi["radius"], m_sil, r_sil)
-    keep_escape = ~(rocky_true & (otegi["mass"] > MASS_MIN))     # remove born-rocky super-Earths
-
-    univ = {"rocky_formation": otegi,
-            "escape_only": {k: (v[keep_escape] if isinstance(v, np.ndarray) else v)
-                            for k, v in otegi.items()},
-            "uniform": indep}
+    univ["uniform"] = make_pool("uniform")
     for key, _, _ in UNIVERSES:
         u = univ[key]
         print(f"    {key:<16} pool={u['mass'].size:>8}  transiting={int(u['transit'].sum()):>7}"
@@ -540,7 +541,7 @@ def main(mission="kepler"):
     rng = np.random.default_rng(RNG_SEED)
 
     print(f"=== Cold super-Earth desert Bayesian comparison — transit mission: {_MISSION_LABEL[MISSION]} ===")
-    univ = build_universes(m_sil, r_sil)
+    univ = build_universes()
 
     # Table-6 reconciliation targets are Kepler-derived; only meaningful for the Kepler run.
     if MISSION == "kepler":

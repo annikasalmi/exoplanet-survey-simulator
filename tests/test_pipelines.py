@@ -14,6 +14,7 @@ import plotting.base_plotter as base_plotter
 import plotting.likelihood_ratio_plotter as likelihood_ratio_plotter
 from plotting.plot_flat_universe import plot_flat_universe
 import run.flat_universe.run_flat_universe as flat
+from science.populations.universes import is_super_earth
 import run.hwo.hwo_run_multiple as hwo
 import run.kepler.run_kepler as kepler
 import run.lifesim.lifesim_run_multiple as lifesim
@@ -135,9 +136,9 @@ def test_flat_universe(sandbox):
                                 seed=0, n_planets=n_planets)
 
     a, b = df[df['universe_type'] == 'A'], df[df['universe_type'] == 'B']
-    assert len(b) == n_planets
-    assert (a['mass_p'] <= 2.0).all(), 'universe A must drop M > 2'
-    assert 0 < len(a) < len(b)
+    assert 0 < len(a) < len(b) <= n_planets
+    assert not is_super_earth(a['mass_p'], a['radius_p']).any(), 'universe A must drop the super-Earths'
+    assert is_super_earth(b['mass_p'], b['radius_p']).any()
     for col in ('kepler_detected', 'tess_detected', 'rv_detected'):
         assert 0 < df[col].sum() < len(df), f'{col} is all-or-nothing'
 

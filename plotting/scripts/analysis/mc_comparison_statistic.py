@@ -23,10 +23,7 @@ N_DRAWS = int(os.environ.get("N_DRAWS", "5000"))
 LABELS = {"rocky_formation": "Sub-Neptune + Super-Earth",
           "escape_only": "Sub-Neptune"}
 
-# precision-cut ceilings AS the noise model: every planet in the sample passed
-# M +-25% / R +-8%, so use those limits as a uniform fractional error — no
-# per-planet published bars needed, only the N planets per insolation bin. The
-# same errors are applied to the simulated planets, so both sides are measured alike.
+# The sample's precision cuts (M +-25%, R +-8%) as the noise model, on NASA and simulated planets alike.
 MASS_CUT_ERR, RAD_CUT_ERR = 0.25, 0.08
 
 
@@ -68,17 +65,9 @@ def main():
     m_sil, r_sil = bayes.load_silicate()
     nasa = bayes.load_nasa(precision=True)
 
-    print("--> building Otegi pool (rocky_formation; escape_only derived from it)")
-    otegi = bayes.make_pool(
-        "powerlaw", pool_size=MC_POOL_SIZE, chunk_size=MC_CHUNK_SIZE, cache_dir=OUT_DIR,
-        mr_C=bayes.OTEGI_C, mr_beta=bayes.OTEGI_BETA,
-        mass_scatter_dex=bayes.OTEGI_SCATTER,
-    )
-    rocky_true = ~bayes.is_volatile(otegi["mass"], otegi["radius"], m_sil, r_sil)
-    keep = ~(rocky_true & (otegi["mass"] > bayes.MASS_MIN))
-    univ = {"rocky_formation": otegi,
-            "escape_only": {k: (v[keep] if isinstance(v, np.ndarray) else v)
-                            for k, v in otegi.items()}}
+    print("--> building universe B pool (rocky_formation; escape_only is universe A)")
+    univ = bayes.universes_ab(bayes.make_pool(
+        "universe_B", pool_size=MC_POOL_SIZE, chunk_size=MC_CHUNK_SIZE, cache_dir=OUT_DIR))
 
     plt.rcParams.update({"font.size": 24, "axes.titlesize": 28, "axes.labelsize": 28,
                          "xtick.labelsize": 24, "ytick.labelsize": 24, "legend.fontsize": 21})

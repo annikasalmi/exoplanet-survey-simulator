@@ -16,7 +16,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from science.populations.flat import generate_flat_catalog
+from science.populations.universes import (flat_nonphysical, flat_superearths_subneptunes,
+                                           MR_SCATTER_DEX, is_super_earth)
 from science.telescopes.detection import run_kepler, run_rv_best
 from plotting.scripts.analysis import puffy_cuts_flat as puffy_cuts
 
@@ -30,7 +31,6 @@ FIGURE_STYLE = {
 FLAT_N = 150000
 SEED = 0
 MC_REPEATS = 4000
-MR_SCATTER_DEX = 0.15           # common log-normal mass scatter around each rocky relation (tunable)
 
 # (name, equation, applies-over, {mr_C, mr_beta})   R = C·M^β  (R in R⊕, M in M⊕)
 RELATIONS = [
@@ -41,42 +41,12 @@ RELATIONS = [
 ]
 
 
-OTEGI_VOLATILE = dict(mr_C=0.70, mr_beta=0.63)   # Otegi et al. 2020 volatile-rich branch
-SUB_NEPTUNE_FRAC_SD = 0.20       # fractional radius width around the volatile-rich curve
-SUPER_EARTH_FRAC_SD = 0.20       # ... and around the silicate line
-
-
-def otegi_volatile_radius(mass):
-    return OTEGI_VOLATILE["mr_C"] * mass ** OTEGI_VOLATILE["mr_beta"]
-
-
-def build_arrays(rel_kw, m_sil, r_sil, two_populations=False, rng=None):
-    """Detected flat-universe pool for one mass-radius relation. With two_populations, radii are
-    redrawn: sub-Neptunes around Otegi's volatile-rich relation, rocky super-Earths (M > 2) around the
-    silicate line (SUB_NEPTUNE_FRAC_SD / SUPER_EARTH_FRAC_SD); planets leaving 0.5-2.2 R_earth drop.
-    """
-    cat = generate_flat_catalog(FLAT_N, seed=SEED, mass_model="powerlaw",
-                                mass_scatter_dex=MR_SCATTER_DEX, **rel_kw)
-    r = pd.to_numeric(cat["radius_p"], errors="coerce")
-    m = pd.to_numeric(cat["mass_p"], errors="coerce")
-    f = pd.to_numeric(cat["flux_p"], errors="coerce")
-    keep = (r.between(puffy_cuts.BOX["r_lo"], puffy_cuts.BOX["r_hi"]) & m.between(puffy_cuts.BOX["m_lo"], puffy_cuts.BOX["m_hi"])
-            & (f.isna() | f.between(puffy_cuts.BOX["f_lo"], puffy_cuts.BOX["f_hi"])))
-    cat = cat[keep].copy()
-    mass = pd.to_numeric(cat["mass_p"], errors="coerce").to_numpy(float)
-    radius = pd.to_numeric(cat["radius_p"], errors="coerce").to_numpy(float).copy()
-    flux = pd.to_numeric(cat["flux_p"], errors="coerce").to_numpy(float)
+def build_arrays(cat, m_sil, r_sil):
+    """Kepler+RV detected pool from one flat catalog (flat_nonphysical or universe B)."""
+    mass = cat["mass_p"].to_numpy(float)
+    radius = cat["radius_p"].to_numpy(float)
+    flux = cat["flux_p"].to_numpy(float)
     puffy = radius > np.interp(mass, m_sil, r_sil)
-    if two_populations:
-        se = (~puffy) & (mass > puffy_cuts.MASS_THRESHOLD)
-        mu = np.where(se, np.interp(mass, m_sil, r_sil), otegi_volatile_radius(mass))
-        frac_sd = np.where(se, SUPER_EARTH_FRAC_SD, SUB_NEPTUNE_FRAC_SD)
-        radius = mu * (1.0 + frac_sd * rng.standard_normal(mass.size))
-        in_box = (radius >= puffy_cuts.BOX["r_lo"]) & (radius <= puffy_cuts.BOX["r_hi"])
-        cat["radius_p"] = radius
-        cat = cat[in_box].copy()
-        mass, radius, flux = mass[in_box], radius[in_box], flux[in_box]
-        puffy = radius > np.interp(mass, m_sil, r_sil)
     td = run_kepler(cat)["detected"].to_numpy(bool)
     rd = run_rv_best(cat, mag_target=puffy_cuts.RV_MAG_TARGET)["detected"].to_numpy(bool)
     return mass, radius, flux, puffy, td & rd
@@ -91,11 +61,11 @@ def noised_scatter_AB(arrays, cut, rng, n_plot=400):
     idx = np.flatnonzero(keep)
     mo = mass[idx] * np.exp(rng.normal(0, puffy_cuts.MASS_FRAC_ERR, idx.size))
     ro = radius[idx] * np.exp(rng.normal(0, puffy_cuts.RAD_FRAC_ERR, idx.size))
-    tmass, tpuffy = mass[idx], puffy[idx]
+    tmass, trad = mass[idx], radius[idx]
     if cut.get("mass_min"):
         k = mo > cut["mass_min"]
-        mo, ro, tmass, tpuffy = mo[k], ro[k], tmass[k], tpuffy[k]
-    dropped = (~tpuffy) & (tmass > puffy_cuts.MASS_THRESHOLD)          # A drops these (true rocky, true M>2)
+        mo, ro, tmass, trad = mo[k], ro[k], tmass[k], trad[k]
+    dropped = is_super_earth(tmass, trad)          # A drops these (true values)
     if mo.size > n_plot:
         j = rng.choice(mo.size, n_plot, replace=False)
         mo, ro, dropped = mo[j], ro[j], dropped[j]
@@ -124,18 +94,17 @@ def nasa_cut(nasa, cut):
     return m, r, me1, me2, re1, re2
 
 
-def true_sample(arrays, cut, n, rng, above_line_only=False):
+def true_sample(arrays, cut, n, rng, universe_a=False):
     """n detected planets at their TRUE masses and radii, with the cut applied to
-    true values. above_line_only keeps only planets truly above the silicate
-    line (universe A's cut)."""
+    true values. universe_a drops the super-Earths (on/below the silicate line, M > 2)."""
     mass, radius, flux, puffy, det = arrays
     keep = det.copy()
     if cut.get("insol_max"):
         keep &= flux < cut["insol_max"]
     if cut.get("mass_min"):
         keep &= mass > cut["mass_min"]
-    if above_line_only:
-        keep &= puffy
+    if universe_a:
+        keep &= ~is_super_earth(mass, radius)
     idx = np.flatnonzero(keep)
     if idx.size > n:
         idx = rng.choice(idx, n, replace=False)
@@ -175,7 +144,7 @@ def _draw_scatter(ax, arr, cut, nasa, m_sil, r_sil, rng, title,
         for above_only, n, colour, lbl, z in [
                 (True, N_SURVEY_BLUE, "tab:blue", labels[0], 4),
                 (False, N_SURVEY_ORANGE, "tab:orange", labels[1], 3)]:
-            mt, rt = true_sample(arr, cut, n, rng, above_line_only=above_only)
+            mt, rt = true_sample(arr, cut, n, rng, universe_a=above_only)
             ax.errorbar(mt, rt,
                         xerr=np.array([mt * (1 - np.exp(-puffy_cuts.MASS_FRAC_ERR)),
                                        mt * (np.exp(puffy_cuts.MASS_FRAC_ERR) - 1)]),
@@ -210,8 +179,8 @@ N_SURVEY_ORANGE = 100
 
 def mc_universe_blue_cut(arrays, drop, cut, m_sil, r_sil, rng):
     """Volatile-fraction Monte Carlo for the 1x2's two universes from one pool: each of MC_REPEATS
-    surveys draws N_SURVEY_BLUE (blue: truly above the silicate line) or N_SURVEY_ORANGE (orange: whole
-    pool) planets that pass the cut after measurement noise.
+    surveys draws N_SURVEY_BLUE (blue: universe A) or N_SURVEY_ORANGE (orange: universe B)
+    planets that pass the cut after measurement noise.
     """
     mass, radius, flux, puffy, det = arrays
     n = N_SURVEY_BLUE if drop else N_SURVEY_ORANGE
@@ -219,7 +188,7 @@ def mc_universe_blue_cut(arrays, drop, cut, m_sil, r_sil, rng):
     if cut.get("insol_max"):
         pool &= flux < cut["insol_max"]
     if drop:
-        pool &= puffy
+        pool &= ~is_super_earth(mass, radius)
     idx = np.flatnonzero(pool)
     mass_min = cut.get("mass_min") or 0.0
     out = np.full(MC_REPEATS, np.nan)
@@ -371,14 +340,12 @@ def _draw_density_1x2(ax, arr, cut, nasa, m_sil, r_sil, rng, tag=""):
 
 def make_otegi_1x2(nasa, m_sil, r_sil, rng):
     """Otegi mass-radius draw (left) beside its volatile-fraction histograms (right), cold cut.
-    Orange = whole pool; blue = pool minus planets truly on/below the silicate line. Left shows true
+    Orange = universe B; blue = universe A (B minus its super-Earths). Left shows true
     values with simulated error bars; histograms use noisy values, so some blue can fall below the line.
     """
-    print("\n--> Otegi 1x2 (cold super-Earth cut; two-population radii):")
+    print("\n--> Otegi 1x2 (cold super-Earth cut; universes A and B):")
     cut_label, cut = OTEGI_2X2_CUTS[1]
-    otegi_kw = next(kw for name, eq, applies, kw in RELATIONS if "Otegi" in name)
-    arr = build_arrays(otegi_kw, m_sil, r_sil, two_populations=True,
-                       rng=np.random.default_rng(SEED + 1))
+    arr = build_arrays(flat_superearths_subneptunes(FLAT_N, seed=SEED), m_sil, r_sil)
     fig, axes = plt.subplots(1, 2, figsize=(17.0, 7.5))
     ax_hist, ax_mr = axes      # histograms on the left, the illustration on the right
     # The mass-radius draw runs first so the histogram draws use the same random
@@ -449,7 +416,8 @@ def _main():
 
     print(f"--> building {len(RELATIONS)} rocky-relation pools + detectors "
           f"(mass scatter = {MR_SCATTER_DEX} dex)...")
-    pools = [(name, eq, applies, build_arrays(kw, m_sil, r_sil)) for name, eq, applies, kw in RELATIONS]
+    pools = [(name, eq, applies, build_arrays(flat_nonphysical(FLAT_N, seed=SEED, **kw), m_sil, r_sil))
+             for name, eq, applies, kw in RELATIONS]
 
     for cut_label, cut, fname in CUTS:
         make_figure(cut_label, cut, fname, pools, nasa, m_sil, r_sil, rng)

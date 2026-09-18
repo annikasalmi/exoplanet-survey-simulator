@@ -1,6 +1,5 @@
-"""Fully flat synthetic planet catalog for detector tests (not P-Pop: no occurrence rates or M-R prior).
-Radius, log mass, log period, eccentricity, Teff and distance are drawn flat and independent; star
-R/M come from Teff, insolation from the orbit (kept within 1e-2..1e4 I_earth). See generate_flat_catalog.
+"""Flat planet catalog (no occurrence rates): radius, log mass, log period, eccentricity, Teff and
+distance drawn flat; star R/M from Teff. Analyses use it through universes.py.
 """
 
 from __future__ import annotations
@@ -14,7 +13,7 @@ ROOT = Path(REPO_ROOT)
 import numpy as np
 import pandas as pd
 
-# Default parameter box (matches P-Pop bounds; small-planet focus per request).
+# Default parameter box (P-Pop bounds, small planets).
 DEFAULTS = dict(
     radius_lims=(0.5, 2.2),       # R_earth
     mass_lims=(0.1, 12.0),        # M_earth
@@ -96,9 +95,7 @@ def _mass_from_radius(radius, mass_model, rng, mass_lims, scatter_dex, mr_C=1.0,
         mass = MassModel(rng).RadiusToMass(np.asarray(radius, float))
     else:
         raise ValueError(f"unknown mass_model {mass_model!r}")
-    # Only the lower bound is clipped; masses above the upper bound are returned
-    # as-is so generate_flat_catalog can discard those planets (clipping them
-    # piled every heavier planet up at exactly mass_lims[1]).
+    # Clip only the floor; generate_flat_catalog drops masses above the box.
     return np.maximum(mass, mass_lims[0])
 
 
@@ -188,16 +185,11 @@ def generate_flat_catalog(
     df["stype"] = _stype_from_teff(teff)
     df["nstar"] = np.arange(len(df))   # one synthetic star per planet (independent draws)
     df["id"] = np.arange(len(df))
-    # Optionally replace the independent (log-uniform) mass by a mass-radius relation.
-    # Insolation/orbit/star do not depend on mass_p, so radius/flux/star are IDENTICAL across
-    # mass models (a controlled comparison), and mass_model="independent" is byte-for-byte the
-    # original catalogue (shared cache stays valid).
+    # Swap the log-uniform mass for an M-R relation; nothing else depends on mass.
     if mass_model != "independent":
         df["mass_p"] = _mass_from_radius(df["radius_p"].to_numpy(), mass_model, rng,
                                          mass_lims, mass_scatter_dex, mr_C, mr_beta)
-        # Planets whose relation-derived mass exceeds the box are discarded, so the
-        # catalogue can hold fewer than n_planets rows. No random draws follow, so
-        # every surviving planet is identical to the unfiltered catalogue.
+        # Drop masses above the box, so fewer than n_planets rows can come back.
         df = df[df["mass_p"] <= mass_lims[1]].reset_index(drop=True)
     return df
 

@@ -1,4 +1,4 @@
-"""Compare the three planet generators (old P-Pop SAG13, new P-Pop Bergsten2022, flat universe) on
+"""Compare the three planet generators (old P-Pop SAG13, new P-Pop Bergsten2022, flat_nonphysical) on
 generation time and per-parameter distributions (three_generators_comparison.png).
 Run: python plotting/scripts/calibration/generator_comparison.py [--rebuild to re-time P-Pop]
 """
@@ -30,7 +30,8 @@ from PPop.StabilityModels import He2019
 from PPop.OrbitModels import Random
 from PPop.AlbedoModels import Uniform
 from PPop.ExozodiModels import Ertel2020
-from science.populations.flat import DEFAULTS, generate_flat_catalog
+from science.populations.flat import DEFAULTS
+from science.populations.universes import flat_nonphysical
 
 N_STARS = 1200
 SUBSET_SEED = 12345
@@ -43,7 +44,7 @@ CACHE = os.path.join(OUT_DIR, "three_generators_data.npz")
 COL = {"old": "#d1495b", "new": "#1f77b4", "flat": "#6c757d"}
 LAB = {"old": "old P-Pop  (SAG13 / Kopparapu 2018, Annika)",
        "new": "new P-Pop  (Bergsten 2022, ours)",
-       "flat": "uniform-parameter universe  (uniform box)"}
+       "flat": "flat_nonphysical  (uniform box, Otegi mass)"}
 _SUN_T = 5772.0
 
 
@@ -77,9 +78,24 @@ def flat_raw_sampled(n=N_FLAT, seed=1):
     """The genuine 'as-sampled' (pre-rejection) input draws of the flat box."""
     rng = np.random.default_rng(seed)
     lo, hi = DEFAULTS["radius_lims"]; R = rng.uniform(lo, hi, n)
-    lo, hi = DEFAULTS["mass_lims"]; M = 10.0 ** rng.uniform(np.log10(lo), np.log10(hi), n)
     lo, hi = DEFAULTS["teff_lims"]; T = rng.uniform(lo, hi, n)
-    return R, M, T
+    return R, T
+
+
+def generate_flat():
+    """flat_nonphysical, timed, plus its as-sampled radius and Teff. Seconds, so not cached."""
+    t0 = time.perf_counter()
+    df_flat = flat_nonphysical(TARGET, seed=0)
+    t_flat = time.perf_counter() - t0
+    n_flat = len(df_flat)
+    df_flat = df_flat.iloc[:N_FLAT]
+    store = {f"flat_{k}": df_flat[col].to_numpy() for k, col in (
+        ("R", "radius_p"), ("M", "mass_p"), ("P", "p_orb"), ("F", "flux_p"),
+        ("a", "semimajor_p"), ("teff", "teff_s"), ("lsun", "l_sun"))}
+    store["flat_R_raw"], store["flat_T_raw"] = flat_raw_sampled()
+    store["flat_sec"] = t_flat * 1e6 / n_flat
+    store["flat_n"] = n_flat; store["flat_t"] = t_flat
+    return store
 
 
 def generate_all():
@@ -91,27 +107,11 @@ def generate_all():
     new = run_ppop(Bergsten2022, idx)
     old = run_ppop(SAG13, idx)
 
-    t0 = time.perf_counter()
-    df_flat = generate_flat_catalog(n_planets=TARGET, seed=0)
-    t_flat = time.perf_counter() - t0
-    df_flat = df_flat.iloc[:N_FLAT]
-    R_raw, M_raw, T_raw = flat_raw_sampled()
-
     store = {}
     for k, dd in (("new", new), ("old", old)):
         for f in ("R", "M", "P", "F", "a", "teff", "lsun"):
             store[f"{k}_{f}"] = dd[f]
         store[f"{k}_sec"] = dd["sec_1e6"]; store[f"{k}_n"] = dd["n"]; store[f"{k}_t"] = dd["t"]
-    store["flat_R"] = df_flat["radius_p"].to_numpy()
-    store["flat_M"] = df_flat["mass_p"].to_numpy()
-    store["flat_P"] = df_flat["p_orb"].to_numpy()
-    store["flat_F"] = df_flat["flux_p"].to_numpy()
-    store["flat_a"] = df_flat["semimajor_p"].to_numpy()
-    store["flat_teff"] = df_flat["teff_s"].to_numpy()
-    store["flat_lsun"] = df_flat["l_sun"].to_numpy()
-    store["flat_R_raw"], store["flat_M_raw"], store["flat_T_raw"] = R_raw, M_raw, T_raw
-    store["flat_sec"] = t_flat                     # t_flat already for 1e6 planets
-    store["flat_n"] = TARGET; store["flat_t"] = t_flat
     os.makedirs(OUT_DIR, exist_ok=True)
     np.savez(CACHE, **store)
     print(f"--> cached: {CACHE}")
@@ -132,6 +132,7 @@ def main(rebuild=False):
     else:
         print(f"--> loading cache: {CACHE}  (use --rebuild to regenerate)")
         d = dict(np.load(CACHE, allow_pickle=True))
+    d.update(generate_flat())      # the cache holds only the slow P-Pop runs
 
     print("\n--- measured generation time ---")
     for k in ("old", "new", "flat"):
@@ -200,12 +201,12 @@ def main(rebuild=False):
     ax.set_xlabel(r"host $T_{\rm eff}$ [K]")
     ax.set_title(r"(C) host $T_{\rm eff}$ — SAMPLED  $U(2300,9700)$", fontweight="bold")
 
-    # ---- (D) mass — SAMPLED --------------------------------------------------
+    # ---- (D) mass — from radius ---------------------------------------------
     ax = axes[1, 0]
-    hist3(ax, "M", 0.08, 14.0, logx=True, flat_key="M_raw")
+    hist3(ax, "M", 0.08, 14.0, logx=True)
     ax.set_xlabel(r"planet mass $M_p\ [M_\oplus]$")
-    ax.set_title(r"(D) mass — SAMPLED  $\log U(0.1,12)$", fontweight="bold")
-    ax.text(0.04, 0.94, "flat = flat in log;\nP-Pop = Chen2017 from radius",
+    ax.set_title(r"(D) mass — from radius", fontweight="bold")
+    ax.text(0.04, 0.94, "flat = Otegi rocky, 0.15 dex;\nP-Pop = Chen2017",
             transform=ax.transAxes, va="top", fontsize=8.5, color="#444")
 
     # ---- (E) luminosity — DERIVED -------------------------------------------

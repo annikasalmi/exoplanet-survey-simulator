@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import numpy as np
 
+from science.physics import is_volatile, radius_on_curve
+
 try:
     from scipy.stats import gaussian_kde
 except Exception:  # pragma: no cover
@@ -20,19 +22,25 @@ RHO_EARTH = 5.513  # g/cc
 
 # ----------------------------- curve-dependent scalars -----------------------------
 def puffy_fraction(M, R, m_sil, r_sil) -> float:
-    R = np.asarray(R, float); M = np.asarray(M, float)
-    return float((R > np.interp(M, m_sil, r_sil)).mean())
+    mass = np.asarray(M, float)
+    radius = np.asarray(R, float)
+    volatile = is_volatile(mass, radius, m_sil, r_sil)
+    return float(volatile.mean())
 
 
 def mean_distance_to_curve(M, R, m_sil, r_sil) -> float:
-    R = np.asarray(R, float); M = np.asarray(M, float)
-    return float((R - np.interp(M, m_sil, r_sil)).mean())
+    mass = np.asarray(M, float)
+    radius = np.asarray(R, float)
+    threshold = radius_on_curve(mass, m_sil, r_sil, outside="edge")
+    return float((radius - threshold).mean())
 
 
 # ----------------------------- curve-free scalars -----------------------------
 def median_density(M, R) -> float:
-    M = np.asarray(M, float); R = np.asarray(R, float)
-    return float(np.median(RHO_EARTH * M / R ** 3))
+    mass = np.asarray(M, float)
+    radius = np.asarray(R, float)
+    density = RHO_EARTH * mass / radius**3
+    return float(np.median(density))
 
 
 def mr_scatter(M, R):
@@ -83,13 +91,17 @@ def density_bimodality(M, R):
 
 # ----------------------------- 2-sample distribution distance -----------------------------
 def _logMR(M, R):
-    P = np.column_stack([np.log10(np.asarray(M, float)), np.log10(np.asarray(R, float))])
-    return P[np.isfinite(P).all(1)]
+    log_mass = np.log10(np.asarray(M, float))
+    log_radius = np.log10(np.asarray(R, float))
+    points = np.column_stack([log_mass, log_radius])
+    return points[np.isfinite(points).all(1)]
 
 
 def _mean_pair_dist(X, Y):
-    d = np.sqrt(((X[:, None, :] - Y[None, :, :]) ** 2).sum(-1))
-    return d.mean()
+    difference = X[:, None, :] - Y[None, :, :]
+    squared_distance = (difference**2).sum(axis=-1)
+    distance = np.sqrt(squared_distance)
+    return distance.mean()
 
 
 def energy_distance_std(A, B):

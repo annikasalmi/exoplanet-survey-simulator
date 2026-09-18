@@ -30,7 +30,7 @@ from PPop.StabilityModels import He2019
 from PPop.OrbitModels import Random
 from PPop.AlbedoModels import Uniform
 from PPop.ExozodiModels import Ertel2020
-from science.populations.universes.flat_baseline import DEFAULTS, flat_baseline
+from science.populations.universes.flat_baseline import DEFAULTS, flat_nonphysical
 
 N_STARS = 1200
 SUBSET_SEED = 12345
@@ -84,7 +84,7 @@ def flat_raw_sampled(n=N_FLAT, seed=1):
 def generate_flat():
     """Flat Otegi baseline, timed, plus its as-sampled radius and Teff. Seconds, so not cached."""
     t0 = time.perf_counter()
-    df_flat = flat_baseline(TARGET, seed=0, radius_lims=DEFAULTS["radius_lims"],
+    df_flat = flat_nonphysical(TARGET, seed=0, radius_lims=DEFAULTS["radius_lims"],
                             mass_lims=DEFAULTS["mass_lims"])
     t_flat = time.perf_counter() - t0
     n_flat = len(df_flat)

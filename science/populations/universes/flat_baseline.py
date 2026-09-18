@@ -93,11 +93,11 @@ def _mass_from_radius(radius, mass_model, rng, mass_lims, scatter_dex, mr_C, mr_
         mass = MassModel(rng).RadiusToMass(np.asarray(radius, float))
     else:
         raise ValueError(f"unknown mass_model {mass_model!r}")
-    # Clip only the floor; flat_baseline drops masses above the box.
+    # Clip only the floor; flat_nonphysical drops masses above the box.
     return np.maximum(mass, mass_lims[0])
 
 
-def flat_baseline(
+def flat_nonphysical(
     n_planets: int = 150_000,
     seed: int = 0,
     *,

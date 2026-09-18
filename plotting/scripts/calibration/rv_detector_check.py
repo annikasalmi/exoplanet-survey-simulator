@@ -24,6 +24,7 @@ except Exception:
     pass
 
 from tools.paths import TESS_DATA_DIR, PAPER_FIGURES_DIR, CALIBRATION_DIR, KEPLER_DATA_DIR
+from science.physics import infer_stellar_type
 from science.telescopes.rv.detection_model import RVData
 
 PPOP_DIR = Path(TESS_DATA_DIR) / "Gaia"
@@ -79,17 +80,6 @@ def load_rvamp_sample() -> pd.DataFrame:
     return df
 
 
-def stype_from_teff(t):
-    if pd.isna(t): return "Unknown"
-    t = float(t)
-    if t >= 7500: return "A"
-    if t >= 6000: return "F"
-    if t >= 5200: return "G"
-    if t >= 3700: return "K"
-    if t > 0: return "M"
-    return "Unknown"
-
-
 def model_k_from_published(df: pd.DataFrame) -> pd.Series:
     """K from the planet's published parameters, using M sin i when present
     (else best mass; most of those planets transit, so i ~ 90 deg).
@@ -107,7 +97,7 @@ def plot_k_calibration(df: pd.DataFrame, args) -> dict:
     df = df[(df["pl_rvamp"] > 0) & (df["pl_msinie"].notna() | df["pl_bmasse"].notna())]
     df["k_model"] = model_k_from_published(df)
     df = df[np.isfinite(df["k_model"]) & (df["k_model"] > 0)].copy()
-    df["stype"] = df["st_teff"].apply(stype_from_teff)
+    df["stype"] = infer_stellar_type(df["st_teff"])
     ratio = df["k_model"] / df["pl_rvamp"]
     print(f"  K calibration sample: {len(df):,}  |  median K_model/K_pub = {ratio.median():.3f}  "
           f"(16-84%: {ratio.quantile(0.16):.3f}-{ratio.quantile(0.84):.3f})")
@@ -336,7 +326,7 @@ def plot_sigmak_3in1(df: pd.DataFrame, args) -> dict:
     d = df.copy()
     err = pd.concat([d["pl_rvamperr1"].abs(), d["pl_rvamperr2"].abs()], axis=1).mean(axis=1)
     d["sigma_k_pub"] = pd.to_numeric(err, errors="coerce")
-    d["stype"] = d["st_teff"].apply(stype_from_teff)
+    d["stype"] = infer_stellar_type(d["st_teff"])
     thr = args.snr_threshold
 
     small = d[(pd.to_numeric(d["pl_rade"], errors="coerce") <= 2.2) & (d["pl_rvamp"] > 0)].copy()
@@ -423,116 +413,6 @@ def plot_sigmak_3in1(df: pd.DataFrame, args) -> dict:
     return {"rec_model": rec_model, "rec_pub": rec_pub, "floor_all": floor_all}
 
 
-def _unused_plot_rv_2x2_paper(df: pd.DataFrame, args) -> dict:
-    """Retired: superseded by the K 3-in-1 + plot_sigmak_3in1 (2x2 calibration figure)."""
-    d = df.copy()
-    err = pd.concat([d["pl_rvamperr1"].abs(), d["pl_rvamperr2"].abs()], axis=1).mean(axis=1)
-    d["sigma_k_pub"] = pd.to_numeric(err, errors="coerce")
-    d["stype"] = d["st_teff"].apply(stype_from_teff)
-    thr = args.snr_threshold
-
-    # Recovery on the real small-planet sample (R <= 2.2 Re, published K).
-    small = d[(pd.to_numeric(d["pl_rade"], errors="coerce") <= 2.2) & (d["pl_rvamp"] > 0)].copy()
-    rec_model = float(small["rv_pass"].mean()) if len(small) else float("nan")
-    snr_pub_small = small["pl_rvamp"] / small["sigma_k_pub"]
-    rec_pub = float((snr_pub_small >= thr).mean()) if len(small) else float("nan")
-    print(f"  small-planet recovery (R<=2.2, N={len(small)}): model {rec_model:.1%} at >={thr:g}sigma "
-          f"vs published S/N>={thr:g} {rec_pub:.1%}")
-
-    fig, axes = plt.subplots(2, 2, figsize=(14, 11))
-
-    # A. signal: model K vs published K
-    axA = axes[0, 0]
-    for st in ["F", "G", "K", "M", "A", "Unknown"]:
-        s = d[d["stype"] == st]
-        if len(s):
-            axA.scatter(s["pl_rvamp"], s["k_model"], s=7, alpha=0.45, color=STYPE_COLORS[st],
-                        label=f"{st} (N={len(s)})", linewidths=0)
-    lims = [0.3, d["pl_rvamp"].quantile(0.999) * 2]
-    axA.plot(lims, lims, "k--", lw=1.2, label="1:1")
-    axA.set_xscale("log"); axA.set_yscale("log"); axA.set_xlim(lims); axA.set_ylim(lims)
-    axA.set_xlabel("Published K  [m/s]"); axA.set_ylabel("Model K  [m/s]")
-    axA.set_title(f"A. Signal: model K vs published K  (median ratio "
-                  f"{(d['k_model'] / d['pl_rvamp']).median():.3f})")
-    axA.legend(fontsize=8, loc="upper left"); axA.grid(alpha=0.2, which="both")
-
-    # B. noise: sigma_K floor test
-    axB = axes[0, 1]
-    db = d[(d["sigma_k_pub"] > 0) & np.isfinite(d["sigma_k_model"]) & (d["sigma_k_model"] > 0)].copy()
-    db["cal_set"] = db["pl_rvamp"].le(15.0) & db["pl_msinie"].notna()
-    floor_all = float((db["sigma_k_model"] <= db["sigma_k_pub"]).mean())
-    lims2 = [max(1e-3, db["sigma_k_pub"].quantile(0.002)), db["sigma_k_pub"].quantile(0.998)]
-    grid = np.logspace(np.log10(lims2[0]), np.log10(lims2[1]), 100)
-    axB.fill_between(grid, lims2[0], grid, color="#2060c0", alpha=0.06, zorder=0,
-                     label="model ≤ published (floor holds)")
-    o = db[~db["cal_set"]]
-    axB.scatter(o["sigma_k_pub"], o["sigma_k_model"], s=6, alpha=0.15, color="0.6",
-                linewidths=0, label=f"context (N={len(o)})")
-    for st in ["F", "G", "K", "M"]:
-        s = db[db["cal_set"] & (db["stype"] == st)]
-        if len(s):
-            axB.scatter(s["sigma_k_pub"], s["sigma_k_model"], s=9, alpha=0.55,
-                        color=STYPE_COLORS[st], label=f"{st} cal-set (N={len(s)})", linewidths=0)
-    axB.plot(lims2, lims2, "k--", lw=1.2, label="1:1")
-    axB.set_xscale("log"); axB.set_yscale("log"); axB.set_xlim(lims2); axB.set_ylim(lims2)
-    axB.set_xlabel("Published σ_K  [m/s]  (pl_rvamperr)")
-    axB.set_ylabel(f"Model σ_K  [m/s]  (√(2/{args.n_obs})·σ_RV)")
-    axB.set_title(f"B. Noise: σ_K floor test  (floor-pass {floor_all:.0%})")
-    axB.text(0.03, 0.97, "model = best-case floor\n→ model ≤ published expected",
-             transform=axB.transAxes, va="top", ha="left", fontsize=8,
-             bbox=dict(boxstyle="round", fc="#f7f7f7", ec="0.6"))
-    axB.legend(fontsize=7, loc="lower right"); axB.grid(alpha=0.2, which="both")
-
-    # C. S/N calibration + small-planet recovery
-    axC = axes[1, 0]
-    db["snr_pub"] = db["pl_rvamp"] / db["sigma_k_pub"]
-    db["snr_mod"] = pd.to_numeric(db["snr_model"], errors="coerce")
-    m = np.isfinite(db["snr_pub"]) & np.isfinite(db["snr_mod"]) & (db["snr_pub"] > 0) & (db["snr_mod"] > 0)
-    dd = db[m]; cc = dd[dd["cal_set"]]
-    slims = [max(0.5, dd["snr_pub"].quantile(0.01)), dd["snr_pub"].quantile(0.99) * 1.5]
-    oo = dd[~dd["cal_set"]]
-    axC.scatter(oo["snr_pub"], oo["snr_mod"], s=6, alpha=0.15, color="0.6",
-                linewidths=0, label=f"context (N={len(oo)})")
-    for st in ["F", "G", "K", "M"]:
-        s = cc[cc["stype"] == st]
-        if len(s):
-            axC.scatter(s["snr_pub"], s["snr_mod"], s=9, alpha=0.55, color=STYPE_COLORS[st],
-                        label=f"{st} cal-set (N={len(s)})", linewidths=0)
-    axC.plot(slims, slims, "k--", lw=1.2, label="1:1")
-    axC.axhline(thr, color="red", ls=":", lw=1.0)
-    axC.axvline(thr, color="red", ls=":", lw=1.0, label=f"{thr:g}σ threshold")
-    axC.set_xscale("log"); axC.set_yscale("log"); axC.set_xlim(slims); axC.set_ylim(slims)
-    axC.set_xlabel("Published S/N  (pl_rvamp / pl_rvamperr)")
-    axC.set_ylabel("Model S/N  (K / σ_K)")
-    axC.set_title(f"C. Detection S/N: small-planet recovery "
-                  f"{rec_model:.0%} model vs {rec_pub:.0%} published")
-    axC.legend(fontsize=7, loc="lower right"); axC.grid(alpha=0.2, which="both")
-
-    # D. per-spectral-type jitter constants (Bellotti & Korhonen 2021)
-    axD = axes[1, 1]
-    jit = RVData.INSTRUMENT_PRESETS["HARPS"]["jitter_by_stype"]
-    order = ["F", "G", "K", "M"]
-    vals = [jit[s] for s in order]
-    axD.bar(order, vals, color=[STYPE_COLORS[s] for s in order], alpha=0.85, edgecolor="k")
-    for i, v in enumerate(vals):
-        axD.annotate(f"{v:g} m/s", (i, v), textcoords="offset points", xytext=(0, 4),
-                     ha="center", fontsize=11)
-    axD.set_ylim(0, max(vals) * 1.25)
-    axD.set_ylabel("HARPS activity jitter σ_jit  [m/s]")
-    axD.set_xlabel("Host spectral type")
-    axD.set_title("D. Per-type jitter (one constant per type)\n"
-                  "Bellotti & Korhonen 2021, Table 3; p2p→RMS ÷2.8")
-    axD.grid(alpha=0.25, axis="y")
-
-    fig.suptitle(f"RV detector calibration: signal (K) and noise (σ_K)  "
-                 f"({args.instrument}, N_obs={args.n_obs}, ≥{thr:g}σ)", fontsize=13)
-    fig.tight_layout(rect=[0, 0, 1, 0.97])
-    out = OUT_DIR / "rv_calibration_2x2.png"
-    fig.savefig(out, bbox_inches="tight")
-    fig.savefig(PAPER_FIG_DIR / "rv_calibration_2x2.png", bbox_inches="tight")
-    plt.close(fig)
-    print(f"  Saved paper 2x2: {PAPER_FIG_DIR / 'rv_calibration_2x2.png'}")
-    return {"rec_model": rec_model, "rec_pub": rec_pub, "floor_all": floor_all}
 
 
 def load_ppop(n_catalogs):

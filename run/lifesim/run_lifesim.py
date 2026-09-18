@@ -1,21 +1,28 @@
 import os
+from functools import partial
+import sys
 import numpy as np
 
+# Add the lifesim directory to the Python path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 import lifesim
-from science.populations.universes.ppop import PPop
+from science.populations.ppop import PPop, set_star_catalog
+import pandas as pd
+import numpy as np
 
 from run.multi_run import run_universes
 from tools.paths import PPOP_DATA_DIR, LIFESIM_DATA_DIR
+from plotting.plot import plot_all
 
 RUN_PPOP = False
 # Universes run at once; defaults to every core.
 MAX_WORKERS = os.cpu_count()
 
-def run_single(i, star_catalog='Gaia'):
+def run_lifesim_single(i, star_catalog='Gaia'):
     print(f"Running LIFEsim for run {i} with star catalog {star_catalog}")
     rng = np.random.default_rng(i)
     # ----- Generate new planet population -----
-    PPopObj = PPop(rng=rng, star_catalog=star_catalog)
+    PPopObj = set_star_catalog(PPop(rng=rng), star_catalog)
 
     filename = f'test_runs_lifesim_{i}'
     data_path = os.path.join(PPOP_DATA_DIR, filename)
@@ -79,6 +86,18 @@ def run_lifesim_import_catalog(i, star_catalog='Gaia'):
 
     return bus.data.catalog
 
+main = partial(
+    run_universes,
+    run_lifesim_single,
+    nruns=np.arange(1),
+    star_catalog="Gaia",
+    run_anew=True,
+    parallel=True,
+    max_workers=MAX_WORKERS,
+    load_single=run_lifesim_import_catalog,
+)
+main.__name__ = "main"
+
+
 if __name__ == '__main__':
-    run_universes(run_single, load_single=run_lifesim_import_catalog,
-                  parallel=True, max_workers=MAX_WORKERS)
+    main()

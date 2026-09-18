@@ -15,6 +15,8 @@ import re
 import numpy as np
 import pandas as pd
 
+from science.physics import infer_stellar_type
+
 try:
     from lifesim.core.data import Data
 except Exception:  # lets this file import outside the lifesim environment
@@ -273,7 +275,7 @@ class TESSData:
         self._fill_tmag_proxy()
         if "stype" not in self.catalog.columns:
             teff = self.catalog.get("teff_s", pd.Series(np.nan, index=self.catalog.index))
-            self.catalog["stype"] = teff.apply(self._stellar_type)
+            self.catalog["stype"] = infer_stellar_type(teff)
         if "habitable" not in self.catalog.columns:
             flux = pd.to_numeric(self.catalog.get("flux_p", pd.Series(np.nan, index=self.catalog.index)), errors="coerce")
             self.catalog["habitable"] = (flux >= 0.25) & (flux <= 2.0)
@@ -349,17 +351,6 @@ class TESSData:
         self.catalog["tess_tmag"] = tmag
         self.catalog["tess_tmag_source"] = src
 
-    @staticmethod
-    def _stellar_type(teff) -> str:
-        if pd.isna(teff): return "Unknown"
-        teff = float(teff)
-        if teff >= 7500: return "A"
-        if teff >= 6000: return "F"
-        if teff >= 5200: return "G"
-        if teff >= 3700: return "K"
-        if teff > 0: return "M"
-        return "Unknown"
-
     def _validate(self) -> None:
         required = ["radius_p", "radius_s", "p_orb", "semimajor_p"]
         missing = [c for c in required if c not in self.catalog.columns]
@@ -399,13 +390,18 @@ class TESSData:
                     continue
                 r = tab[0]
                 self.catalog.at[idx, "ticid"] = self._get_table_value(r, ["ID", "TICID", "ticid"])
-                for column, names in (("tess_tmag", ["Tmag", "tmag"]),
-                                      ("radius_s", ["rad", "radius"]),
-                                      ("mass_s", ["mass"]),
-                                      ("teff_s", ["Teff", "teff"])):
-                    value = self._get_table_value(r, names)
-                    if pd.isna(row.get(column)) and not pd.isna(value):
-                        self.catalog.at[idx, column] = value
+                for target, candidates in (
+                    ("tess_tmag", ["Tmag", "tmag"]),
+                    ("radius_s", ["rad", "radius"]),
+                    ("mass_s", ["mass"]),
+                    ("teff_s", ["Teff", "teff"]),
+                ):
+                    current = row.get(target)
+                    replacement = self._get_table_value(r, candidates)
+                    self.catalog.at[idx, target] = (
+                        replacement
+                        if pd.isna(current) and not pd.isna(replacement) else current
+                    )
                 self.catalog.at[idx, "tess_tmag_source"] = "TIC_MAST"
                 self.catalog.at[idx, "tic_query_status"] = "matched"
             except Exception as exc:

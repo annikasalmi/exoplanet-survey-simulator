@@ -26,7 +26,7 @@ except Exception:
     pass
 
 from tools.paths import REPO_ROOT, EXOFOP_TOI_CSV, PAPER_FIGURES_DIR, CALIBRATION_DIR, TESS_DATA_DIR
-from tools.exoplanet_catalog import read_nasa_csv
+from science.catalogs import read_nasa_csv
 ROOT = Path(REPO_ROOT)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -223,10 +223,14 @@ def run_detector(df: pd.DataFrame) -> pd.DataFrame:
     if not CDPP_DIR.exists():
         raise FileNotFoundError(f"SPOC CDPP CSVs not found in {CDPP_DIR}")
 
-    settings = dict(source="auto", min_transits=2, snr_threshold=SNR_THRESHOLD, tmag_limit=16.0,
-                    use_catalog_sectors=True, phase_mode="expected", cdpp_dir=CDPP_DIR,
-                    validate_for_detection=True)
-    raw = TESSData(df, snr_calibration=1.0, **settings).determine_detectable()
+    detector_options = {
+        "source": "auto", "min_transits": 2, "snr_threshold": SNR_THRESHOLD,
+        "tmag_limit": 16.0, "use_catalog_sectors": True, "phase_mode": "expected",
+        "cdpp_dir": CDPP_DIR, "validate_for_detection": True,
+    }
+    raw = TESSData(
+        df, snr_calibration=1.0, **detector_options
+    ).determine_detectable()
     official = pd.to_numeric(raw["official_snr"], errors="coerce")
     in_range = official.between(*CAL_SNR_RANGE)
     cal = float(1.0 / (raw.loc[in_range, "tess_snr"] / official[in_range]).median())
@@ -234,7 +238,7 @@ def run_detector(df: pd.DataFrame) -> pd.DataFrame:
           f"with official SNR {CAL_SNR_RANGE[0]:g}-{CAL_SNR_RANGE[1]:g}); "
           f"TESSData.SNR_OFFICIAL_CALIBRATION is {TESSData.SNR_OFFICIAL_CALIBRATION}")
 
-    td = TESSData(df, snr_calibration=cal, **settings)
+    td = TESSData(df, snr_calibration=cal, **detector_options)
     out = td.determine_detectable()
     out["toy_over_official_snr"] = (
         pd.to_numeric(out["tess_snr"], errors="coerce") /

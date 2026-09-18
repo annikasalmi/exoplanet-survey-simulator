@@ -10,6 +10,8 @@ from typing import Optional, Union
 import numpy as np
 import pandas as pd
 
+from science.physics import infer_stellar_type
+
 try:
     from lifesim.core.data import Data
 except Exception:  # lets this file import outside the lifesim environment
@@ -276,7 +278,7 @@ class KeplerData:
         # Spectral type from stellar temperature if stype is missing.
         if "stype" not in self.catalog.columns:
             if "teff_s" in self.catalog.columns:
-                self.catalog["stype"] = self.catalog["teff_s"].apply(self._stellar_type_from_teff)
+                self.catalog["stype"] = infer_stellar_type(self.catalog["teff_s"])
             else:
                 self.catalog["stype"] = "Unknown"
 
@@ -293,23 +295,6 @@ class KeplerData:
             self.catalog["luminosity_s"] = self.catalog["l_sun"]
         if "teff_s" in self.catalog.columns and "temp_s" not in self.catalog.columns:
             self.catalog["temp_s"] = self.catalog["teff_s"]
-
-    @staticmethod
-    def _stellar_type_from_teff(teff) -> str:
-        if pd.isna(teff):
-            return "Unknown"
-        teff = float(teff)
-        if teff >= 7500:
-            return "A"
-        if teff >= 6000:
-            return "F"
-        if teff >= 5200:
-            return "G"
-        if teff >= 3700:
-            return "K"
-        if teff > 0:
-            return "M"
-        return "Unknown"
 
     def _estimate_missing_semimajor_axis_if_possible(self) -> None:
         """Fill missing semimajor_p from period and stellar mass: a_AU = (M_star * P_yr^2)^(1/3)."""
@@ -360,6 +345,11 @@ class KeplerData:
         if bad:
             raise ValueError(f"Detection columns exist but are entirely NaN: {bad}")
 
+    def _is_nasa_like(self) -> bool:
+        return self.source in {"pscomppars", "ps", "nasa", "koi"} or str(
+            self.catalog.get("dataset_source", pd.Series([""])).iloc[0]
+        ).startswith("NASA")
+
     # ============================================================
     # Transit / depth / brightness calculations
     # ============================================================
@@ -371,21 +361,21 @@ class KeplerData:
 
     # Observed depth for NASA rows that have one, else the (Rp/R*)^2 model depth.
     def calc_transit_depth_ppm(self):
-        model = self.calc_transit_depth_fraction() * 1e6
-        if self.source != "ppop" and self.use_observed_transit_depth_for_nasa:
+        if self._is_nasa_like() and self.use_observed_transit_depth_for_nasa:
             if "observed_transit_depth_ppm" in self.catalog.columns:
                 observed = pd.to_numeric(self.catalog["observed_transit_depth_ppm"], errors="coerce")
+                model = self.calc_transit_depth_fraction() * 1e6
                 depth = observed.fillna(model)
                 self.catalog["transit_depth_source"] = np.where(observed.notna(), "observed", "model_Rp_Rstar")
                 return depth
         self.catalog["transit_depth_source"] = "model_Rp_Rstar"
-        return model
+        return self.calc_transit_depth_fraction() * 1e6
 
     def calc_transiting_from_inclination(self):
         """P-Pop: use geometric inclination. NASA PSCompPars/KOI: optionally use tran_flag,
         since those planets are already observed to transit.
         """
-        if self.source != "ppop" and self.use_observed_transit_flag_for_nasa and "tran_flag" in self.catalog.columns:
+        if self._is_nasa_like() and self.use_observed_transit_flag_for_nasa and "tran_flag" in self.catalog.columns:
             tran_flag = pd.to_numeric(self.catalog["tran_flag"], errors="coerce").fillna(0)
             transiting = tran_flag.astype(int) == 1
             self.catalog["impact_parameter_toy"] = np.nan
@@ -440,7 +430,7 @@ class KeplerData:
             mag = pd.to_numeric(self.catalog["kepmag"], errors="coerce")
             bright = mag <= self.kepler_mag_limit
 
-            if self.source != "ppop" and self.assume_bright_if_kepmag_missing_for_nasa:
+            if self._is_nasa_like() and self.assume_bright_if_kepmag_missing_for_nasa:
                 bright = bright | mag.isna()
                 source = np.where(mag.notna(), "kepmag", "missing_kepmag_assumed_bright_for_nasa")
             else:
@@ -475,7 +465,7 @@ class KeplerData:
 
     def estimate_transit_duration_hours(self):
         # Prefer observed duration if NASA provides it.
-        if self.source != "ppop" and "observed_transit_duration_hr" in self.catalog.columns:
+        if self._is_nasa_like() and "observed_transit_duration_hr" in self.catalog.columns:
             observed = pd.to_numeric(self.catalog["observed_transit_duration_hr"], errors="coerce")
         else:
             observed = pd.Series(np.nan, index=self.catalog.index)

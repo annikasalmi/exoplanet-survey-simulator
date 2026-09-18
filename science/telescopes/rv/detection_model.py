@@ -10,6 +10,8 @@ from typing import Optional, Union
 import numpy as np
 import pandas as pd
 
+from science.physics import infer_stellar_type
+
 try:
     from lifesim.core.data import Data
 except Exception:  # lets this file import outside the lifesim environment
@@ -188,7 +190,7 @@ class RVData:
     def _add_basic_columns(self) -> None:
         if "stype" not in self.catalog.columns:
             teff = self.catalog.get("teff_s", pd.Series(np.nan, index=self.catalog.index))
-            self.catalog["stype"] = teff.apply(self._stellar_type)
+            self.catalog["stype"] = infer_stellar_type(teff)
         else:
             # normalize to single uppercase letter
             self.catalog["stype"] = (
@@ -201,18 +203,6 @@ class RVData:
         if "habitable" not in self.catalog.columns and "flux_p" in self.catalog.columns:
             flux = pd.to_numeric(self.catalog["flux_p"], errors="coerce")
             self.catalog["habitable"] = (flux >= 0.25) & (flux <= 2.0)
-
-    @staticmethod
-    def _stellar_type(teff) -> str:
-        if pd.isna(teff):
-            return "Unknown"
-        teff = float(teff)
-        if teff >= 7500: return "A"
-        if teff >= 6000: return "F"
-        if teff >= 5200: return "G"
-        if teff >= 3700: return "K"
-        if teff > 0: return "M"
-        return "Unknown"
 
     def _validate(self) -> None:
         required = ["mass_p", "p_orb"]

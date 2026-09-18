@@ -22,7 +22,7 @@ except Exception:
     pass
 
 from tools.paths import REPO_ROOT, KOI_CUMULATIVE_CSV, PAPER_FIGURES_DIR, CALIBRATION_DIR
-from tools.exoplanet_catalog import read_nasa_csv
+from science.catalogs import read_nasa_csv
 ROOT = Path(REPO_ROOT)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))

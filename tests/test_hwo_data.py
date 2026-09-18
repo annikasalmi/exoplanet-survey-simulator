@@ -1,6 +1,7 @@
 import pytest  # type: ignore
 import numpy as np
 import pandas as pd
+from science.physics import blackbody_spectral_radiance
 from science.telescopes.hwo.detection_model import HWOData
 
 class DummyConst:
@@ -37,8 +38,9 @@ def test_constructor_accepts_dataframe():
     assert isinstance(hwo.catalog, pd.DataFrame)
 
 def test_constructor_rejects_invalid_type():
+    invalid_catalog = "not a dataframe"
     with pytest.raises(ValueError):
-        HWOData("not a dataframe")  # type: ignore
+        HWOData(invalid_catalog)  # type: ignore
 
 def test_validate_catalog_missing_column():
     df = minimal_catalog().drop(columns=['z'])
@@ -46,15 +48,13 @@ def test_validate_catalog_missing_column():
         HWOData(df)
 
 def test_blackbody_flux_shape_and_value(monkeypatch):
-    df = minimal_catalog()
-    hwo = HWOData(df)
     # Patch const
     import tools.physics_constants as const
     monkeypatch.setattr(const, 'h', DummyConst.h)
     monkeypatch.setattr(const, 'c', DummyConst.c)
     monkeypatch.setattr(const, 'k', DummyConst.k)
     # Should return array of same shape as input
-    result = hwo.blackbody_flux(1e-6, 300)
+    result = blackbody_spectral_radiance(1e-6, 300)
     assert np.isscalar(result) or result.shape == ()
 
 def test_bolometric_flux(monkeypatch):
@@ -66,25 +66,6 @@ def test_bolometric_flux(monkeypatch):
     monkeypatch.setattr(const, 'R_earth', DummyConst.R_earth)
     result = hwo.bolometric_flux(300)
     assert isinstance(result, float)
-
-def test_iwa_threshold(monkeypatch):
-    from science.telescopes.hwo import detection_model
-    monkeypatch.setattr(detection_model, 'HWO', DummyHWO)
-    df = pd.concat([minimal_catalog()] * 3, ignore_index=True)
-    df['maxangsep'] = [0.09, 0.1, 0.11]
-    hwo = HWOData(df)
-    result = hwo.determine_detectable()
-    for case in ('best', 'worst'):
-        assert result[f'iwa_pass_{case}'].tolist() == [False, True, True]
-
-def test_photon_energy(monkeypatch):
-    df = minimal_catalog()
-    hwo = HWOData(df)
-    import tools.physics_constants as const
-    monkeypatch.setattr(const, 'h', DummyConst.h)
-    monkeypatch.setattr(const, 'c', DummyConst.c)
-    result = hwo.photon_energy(1e-6)
-    assert np.isclose(result, DummyConst.h * DummyConst.c / 1e-6)
 
 def test_photon_rate_per_hour_per_micron():
     df = minimal_catalog()

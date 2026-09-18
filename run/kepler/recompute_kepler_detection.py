@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 
 from tools.paths import KEPLER_DATA_DIR
+from science.telescopes.detection import as_boolean
 from science.telescopes.kepler.detection_model import KeplerData
 
 KEPLER_DIR = Path(KEPLER_DATA_DIR) / "Gaia"
@@ -25,8 +26,8 @@ N_UNIVERSES = 10
 def _detected_pct_by_type(df: pd.DataFrame) -> dict:
     """Detected fraction among transiting planets, per spectral type."""
     st = df["stype"].astype(str).str[0]
-    trans = df["transiting_geometric"].astype(str).str.lower().isin(["true", "1", "1.0"])
-    det = df["detected"].astype(str).str.lower().isin(["true", "1", "1.0"])
+    trans = as_boolean(df["transiting_geometric"])
+    det = as_boolean(df["detected"])
     out = {}
     for t in ["F", "G", "K", "M"]:
         m = (st == t) & trans

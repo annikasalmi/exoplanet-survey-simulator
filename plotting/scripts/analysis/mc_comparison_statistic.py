@@ -1,19 +1,29 @@
 """Paper MC figure (mc_comparison_statistic_<N_DRAWS>.png): distribution of x_k = (f_k - f_obs)^2 /
 sigma_obs^2 for I<10, I<50, I>50 (M>2), each draw a NASA-sized (7/27/75) mock survey with the
-sample's 25%/8% errors, using bayesian_cold_rocky_desert.py's machinery.
+sample's 25%/8% errors, using the shared science.comparison machinery.
 Run: [N_DRAWS=500] python plotting/scripts/analysis/mc_comparison_statistic.py
 """
 
 import os
 import time
 
-from plotting.scripts.analysis import bayesian_cold_rocky_desert as bayes
-from science.populations.universes.flat_curves import load_silicate
-
 import numpy as np
 import matplotlib.pyplot as plt
 
-from tools.paths import ANALYSIS_DIR, PAPER_FIGURES_DIR
+from science.physics import (
+    SUPER_EARTH_MIN_MASS,
+    load_mass_radius_curve,
+)
+from science.catalogs import COMPARISON_PARAMETER_BOX, load_measured_planets
+from science.comparison import (
+    INSOLATION_BINS,
+    mock_survey_volatile_fractions,
+    observed_volatile_count,
+    observed_volatile_fraction_draws,
+)
+from science.telescopes.detection import make_detected_pool, split_universes
+from science.statistics import NASA_MEASUREMENT_ERROR
+from tools.paths import ANALYSIS_DIR, PAPER_FIGURES_DIR, PSCOMPPARS_CSV
 
 OUT_DIR = os.path.join(ANALYSIS_DIR, "mc_comparison_statistic")
 
@@ -25,64 +35,48 @@ LABELS = {"rocky_formation": "Sub-Neptune + Super-Earth",
           "escape_only": "Sub-Neptune"}
 
 # The sample's precision cuts (M +-25%, R +-8%) as the noise model, on NASA and simulated planets alike.
-MASS_CUT_ERR, RAD_CUT_ERR = 0.25, 0.08
-
-
-def frac_draws(u, lo, hi, rng, m_sil, r_sil, n_obs, n_rep=N_DRAWS):
-    """Per-draw volatile fractions f_k^(t) of a mock survey the size of NASA's: noise the bin's
-    detected planets with the NASA sample's 25%/8% errors, apply M>2 to the noisy masses, then
-    keep a random n_obs of the survivors, so the spread is what an n_obs-planet sample would see."""
-    sel = u["det"] & (u["flux"] >= lo) & (u["flux"] < hi)
-    m0, r0 = u["mass"][sel], u["radius"][sel]
-    out = []
-    for _ in range(n_rep):
-        mo = m0 * np.exp(rng.normal(0.0, MASS_CUT_ERR, m0.size))
-        ro = r0 * np.exp(rng.normal(0.0, RAD_CUT_ERR, r0.size))
-        k = np.flatnonzero(mo > bayes.MASS_MIN)
-        if k.size < n_obs:
-            continue
-        pick = rng.choice(k, n_obs, replace=False)
-        out.append(float(bayes.is_volatile(mo[pick], ro[pick], m_sil, r_sil).mean()))
-    return np.array(out)
-
-
-def nasa_frac_draws(nasa, lo, hi, rng, m_sil, r_sil, n_rep=N_DRAWS):
-    """Per-draw observed volatile fractions f_obs^(t) from flat 25%/8% (lognormal) noise on
-    the bin's own N planets; M>2 cut reapplied per draw so boundary planets flip in/out."""
-    sel = (nasa["ins"] >= lo) & (nasa["ins"] < hi)
-    m, r = nasa["m"][sel], nasa["r"][sel]
-    fr = np.empty(n_rep)
-    for t in range(n_rep):
-        mb = m * np.exp(rng.normal(0.0, MASS_CUT_ERR, m.size))
-        rb = r * np.exp(rng.normal(0.0, RAD_CUT_ERR, r.size))
-        k = mb > bayes.MASS_MIN
-        fr[t] = bayes.is_volatile(mb[k], rb[k], m_sil, r_sil).mean() if k.any() else np.nan
-    return fr[np.isfinite(fr)]
+COMPARISON_ERROR = NASA_MEASUREMENT_ERROR
 
 
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     t0 = time.time()
-    m_sil, r_sil = load_silicate()
-    nasa = bayes.load_nasa(precision=True)
+    m_sil, r_sil = load_mass_radius_curve()
+    nasa = load_measured_planets(
+        PSCOMPPARS_CSV,
+        mass_bounds=(COMPARISON_PARAMETER_BOX["m_lo"], COMPARISON_PARAMETER_BOX["m_hi"]),
+        radius_bounds=(COMPARISON_PARAMETER_BOX["r_lo"], COMPARISON_PARAMETER_BOX["r_hi"]),
+        insolation_bounds=(COMPARISON_PARAMETER_BOX["f_lo"], COMPARISON_PARAMETER_BOX["f_hi"]),
+        max_relative_error=NASA_MEASUREMENT_ERROR,
+        missing_relative_error=NASA_MEASUREMENT_ERROR,
+    )
 
     print("--> building universe B pool (rocky_formation; escape_only is universe A)")
-    univ = bayes.universes_ab(bayes.make_pool(
-        "universe_B", pool_size=MC_POOL_SIZE, chunk_size=MC_CHUNK_SIZE, cache_dir=OUT_DIR))
+    univ = split_universes(make_detected_pool(
+        "universe_B", pool_size=MC_POOL_SIZE, chunk_size=MC_CHUNK_SIZE,
+        cache_dir=OUT_DIR, box=COMPARISON_PARAMETER_BOX))
 
     plt.rcParams.update({"font.size": 24, "axes.titlesize": 28, "axes.labelsize": 28,
                          "xtick.labelsize": 24, "ytick.labelsize": 24, "legend.fontsize": 21})
     rng = np.random.default_rng(0)
     fig, axes = plt.subplots(1, 3, figsize=(24, 7.5), layout="constrained")
-    for ax, (blabel, lo, hi) in zip(axes, bayes.INSOL_BINS):
-        k_obs, n_obs = bayes.nasa_bin(nasa, lo, hi, bayes.MASS_MIN, m_sil, r_sil)
+    for ax, (blabel, lo, hi) in zip(axes, INSOLATION_BINS):
+        k_obs, n_obs = observed_volatile_count(
+            nasa, lo, hi, m_sil, r_sil, mass_min=SUPER_EARTH_MIN_MASS)
         f_obs = k_obs / n_obs
-        fobs_t = nasa_frac_draws(nasa, lo, hi, rng, m_sil, r_sil)  # sets sigma_obs only
+        fobs_t = observed_volatile_fraction_draws(
+            nasa, lo, hi, m_sil, r_sil, rng, repeats=N_DRAWS,
+            mass_min=SUPER_EARTH_MIN_MASS, error=COMPARISON_ERROR,
+        )
         sig_obs = float(fobs_t.std())
         print(f"[{blabel}] NASA v/n = {k_obs}/{n_obs} = {f_obs:.3f} +- {sig_obs:.3f}")
         stats, points = {}, {}
         for key in ("rocky_formation", "escape_only"):
-            fk = frac_draws(univ[key], lo, hi, rng, m_sil, r_sil, n_obs)
+            fk = mock_survey_volatile_fractions(
+                univ[key], lo, hi, m_sil, r_sil, rng, n_obs,
+                repeats=N_DRAWS, mass_min=SUPER_EARTH_MIN_MASS,
+                error=COMPARISON_ERROR,
+            )
             stats[key] = ((fk - f_obs) / sig_obs) ** 2   # vs the raw observed number
             points[key] = ((fk.mean() - f_obs) / sig_obs) ** 2
         # an n_obs-planet survey can only give sqrt(x_k) = m * step for integer m. Put edges

@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 
 import tools.physics_constants as const
+from science.physics import blackbody_spectral_radiance
 from tools.physics_constants import HWOConstants as HWO
 from lifesim.core.data import Data
 from typing import Union
@@ -49,28 +50,13 @@ class HWOData():
         if missing_columns:
             raise ValueError(f"Missing required columns in catalog: {missing_columns}")
 
-    def blackbody_flux(self, wavelength_m, temperature_K):
-        """
-        Calculate the blackbody spectral radiance at a given wavelength and temperature.
-        
-        Parameters:
-            wavelength_m: Wavelength in meters (float or array)
-            temperature_K: Temperature in Kelvin (float)
-            
-        Returns:
-            Spectral radiance in W·sr⁻¹·m⁻³
-        """
-        wavelength_m = np.asarray(wavelength_m)
-        temperature_K = np.asarray(temperature_K)
-        
-        exponent = (const.h * const.c) / (wavelength_m * const.k * temperature_K)
-        numerator = 2 * const.h * const.c**2
-        denominator = (wavelength_m**5) * (np.exp(exponent) - 1)
-        return numerator / denominator
-
     def calc_planet_flux(self, case: str):
-        flux_planet_a = self.blackbody_flux(HWO(case).min_wavelength_hwo, self.catalog.temp_p.values)
-        flux_planet_b = self.blackbody_flux(HWO(case).max_wavelength_hwo, self.catalog.temp_p.values)
+        flux_planet_a = blackbody_spectral_radiance(
+            HWO(case).min_wavelength_hwo, self.catalog.temp_p.values
+        )
+        flux_planet_b = blackbody_spectral_radiance(
+            HWO(case).max_wavelength_hwo, self.catalog.temp_p.values
+        )
 
         if case == 'best':
             # Best case: use minimum flux (easier to detect)
@@ -101,11 +87,19 @@ class HWOData():
 
     def calc_flux_ratio(self, case: str):
         hwo = HWO(case)
-        flux_planet_a = self.blackbody_flux(hwo.min_wavelength_hwo, self.catalog.temp_p.values)
-        flux_planet_b = self.blackbody_flux(hwo.max_wavelength_hwo, self.catalog.temp_p.values)
+        flux_planet_a = blackbody_spectral_radiance(
+            hwo.min_wavelength_hwo, self.catalog.temp_p.values
+        )
+        flux_planet_b = blackbody_spectral_radiance(
+            hwo.max_wavelength_hwo, self.catalog.temp_p.values
+        )
 
-        flux_star_a = self.blackbody_flux(hwo.min_wavelength_hwo, self.catalog.temp_s.values)
-        flux_star_b = self.blackbody_flux(hwo.max_wavelength_hwo, self.catalog.temp_s.values)
+        flux_star_a = blackbody_spectral_radiance(
+            hwo.min_wavelength_hwo, self.catalog.temp_s.values
+        )
+        flux_star_b = blackbody_spectral_radiance(
+            hwo.max_wavelength_hwo, self.catalog.temp_s.values
+        )
 
         flux_ratio_a = self.catalog.radius_p.values**2 * flux_planet_a / (self.catalog.radius_s.values**2 * flux_star_a)
         flux_ratio_b = self.catalog.radius_p.values**2 * flux_planet_b / (self.catalog.radius_s.values**2 * flux_star_b)
@@ -119,9 +113,6 @@ class HWOData():
 
         return flux_ratio
     
-    def photon_energy(self, wavelength):
-        return const.h * const.c / wavelength  # in joules
-
     def photon_rate_per_hour_per_micron(self, flux_w_m2, wavelength_m):
         """
         Calculate photon rate in photons/hour/μm given:
@@ -156,8 +147,12 @@ class HWOData():
         # Use blackbody flux (spectral) instead of bolometric flux
         
         # Get spectral flux density at the specific wavelengths
-        spectral_flux_a = self.blackbody_flux(HWO(case).min_wavelength_hwo, self.catalog.temp_p.values)
-        spectral_flux_b = self.blackbody_flux(HWO(case).max_wavelength_hwo, self.catalog.temp_p.values)
+        spectral_flux_a = blackbody_spectral_radiance(
+            HWO(case).min_wavelength_hwo, self.catalog.temp_p.values
+        )
+        spectral_flux_b = blackbody_spectral_radiance(
+            HWO(case).max_wavelength_hwo, self.catalog.temp_p.values
+        )
         
         # Convert to flux at Earth (accounting for distance and planet size)
         # spectral_flux is in W·sr⁻¹·m⁻³, we need W/m²
@@ -189,7 +184,7 @@ class HWOData():
         cases = ['best', 'worst']
 
         for c in cases:
-            iwa_condition = self.catalog['maxangsep'] >= HWO(c).iwa
+            iwa_condition = self.catalog.maxangsep >= HWO(c).iwa
             flux_condition = self.calc_flux_ratio(c) >= HWO(c).min_planet_flux_star_ratio
             min_photon_rate_condition = self.calc_photons(c) <= HWO(c).min_photons
             z_condition = self.catalog['z'] <= HWO(c).max_z
@@ -207,5 +202,4 @@ class HWOData():
             condition = iwa_condition & flux_condition & min_photon_rate_condition & z_condition
             self.catalog['detected_' + c] = condition
         return self.catalog
-
 

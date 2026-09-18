@@ -1,7 +1,9 @@
 """Sub-Neptune fraction of flat and P-Pop universes (A/B each) vs NASA under four cuts: all, M > 2,
 I < 50, both. Detection is transit+RV with NASA-like measurement error. Also loaded by
-flat_rocky_mr_vs_nasa.py. Run: python plotting/scripts/analysis/puffy_cuts_flat.py
-Needs Kepler Gaia-60pc universe 0 from the Kepler/TESS lines in `sim.py` (~3-4 h for all 20; see README). Not a paper figure.
+flat_rocky_mr_vs_nasa.py.
+Run: python plotting/scripts/analysis/puffy_cuts_flat.py
+Needs Kepler Gaia-60pc universe 0 from the Kepler/TESS lines in `sim.py`
+(~3-4 h for all 20; see README). Not a paper figure.
 """
 
 from __future__ import annotations
@@ -14,15 +16,20 @@ from tools.paths import REPO_ROOT, PSCOMPPARS_CSV, KEPLER_DATA_DIR, ANALYSIS_DIR
 ROOT = Path(REPO_ROOT)
 
 import numpy as np
-import pandas as pd
-from scipy.stats import norm
-
-from tools.exoplanet_catalog import read_nasa_csv
 import matplotlib.pyplot as plt
 
-from science.populations.universes.flat_curves import flat_curves, is_super_earth, load_silicate
-from science.telescopes.kepler.detection_model import KeplerData
-from science.telescopes.detection import run_rv_best
+from science.physics import load_mass_radius_curve
+from science.catalogs import load_measured_planets
+from science.comparison import (
+    monte_carlo_observed_fraction,
+    monte_carlo_population_fraction,
+)
+from science.telescopes.detection import build_detected_population
+from science.statistics import gaussian_density
+from science.statistics import (
+    NASA_MEASUREMENT_ERROR,
+    SIMULATED_MEASUREMENT_ERROR,
+)
 
 PPOP_CATALOG = Path(KEPLER_DATA_DIR) / "Gaia" / "kepler_catalog_0.csv"
 NASA_FILE = Path(PSCOMPPARS_CSV)
@@ -30,10 +37,10 @@ OUT_DIR = os.path.join(ANALYSIS_DIR, "puffy_cuts_flat")
 
 N_SAMPLE = 20000
 N_REPEATS = 10000
-MASS_FRAC_ERR = 0.20
-RAD_FRAC_ERR = 0.046
-NASA_MASS_PREC = 0.25           # keep NASA planets with fractional mass error <= this
-NASA_RAD_PREC = 0.08            # keep NASA planets with fractional radius error <= this
+MASS_FRAC_ERR = SIMULATED_MEASUREMENT_ERROR["mass"]
+RAD_FRAC_ERR = SIMULATED_MEASUREMENT_ERROR["radius"]
+NASA_MASS_PREC = NASA_MEASUREMENT_ERROR["mass"]
+NASA_RAD_PREC = NASA_MEASUREMENT_ERROR["radius"]
 FLAT_N_POOL = 300000
 RNG_SEED = 0
 RV_MAG_TARGET = 12.0
@@ -47,124 +54,34 @@ CUTS = [("all (no cut)", {}),
         ("mass>2 & insol<50", dict(mass_min=2.0, insol_max=50.0))]
 
 
-def puffy_frac(m_obs, r_obs, m_sil, r_sil):
-    """Fraction above the pure-silicate curve, classified as volatile-rich."""
-    return float((r_obs > np.interp(m_obs, m_sil, r_sil)).mean())
-
-
-def build_pool(population, m_sil, r_sil):
-    if population == "flat":
-        pool = flat_curves(FLAT_N_POOL, seed=RNG_SEED)
-    else:
-        if not PPOP_CATALOG.exists():
-            raise FileNotFoundError(f"{PPOP_CATALOG} not found; run the Kepler/TESS lines in `sim.py` first (~3-4 h)")
-        cols = ["radius_p", "mass_p", "p_orb", "inc_p", "ecc_p", "semimajor_p", "radius_s",
-                "mass_s", "temp_s", "teff_s", "distance_s", "l_sun", "flux_p", "detected"]
-        pool = pd.read_csv(PPOP_CATALOG, usecols=lambda c: c in cols, low_memory=False)
-    r = pd.to_numeric(pool["radius_p"], errors="coerce")
-    m = pd.to_numeric(pool["mass_p"], errors="coerce")
-    keep = r.between(BOX["r_lo"], BOX["r_hi"]) & m.between(BOX["m_lo"], BOX["m_hi"])
-    f = pd.to_numeric(pool["flux_p"], errors="coerce")
-    keep = keep & (f.isna() | f.between(BOX["f_lo"], BOX["f_hi"]))
-    pool = pool[keep].copy()
-    mass = pd.to_numeric(pool["mass_p"], errors="coerce").to_numpy(float)
-    radius = pd.to_numeric(pool["radius_p"], errors="coerce").to_numpy(float)
-    flux = pd.to_numeric(pool["flux_p"], errors="coerce").to_numpy(float)
-    puffy = radius > np.interp(mass, m_sil, r_sil)
-    if population == "flat":
-        td = KeplerData(pool.copy(), source="ppop").determine_detectable()["detected"].to_numpy(bool)
-    else:
-        td = pd.to_numeric(pool["detected"], errors="coerce").fillna(0).astype(bool).to_numpy()
-    rd = run_rv_best(pool, mag_target=RV_MAG_TARGET)["detected"].to_numpy(bool)
-    return mass, radius, flux, puffy, td & rd
-
-
-def mc_universe(arrays, drop, cut, m_sil, r_sil, rng, n_repeats=N_REPEATS):
-    mass, radius, flux, puffy, det = arrays
-    keep = ~is_super_earth(mass, radius) if drop else np.ones(len(mass), bool)
-    if cut.get("insol_max"):
-        keep = keep & (flux < cut["insol_max"])
-    idx = np.flatnonzero(keep)
-    mass_min = cut.get("mass_min")
-    out = np.full(n_repeats, np.nan); cnt = np.zeros(n_repeats)
-    if idx.size:
-        m_u, r_u, det_u = mass[idx], radius[idx], det[idx]
-        L = idx.size
-        for i in range(n_repeats):
-            s = rng.integers(0, L, N_SAMPLE)
-            sel = s[det_u[s]]
-            if sel.size == 0:
-                continue
-            m_obs = m_u[sel] * np.exp(rng.normal(0, MASS_FRAC_ERR, sel.size))
-            r_obs = r_u[sel] * np.exp(rng.normal(0, RAD_FRAC_ERR, sel.size))
-            if mass_min:
-                k = m_obs > mass_min
-                m_obs, r_obs = m_obs[k], r_obs[k]
-            if m_obs.size < 5:
-                continue
-            out[i] = puffy_frac(m_obs, r_obs, m_sil, r_sil); cnt[i] = m_obs.size
-    return out[np.isfinite(out)], float(np.nanmean(cnt[cnt > 0])) if (cnt > 0).any() else 0.0
-
-
-def load_nasa():
-    df = read_nasa_csv(NASA_FILE)
-    m = pd.to_numeric(df["pl_bmasse"], errors="coerce")
-    r = pd.to_numeric(df["pl_rade"], errors="coerce")
-    ins = pd.to_numeric(df["pl_insol"], errors="coerce")
-    me1 = pd.to_numeric(df["pl_bmasseerr1"], errors="coerce").abs()
-    me2 = pd.to_numeric(df["pl_bmasseerr2"], errors="coerce").abs()
-    re1 = pd.to_numeric(df["pl_radeerr1"], errors="coerce").abs()
-    re2 = pd.to_numeric(df["pl_radeerr2"], errors="coerce").abs()
-    prov = df.get("pl_bmassprov", pd.Series("", index=df.index)).astype(str)
-    meas = prov.str.contains("Mass|Msini", case=False, na=False) & ~prov.str.contains("Calc", case=False, na=False)
-    # measurement-precision test: larger (conservative) error side must be within tolerance
-    prec = (np.maximum(me1, me2) / m <= NASA_MASS_PREC) & (np.maximum(re1, re2) / r <= NASA_RAD_PREC)
-    keep = meas & prec & r.between(BOX["r_lo"], BOX["r_hi"]) & m.between(BOX["m_lo"], BOX["m_hi"])
-    d = dict(m=m[keep].to_numpy(), r=r[keep].to_numpy(), ins=ins[keep].to_numpy(),
-             me1=me1[keep].to_numpy(), me2=me2[keep].to_numpy(), re1=re1[keep].to_numpy(), re2=re2[keep].to_numpy())
-    d["me1"] = np.where(np.isfinite(d["me1"]), d["me1"], MASS_FRAC_ERR * d["m"])
-    d["me2"] = np.where(np.isfinite(d["me2"]), d["me2"], MASS_FRAC_ERR * d["m"])
-    d["re1"] = np.where(np.isfinite(d["re1"]), d["re1"], RAD_FRAC_ERR * d["r"])
-    d["re2"] = np.where(np.isfinite(d["re2"]), d["re2"], RAD_FRAC_ERR * d["r"])
-    return d
-
-
-def mc_nasa(nasa, cut, m_sil, r_sil, rng, n_repeats=N_REPEATS):
-    sub = (nasa["ins"] < cut["insol_max"]) if cut.get("insol_max") else np.ones(len(nasa["m"]), bool)
-    m, r = nasa["m"][sub], nasa["r"][sub]
-    me1, me2, re1, re2 = nasa["me1"][sub], nasa["me2"][sub], nasa["re1"][sub], nasa["re2"][sub]
-    n = len(m); mass_min = cut.get("mass_min")
-    out = np.full(n_repeats, np.nan); cnt = np.zeros(n_repeats)
-    # NO bootstrap resample: the fixed set of n precision-passing planets is kept every universe;
-    # only each planet's OWN asymmetric measurement error is re-perturbed -> narrower bell (the "real" universe).
-    for i in range(n_repeats):
-        zm, zr = rng.normal(size=n), rng.normal(size=n)
-        mb = np.clip(m + np.where(zm >= 0, zm * me1, zm * me2), 1e-3, None)
-        rb = np.clip(r + np.where(zr >= 0, zr * re1, zr * re2), 1e-3, None)
-        if mass_min:
-            k = mb > mass_min; mb, rb = mb[k], rb[k]
-        if mb.size < 5:
-            continue
-        out[i] = puffy_frac(mb, rb, m_sil, r_sil); cnt[i] = mb.size
-    good = np.isfinite(out)
-    # report the mean per-draw count AFTER the observed-mass cut (matches mc_universe's N_eff),
-    # not the insolation-only window count — the bell width is set by this effective N
-    n_eff = int(round(cnt[good].mean())) if good.any() else 0
-    return out[good], n_eff
-
-
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
-    m_sil, r_sil = load_silicate()
+    m_sil, r_sil = load_mass_radius_curve()
     rng = np.random.default_rng(RNG_SEED)
     print("--> building pools + detectors...")
-    pools = {pop: build_pool(pop, m_sil, r_sil) for pop in ["flat", "ppop"]}
-    nasa = load_nasa()
+    pools = {
+        population: build_detected_population(
+            population, ppop_catalog=PPOP_CATALOG,
+            flat_size=FLAT_N_POOL, seed=RNG_SEED, rv_mag_target=RV_MAG_TARGET,
+            box=BOX,
+        )
+        for population in ("flat", "ppop")
+    }
+    nasa = load_measured_planets(
+        NASA_FILE,
+        mass_bounds=(BOX["m_lo"], BOX["m_hi"]),
+        radius_bounds=(BOX["r_lo"], BOX["r_hi"]),
+        insolation_bounds=None,
+        max_relative_error=NASA_MEASUREMENT_ERROR,
+        missing_relative_error=SIMULATED_MEASUREMENT_ERROR,
+    )
 
     # precompute NASA bells per cut (shared by both rows)
     nasa_cut = {}
     for cut_label, cut in CUTS:
-        nasa_cut[cut_label] = mc_nasa(nasa, cut, m_sil, r_sil, rng)
+        nasa_cut[cut_label] = monte_carlo_observed_fraction(
+            nasa, cut, m_sil, r_sil, rng, repeats=N_REPEATS
+        )
 
     # ---- pass 1: compute every panel, collect all values for shared axes ----
     panels = {}
@@ -176,7 +93,11 @@ def main():
             n_mu, n_sd = nv.mean(), nv.std()
             series = []
             for drop, label, colour in models:
-                s, neff = mc_universe(pools[pop], drop, cut, m_sil, r_sil, rng)
+                s, neff = monte_carlo_population_fraction(
+                    pools[pop], cut, m_sil, r_sil, rng,
+                    drop_super_earths=drop, sample_size=N_SAMPLE,
+                    repeats=N_REPEATS, error=SIMULATED_MEASUREMENT_ERROR,
+                )
                 tens = (abs(s.mean() - n_mu) / np.sqrt(s.std() ** 2 + n_sd ** 2)
                         if s.size and (s.std() + n_sd) > 0 else np.nan)
                 series.append((label, colour, s, neff, tens))
@@ -201,9 +122,9 @@ def main():
         for _, _, s, _, _ in P["series"]:
             if s.size:
                 y_max = max(y_max, np.histogram(s, bins=edges, density=True)[0].max(),
-                            (norm.pdf(xs, loc=s.mean(), scale=s.std()) if s.std() > 0 else np.zeros_like(xs)).max())
+                            gaussian_density(xs, s.mean(), s.std()).max())
         y_max = max(y_max, np.histogram(P["nv"], bins=edges, density=True)[0].max(),
-                    (norm.pdf(xs, loc=P["n_mu"], scale=P["n_sd"]) if P["n_sd"] > 0 else np.zeros_like(xs)).max())
+                    gaussian_density(xs, P["n_mu"], P["n_sd"]).max())
     gy_hi = y_max * 1.06
 
     # ---- pass 2: plot every panel on the shared x/y axes ----
@@ -216,10 +137,10 @@ def main():
                 if s.size == 0:
                     continue
                 ax.hist(s, bins=edges, density=True, color=colour, alpha=0.30)
-                ax.plot(xs, (norm.pdf(xs, loc=s.mean(), scale=s.std()) if s.std() > 0 else np.zeros_like(xs)), color=colour, lw=2.0,
+                ax.plot(xs, gaussian_density(xs, s.mean(), s.std()), color=colour, lw=2.0,
                         label=f"{label}: μ={s.mean():.2f} σ={s.std():.3f} ({tens:.1f}σ)")
             ax.hist(P["nv"], bins=edges, density=True, color="tab:green", alpha=0.34)
-            ax.plot(xs, (norm.pdf(xs, loc=P["n_mu"], scale=P["n_sd"]) if P["n_sd"] > 0 else np.zeros_like(xs)), color="tab:green", lw=2.4,
+            ax.plot(xs, gaussian_density(xs, P["n_mu"], P["n_sd"]), color="tab:green", lw=2.4,
                     label=f"NASA: μ={P['n_mu']:.2f} σ={P['n_sd']:.3f} (N={P['n_nasa']})")
             ax.set_xlim(gx_lo, gx_hi); ax.set_ylim(0, gy_hi)
             ax.set_title((f"{cut_label}\n" if ri == 0 else "") + f"{row_label} — sub-Neptune fraction", fontsize=10)

@@ -9,13 +9,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from science.populations.universes.flat_baseline import DEFAULTS, flat_baseline
-from science.populations.universes.flat_curves import flat_curves, is_super_earth
+from science.populations.universes.flat_baseline import DEFAULTS, flat_nonphysical
+from science.populations.universes.flat_curves import flat_radii_curves, is_super_earth
 from tools import paths
 
 
 def test_baseline_radius_prior_and_mass_relation():
-    cat = flat_baseline(20_000, seed=4, mass_scatter_dex=0)
+    cat = flat_nonphysical(20_000, seed=4, mass_scatter_dex=0)
     assert len(cat) == 20_000
     assert cat.radius_p.between(0, 12).all()
     counts, _ = np.histogram(cat.radius_p, bins=np.arange(13))
@@ -26,7 +26,7 @@ def test_baseline_radius_prior_and_mass_relation():
 
 def test_paper_window_preserves_previous_catalog():
     kw = dict(radius_lims=DEFAULTS["radius_lims"], mass_lims=DEFAULTS["mass_lims"])
-    actual = flat_baseline(2000, seed=75, **kw)
+    actual = flat_nonphysical(2000, seed=75, **kw)
     # Seeded values from the paper's original sampler, including its mass cutoff.
     assert len(actual) == 1847
     np.testing.assert_allclose(actual[["radius_p", "mass_p", "p_orb"]].head(3), [
@@ -34,21 +34,24 @@ def test_paper_window_preserves_previous_catalog():
         [1.629225769291016, 5.34401147852668, 93.77770872502197],
         [1.6633639898369954, 5.975752238127815, 479.9998392704545],
     ])
-    pd.testing.assert_frame_equal(actual, flat_baseline(2000, seed=75, **kw))
+    pd.testing.assert_frame_equal(actual, flat_nonphysical(2000, seed=75, **kw))
 
 
 def test_curve_based_a_is_b_without_super_earths():
-    b = flat_curves(2000, seed=0)
-    a = flat_curves(2000, seed=0, variant="A")
+    b = flat_radii_curves(2000, seed=0)
+    a = flat_radii_curves(2000, seed=0, variant="only_subneptunes")
     assert 0 < len(a) < len(b) <= 2000
     assert b.radius_p.between(*DEFAULTS["radius_lims"]).all()
     assert b.mass_p.between(*DEFAULTS["mass_lims"]).all()
     expected = b[~is_super_earth(b.mass_p, b.radius_p)].reset_index(drop=True)
     pd.testing.assert_frame_equal(a, expected)
 
-
-@pytest.mark.parametrize("universe,variant", [("flat_baseline", "B"),
-                                             ("flat_curves", "A"), ("flat_curves", "B")])
+@pytest.mark.parametrize(
+    "universe,variant",
+    [("flat_nonphysical", "superearths_supneptunes"),
+     ("flat_radii_curves", "only_subneptunes"),
+     ("flat_radii_curves", "superearths_supneptunes")],
+)
 def test_flat_quickstart_writes_catalog_and_plots(tmp_path, monkeypatch, universe, variant):
     import plotting.plot_population as plotter
 

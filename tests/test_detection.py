@@ -1,4 +1,4 @@
-from tools.exoplanet_catalog import load_and_filter_exoplanets
+from science.catalogs import load_and_filter_exoplanets
 from tools.paths import EXOPLANETS_2026_CSV
 from science.telescopes.hwo.detection_model import HWOData
 import numpy as np

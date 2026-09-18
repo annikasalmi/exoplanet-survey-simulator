@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib import gridspec
 
 from plotting.base_plotter import BasePlotter
+from science.statistics import binned_fraction_2d
 from tools.plotting_constants import PLOT_CONFIGS, PANEL_CONFIGS
 
 plt.rcParams.update({'font.size': 16})
@@ -179,12 +180,11 @@ class PlanetDetectionPlotter(BasePlotter):
             xbins = np.linspace(x_min, x_max, 40)
         
         # Calculate efficiency
-        total_counts, _, _ = np.histogram2d(df[x], df[y], bins=[xbins, ybins])
-        detected_counts, _, _ = np.histogram2d(df[mask_best][x], df[mask_best][y], bins=[xbins, ybins])
-        
-        with np.errstate(divide='ignore', invalid='ignore'):
-            efficiency = np.true_divide(detected_counts, total_counts)
-            efficiency[~np.isfinite(efficiency)] = 0.0
+        efficiency, _ = binned_fraction_2d(
+            df[x], df[y], mask_best, np.ones(len(df), dtype=bool),
+            xbins, ybins,
+        )
+        efficiency = np.nan_to_num(efficiency)
         
         # Create mesh
         mesh = ax.imshow(efficiency.T, origin='lower', aspect='auto',

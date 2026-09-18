@@ -104,7 +104,7 @@ def print_tmag_corrections():
     for TESSData._MBOL_MINUS_T and _G_MINUS_T (sy_tmag there is TIC-8, Stassun et al. 2019).
     """
     from science.telescopes.tess.detection_model import TESSData
-    from tools.exoplanet_catalog import read_nasa_csv
+    from science.catalogs import read_nasa_csv
     from tools.paths import PSCOMPPARS_CSV
 
     cols = ["st_teff", "st_lum", "sy_dist", "sy_tmag", "sy_gaiamag", "st_logg"]

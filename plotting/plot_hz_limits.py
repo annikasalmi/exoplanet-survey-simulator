@@ -13,7 +13,6 @@ from matplotlib.lines import Line2D
 from matplotlib.axes import Axes
 from matplotlib.colors import LinearSegmentedColormap
 from lifesim.util.habitable import single_habitable_zone
-from plotting.exoplanet_data_utils import load_exoplanet_luminosity_distance
 
 plt.rcParams.update({'font.size': 16})
 

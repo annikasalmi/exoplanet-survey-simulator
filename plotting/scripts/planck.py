@@ -5,24 +5,19 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
+from science.physics import blackbody_spectral_radiance
 from tools import physics_constants as const
 from tools.paths import OTHER_FIGURES_DIR
 from lifesim.util.habitable import single_habitable_zone
 
 plt.rcParams.update({'font.size': 16})
 
-def planck(wavelength_m, temperature):
-    """Calculate spectral radiance using Planck's Law."""
-    h, c, k = const.h, const.c, const.k
-    exponent = h * c / (wavelength_m * k * temperature)
-    exp_term = np.where(exponent > 100, np.inf, np.exp(exponent))
-    B_lambda = (2 * h * c**2) / (wavelength_m**5) / (exp_term - 1)
-    return np.where(np.isinf(exp_term), 0, B_lambda)
-
 def lambert_phase(alpha_rad):
     """Lambertian phase function."""
-    alpha_rad = np.clip(alpha_rad, 0, np.pi)
-    return (np.sin(alpha_rad) + (np.pi - alpha_rad) * np.cos(alpha_rad)) / np.pi
+    alpha = np.clip(alpha_rad, 0, np.pi)
+    direct = np.sin(alpha)
+    projected = (np.pi - alpha) * np.cos(alpha)
+    return (direct + projected) / np.pi
 
 def calculate_system_fluxes(T_star, T_planet, R_star, R_planet, D, wavelength_m, Ag, alpha_rad):
     """Calculate fluxes for a star-planet system."""
@@ -30,10 +25,10 @@ def calculate_system_fluxes(T_star, T_planet, R_star, R_planet, D, wavelength_m,
     R_star_m = R_star * const.R_sun
     R_planet_m = R_planet * const.R_earth
     D_m = D * const.au_to_m
-    
+
     # Calculate fluxes
-    flux_star = planck(wavelength_m, T_star) * (R_star_m / D_m)**2
-    flux_planet = planck(wavelength_m, T_planet) * (R_planet_m / D_m)**2
+    flux_star = blackbody_spectral_radiance(wavelength_m, T_star) * (R_star_m / D_m)**2
+    flux_planet = blackbody_spectral_radiance(wavelength_m, T_planet) * (R_planet_m / D_m)**2
     
     # Reflected light
     phase = lambert_phase(alpha_rad)
@@ -192,5 +187,4 @@ def main():
     print(f"Plot saved to {out}")
 
 if __name__ == "__main__":
-    main() 
-    
+    main()

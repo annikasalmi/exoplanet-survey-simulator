@@ -6,27 +6,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 from tools.paths import OTHER_FIGURES_DIR, EXOPLANETS_2026_CSV
-from tools.exoplanet_catalog import read_nasa_csv
+from science.catalogs import read_nasa_csv
+from science.physics import blackbody_spectral_radiance
 import tools.physics_constants as const
-
-def blackbody_flux(wavelength_m, temperature_K):
-    """
-    Calculate the blackbody spectral radiance at a given wavelength and temperature.
-    
-    Parameters:
-        wavelength_m: Wavelength in meters (float or array)
-        temperature_K: Temperature in Kelvin (float)
-        
-    Returns:
-        Spectral radiance in W·sr⁻¹·m⁻³
-    """
-    wavelength_m = np.asarray(wavelength_m)
-    temperature_K = np.asarray(temperature_K)
-    
-    exponent = (const.h * const.c) / (wavelength_m * const.k * temperature_K)
-    numerator = 2 * const.h * const.c**2
-    denominator = (wavelength_m**5) * (np.exp(exponent) - 1)
-    return numerator / denominator
 
 def plot_planetary_vs_stellar_flux():
     """
@@ -57,16 +39,16 @@ def plot_planetary_vs_stellar_flux():
     # Planetary flux: Rp^2 * B(Tp)
     planet_temp = df['pl_eqt'].values
     planet_radius = df['pl_rade'].values * const.R_earth  # Convert to meters
-    planet_blackbody_a = blackbody_flux(min_wavelength, planet_temp)
-    planet_blackbody_b = blackbody_flux(max_wavelength, planet_temp)
+    planet_blackbody_a = blackbody_spectral_radiance(min_wavelength, planet_temp)
+    planet_blackbody_b = blackbody_spectral_radiance(max_wavelength, planet_temp)
     planetary_flux_a = planet_radius**2 * planet_blackbody_a
     planetary_flux_b = planet_radius**2 * planet_blackbody_b
     
     # Stellar flux: Rs^2 * B(Ts)
     stellar_temp = df['st_teff'].values
     stellar_radius = df['st_rad'].values * const.R_sun  # Convert to meters
-    stellar_blackbody_a = blackbody_flux(min_wavelength, stellar_temp)
-    stellar_blackbody_b = blackbody_flux(max_wavelength, stellar_temp)
+    stellar_blackbody_a = blackbody_spectral_radiance(min_wavelength, stellar_temp)
+    stellar_blackbody_b = blackbody_spectral_radiance(max_wavelength, stellar_temp)
     stellar_flux_a = stellar_radius**2 * stellar_blackbody_a
     stellar_flux_b = stellar_radius**2 * stellar_blackbody_b
     
@@ -155,8 +137,8 @@ def plot_flux_ratio_vs_wavelength():
     wavelengths = np.logspace(np.log10(200e-9), np.log10(28.5e-6), 1000)  # 200nm to 28.5μm
     
     # Calculate blackbody fluxes
-    planet_blackbody = blackbody_flux(wavelengths, T_earth)
-    stellar_blackbody = blackbody_flux(wavelengths, T_sun)
+    planet_blackbody = blackbody_spectral_radiance(wavelengths, T_earth)
+    stellar_blackbody = blackbody_spectral_radiance(wavelengths, T_sun)
     
     # Calculate fluxes
     planetary_flux = R_earth**2 * planet_blackbody
@@ -171,8 +153,10 @@ def plot_flux_ratio_vs_wavelength():
     R_planet_mdwarf = 0.2 * const.R_earth  # m (smaller planet around M dwarf)
     
     # Calculate fluxes for M dwarf system
-    planet_blackbody_mdwarf = blackbody_flux(wavelengths, T_earth)  # Same planet temperature
-    stellar_blackbody_mdwarf = blackbody_flux(wavelengths, T_mdwarf)
+    planet_blackbody_mdwarf = blackbody_spectral_radiance(
+        wavelengths, T_earth
+    )  # Same planet temperature
+    stellar_blackbody_mdwarf = blackbody_spectral_radiance(wavelengths, T_mdwarf)
     
     planetary_flux_mdwarf = R_planet_mdwarf**2 * planet_blackbody_mdwarf
     stellar_flux_mdwarf = R_mdwarf**2 * stellar_blackbody_mdwarf
@@ -205,8 +189,8 @@ def plot_flux_ratio_vs_wavelength():
         R_star = row['st_rad'] * const.R_sun
         
         # Calculate blackbody fluxes
-        planet_bb = blackbody_flux(wavelengths, T_planet)
-        stellar_bb = blackbody_flux(wavelengths, T_star)
+        planet_bb = blackbody_spectral_radiance(wavelengths, T_planet)
+        stellar_bb = blackbody_spectral_radiance(wavelengths, T_star)
         
         # Calculate fluxes
         planet_flux = R_planet**2 * planet_bb
@@ -261,4 +245,4 @@ def plot_flux_ratio_vs_wavelength():
 
 if __name__ == "__main__":
     plot_planetary_vs_stellar_flux()
-    # plot_flux_ratio_vs_wavelength() 
+    # plot_flux_ratio_vs_wavelength()

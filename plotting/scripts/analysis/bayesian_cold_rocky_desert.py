@@ -15,48 +15,54 @@ ROOT = Path(REPO_ROOT)
 import numpy as np
 import pandas as pd
 
-from tools.exoplanet_catalog import read_nasa_csv
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
-from scipy.stats import binom
 from scipy.ndimage import gaussian_filter
 
-from science.populations.universes.flat_baseline import flat_baseline
-from science.populations.universes.flat_curves import flat_curves, is_super_earth, load_silicate, SUPER_EARTH_MIN_MASS
-from science.telescopes.kepler.detection_model import KeplerData
-from science.telescopes.tess.detection_model import TESSData
-from science.telescopes.detection import run_rv_best
+from science.physics import (
+    SUPER_EARTH_MIN_MASS,
+    load_mass_radius_curve,
+    radius_on_curve,
+)
+from science.catalogs import COMPARISON_PARAMETER_BOX, load_measured_planets
+from science.comparison import (
+    COLD_DESERT_MAX_INSOLATION,
+    INSOLATION_BINS,
+    detection_fraction_map,
+    observed_fraction_uncertainty,
+    observed_volatile_count,
+    predicted_volatile_fraction,
+)
+from science.telescopes.detection import make_detected_pool, split_universes
+from science.statistics import binomial_model_posterior
+from science.statistics import (
+    NASA_MEASUREMENT_ERROR,
+    SIMULATED_MEASUREMENT_ERROR,
+)
 
 # Transit leg of the joint detector; main("tess") switches it to TESS.
 MISSION = "kepler"
-_TRANSIT = {"kepler": KeplerData, "tess": TESSData}
 _MISSION_LABEL = {"kepler": "Kepler", "tess": "TESS"}
-OUT_DIRS = {"kepler": os.path.join(ANALYSIS_DIR, "bayesian_cold_rocky_desert"),
-            "tess": os.path.join(ANALYSIS_DIR, "bayesian_cold_rocky_desert_tess")}
+_OUT_NAME = {"kepler": "bayesian_cold_rocky_desert",
+             "tess": "bayesian_cold_rocky_desert_tess"}
 
 
 NASA_FILE = Path(PSCOMPPARS_CSV)
 
-BOX = dict(r_lo=0.5, r_hi=2.2, m_lo=0.1, m_hi=12.0, f_lo=1e-2, f_hi=1e4)
+BOX = COMPARISON_PARAMETER_BOX
 FLAT_N_POOL = 10_000_000       # 10x: the cold among-transiting denominator is thin (~2% transit);
                                # this fills every MR cell in the I<10 panel above MIN_CELL.
 CHUNK = 2_000_000              # generate+detect in chunks to bound peak memory (~1.5 GB/chunk)
 RNG_SEED = 0
 RV_MAG_TARGET = 12.0
 MASS_MIN = SUPER_EARTH_MIN_MASS  # cold super-Earth desert cut
-COLD_MAX = 50.0                # cold super-Earth desert boundary [I_earth]
-MASS_FRAC_ERR = 0.20           # log-normal measurement noise (as in puffy_cuts_flat.py)
-RAD_FRAC_ERR = 0.046
-NASA_MASS_PREC = 0.25
-NASA_RAD_PREC = 0.08
+COLD_MAX = COLD_DESERT_MAX_INSOLATION
+MASS_FRAC_ERR = SIMULATED_MEASUREMENT_ERROR["mass"]
+RAD_FRAC_ERR = SIMULATED_MEASUREMENT_ERROR["radius"]
+NASA_MASS_PREC = NASA_MEASUREMENT_ERROR["mass"]
+NASA_RAD_PREC = NASA_MEASUREMENT_ERROR["radius"]
 N_FRAC_REP = 4000               # noise realizations for the predicted volatile fraction
                                 # (as in the main paper's Section-4.2 MC procedure)
-
-# Nested insolation panels, matching paper Figure 1 (rocky_mr_insolation_3panel): the cold super-Earth
-# desert is the I<50 panel, I<10 its extreme, I>50 the hot control.
-INSOL_BINS = [("I < 10", BOX["f_lo"], 10.0),
-              ("I < 50", BOX["f_lo"], 50.0),
-              ("I > 50", 50.0, BOX["f_hi"])]
 
 UNIVERSES = [
     ("rocky_formation", "Primordial-rocky", "tab:blue"),
@@ -72,214 +78,53 @@ R_CENT = 0.5 * (R_EDGES[:-1] + R_EDGES[1:])
 MIN_CELL = 5                   # display gate; at 10M even the sparsest cold cell has >=~10 samples
 
 
-def is_volatile(mass, radius, m_sil, r_sil):
-    """Planets above the pure-silicate radius at their mass are volatile-rich."""
-    return radius > np.interp(mass, m_sil, r_sil)
-
-
-def nasa_frac_sigma(nasa, lo, hi, mass_min, m_sil, r_sil, rng, n_rep=N_FRAC_REP):
-    """Std of NASA's observed volatile fraction v/n from measurement error alone: redraw each planet
-    within its published errors, reapply the mass cut, and take the spread over n_rep redraws."""
-    sel = (nasa["ins"] >= lo) & (nasa["ins"] < hi)
-    m, r = nasa["m"][sel], nasa["r"][sel]
-    me1, me2, re1, re2 = nasa["me1"][sel], nasa["me2"][sel], nasa["re1"][sel], nasa["re2"][sel]
-    n = m.size
-    if n == 0:
-        return np.nan, np.nan
-    fr = []
-    for _ in range(n_rep):
-        zm, zr = rng.normal(size=n), rng.normal(size=n)
-        mb = np.clip(m + np.where(zm >= 0, zm * me1, zm * me2), 1e-3, None)
-        rb = np.clip(r + np.where(zr >= 0, zr * re1, zr * re2), 1e-3, None)
-        if mass_min:
-            k = mb > mass_min
-            mb, rb = mb[k], rb[k]
-        if mb.size < 1:
-            continue
-        fr.append(float(is_volatile(mb, rb, m_sil, r_sil).mean()))
-    if not fr:
-        return np.nan, np.nan
-    return float(np.mean(fr)), float(np.std(fr))
-
-
-def load_nasa(precision: bool):
-    df = read_nasa_csv(NASA_FILE)
-    m = pd.to_numeric(df["pl_bmasse"], errors="coerce")
-    r = pd.to_numeric(df["pl_rade"], errors="coerce")
-    ins = pd.to_numeric(df["pl_insol"], errors="coerce")
-    me1 = pd.to_numeric(df["pl_bmasseerr1"], errors="coerce").abs()
-    me2 = pd.to_numeric(df["pl_bmasseerr2"], errors="coerce").abs()
-    re1 = pd.to_numeric(df["pl_radeerr1"], errors="coerce").abs()
-    re2 = pd.to_numeric(df["pl_radeerr2"], errors="coerce").abs()
-    me = np.maximum(me1, me2)
-    re = np.maximum(re1, re2)
-    prov = df.get("pl_bmassprov", pd.Series("", index=df.index)).astype(str)
-    meas = prov.str.contains("Mass|Msini", case=False, na=False) & \
-        ~prov.str.contains("Calc", case=False, na=False)
-    keep = (meas & r.between(BOX["r_lo"], BOX["r_hi"]) & m.between(BOX["m_lo"], BOX["m_hi"])
-            & ins.between(BOX["f_lo"], BOX["f_hi"]))
-    if precision:
-        keep = keep & (me / m <= NASA_MASS_PREC) & (re / r <= NASA_RAD_PREC)
-    k = keep.to_numpy(bool)
-
-    errors = {}
-    for name, err, base, frac in (
-            ("me", me, m, MASS_FRAC_ERR), ("re", re, r, RAD_FRAC_ERR),
-            ("me1", me1, m, MASS_FRAC_ERR), ("me2", me2, m, MASS_FRAC_ERR),
-            ("re1", re1, r, RAD_FRAC_ERR), ("re2", re2, r, RAD_FRAC_ERR)):
-        errors[name] = np.where(np.isfinite(err) & (err > 0), err, frac * base)[k]
-    return dict(
-        m=m.to_numpy(float)[k], r=r.to_numpy(float)[k], ins=ins.to_numpy(float)[k],
-        **errors, n=int(k.sum()))
-
-
-# make_pool's pools: universe B (A derives from it) and the mass-independent map pool.
-POOLS = {"universe_B": flat_curves, "uniform": flat_baseline}
-
-
-def _detect_chunk(pool_name, n, seed, mission=None):
-    """Generate n planets -> box cut -> joint Kepler+RV detection. Per-row detectors, so this is
-    equivalent to processing one big pool but with bounded memory."""
-    # The map alone decouples mass from radius to measure detectability across the box.
-    kw = {"mass_model": "independent"} if pool_name == "uniform" else {}
-    pool = POOLS[pool_name](n, seed=seed,
-                            radius_lims=(BOX["r_lo"], BOX["r_hi"]),
-                            mass_lims=(BOX["m_lo"], BOX["m_hi"]), **kw)
-    r = pd.to_numeric(pool["radius_p"], errors="coerce")
-    m = pd.to_numeric(pool["mass_p"], errors="coerce")
-    f = pd.to_numeric(pool["flux_p"], errors="coerce")
-    keep = (r.between(BOX["r_lo"], BOX["r_hi"]) & m.between(BOX["m_lo"], BOX["m_hi"])
-            & f.between(BOX["f_lo"], BOX["f_hi"]))
-    pool = pool[keep].copy()
-    transit_mission = mission or MISSION
-    transit_options = {"use_cdpp_tables": False} if transit_mission == "tess" else {}
-    kep = _TRANSIT[transit_mission](pool.copy(), source="ppop", **transit_options).determine_detectable()
-    rd = run_rv_best(pool, mag_target=RV_MAG_TARGET)["detected"].to_numpy(bool)
-    return dict(
-        mass=pd.to_numeric(pool["mass_p"], errors="coerce").to_numpy(float),
-        radius=pd.to_numeric(pool["radius_p"], errors="coerce").to_numpy(float),
-        flux=pd.to_numeric(pool["flux_p"], errors="coerce").to_numpy(float),
-        teff=pd.to_numeric(pool["teff_s"], errors="coerce").to_numpy(float),
-        det=kep["detected"].to_numpy(bool) & rd,
-        transit=kep["transiting_geometric"].to_numpy(bool),
-    )
-
-
-def make_pool(pool_name, *, pool_size=None, chunk_size=None, cache_dir=None, mission=None):
-    """POOLS[pool_name] -> box cut -> joint Kepler+RV detection (cached to npz), built in
-    CHUNK-sized pieces (distinct per-chunk seeds) to bound peak memory. Returns TRUE arrays, the
-    joint-detected mask, and the geometric transit mask (detected ⊂ transit)."""
-    pool_size = FLAT_N_POOL if pool_size is None else int(pool_size)
-    chunk_size = CHUNK if chunk_size is None else int(chunk_size)
-    mission = MISSION if mission is None else mission
-    cache_dir = OUT_DIRS[mission] if cache_dir is None else os.fspath(cache_dir)
-    tag = f"{pool_name}_N{pool_size}_s{RNG_SEED}"
-    cache = os.path.join(cache_dir, f"pool_{tag}.npz")
-    if os.path.exists(cache):
-        print(f"    loaded cached pool: {os.path.basename(cache)}")
-        z = np.load(cache)
-        return {fld: z[fld] for fld in z.files}
-    parts, done, ci = [], 0, 0
-    while done < pool_size:
-        n = min(chunk_size, pool_size - done)
-        parts.append(_detect_chunk(pool_name, n, RNG_SEED + ci, mission=mission))
-        done += n
-        ci += 1
-        print(f"      chunk {ci}: {done:>9d}/{pool_size} generated+detected")
-    result = {fld: np.concatenate([p[fld] for p in parts]) for fld in parts[0]}
-    np.savez(cache, **result)
-    return result
-
-
-def universes_ab(b):
-    """rocky_formation = universe B pool; escape_only = universe A (B minus its super-Earths)."""
-    keep = ~is_super_earth(b["mass"], b["radius"])
-    return {"rocky_formation": b,
-            "escape_only": {k: (v[keep] if isinstance(v, np.ndarray) else v) for k, v in b.items()}}
-
-
 def build_universes():
     print(f"--> building universe B pool N={FLAT_N_POOL} ...")
-    univ = universes_ab(make_pool("universe_B"))
+    cache_dir = os.path.join(ANALYSIS_DIR, _OUT_NAME[MISSION])
+    univ = split_universes(make_detected_pool(
+        "universe_B", pool_size=FLAT_N_POOL, chunk_size=CHUNK,
+        cache_dir=cache_dir, mission=MISSION, seed=RNG_SEED,
+        box=BOX, rv_mag_target=RV_MAG_TARGET,
+    ))
     print(f"--> building independent (uniform) pool N={FLAT_N_POOL} ...")
-    univ["uniform"] = make_pool("uniform")
+    univ["uniform"] = make_detected_pool(
+        "uniform", pool_size=FLAT_N_POOL, chunk_size=CHUNK,
+        cache_dir=cache_dir, mission=MISSION, seed=RNG_SEED,
+        box=BOX, rv_mag_target=RV_MAG_TARGET,
+    )
     for key, _, _ in UNIVERSES:
         u = univ[key]
-        print(f"    {key:<16} pool={u['mass'].size:>8}  transiting={int(u['transit'].sum()):>7}"
-              f"  detected={int(u['det'].sum()):>6}")
+        print(f"    {key:<16} pool={u['mass'].size:>8}  "
+              f"transiting={int(u['transit_eligible'].sum()):>7}  "
+              f"detected={int(u['joint_detected'].sum()):>6}")
     return univ
-
-
-def detection_map(pool, lo, hi):
-    """l_b(M,R) = joint detected fraction AMONG TRANSITING on the linear-mass MR grid, in
-    insolation bin [lo,hi). Denominator = transiting count (paper fig:flat convention)."""
-    tsel = (pool["flux"] >= lo) & (pool["flux"] < hi) & pool["transit"]
-    m, r, det = pool["mass"][tsel], pool["radius"][tsel], pool["det"][tsel]
-    num, _, _ = np.histogram2d(m, r, bins=[M_EDGES, R_EDGES], weights=det.astype(float))
-    tot, _, _ = np.histogram2d(m, r, bins=[M_EDGES, R_EDGES])
-    D = np.where(tot >= MIN_CELL, num / np.maximum(tot, 1), np.nan)
-    return D, tot
-
-
-def predicted_frac(u, lo, hi, mass_min, m_sil, r_sil, rng, n_rep=N_FRAC_REP):
-    """Detected volatile fraction p_{k,b} for one universe/bin/mass-cut, averaged over
-    measurement-noise realizations (detected planets all transit)."""
-    sel = u["det"] & (u["flux"] >= lo) & (u["flux"] < hi)
-    m0, r0 = u["mass"][sel], u["radius"][sel]
-    if m0.size == 0:
-        return np.nan, np.nan, 0
-    fr, cnt = [], []
-    for _ in range(n_rep):
-        mo = m0 * np.exp(rng.normal(0.0, MASS_FRAC_ERR, m0.size))
-        ro = r0 * np.exp(rng.normal(0.0, RAD_FRAC_ERR, r0.size))
-        if mass_min:
-            k = mo > mass_min
-            mo, ro = mo[k], ro[k]
-        if mo.size < 5:
-            continue
-        fr.append(float(is_volatile(mo, ro, m_sil, r_sil).mean()))
-        cnt.append(mo.size)
-    if not fr:
-        return np.nan, np.nan, 0
-    return float(np.mean(fr)), float(np.std(fr)), int(np.mean(cnt))
-
-
-def nasa_bin(nasa, lo, hi, mass_min, m_sil, r_sil):
-    sel = (nasa["ins"] >= lo) & (nasa["ins"] < hi)
-    if mass_min:
-        sel = sel & (nasa["m"] > mass_min)
-    m, r = nasa["m"][sel], nasa["r"][sel]
-    vol = is_volatile(m, r, m_sil, r_sil)
-    return int(vol.sum()), int(sel.sum())
-
-
-def model_posterior(p_by_univ, k, n):
-    keys = list(p_by_univ)
-    logl = np.array([binom.logpmf(k, n, float(np.clip(p_by_univ[key], 1e-4, 1 - 1e-4)))
-                     for key in keys])
-    post = np.exp(logl - logl.max())
-    post = post / post.sum()
-    return dict(zip(keys, logl)), dict(zip(keys, post))
 
 
 # ----------------------------------------------------------------------- reporting
 def desert_table(univ, nasa, m_sil, r_sil, rng, tag):
     print(f"\n  ================ Bayesian model comparison — {tag} ================")
     print("  volatile fraction f_k, NASA v/n, binomial likelihood L_k, and likelihood odds O=L/sum L\n")
-    segments = [(lbl, lo, hi, MASS_MIN) for lbl, lo, hi in INSOL_BINS]
+    segments = [(lbl, lo, hi, MASS_MIN) for lbl, lo, hi in INSOLATION_BINS]
     segments += [("all insolation", BOX["f_lo"], BOX["f_hi"], None)]
     rows = []
     for lbl, lo, hi, mcut in segments:
-        p_raw = {key: predicted_frac(univ[key], lo, hi, mcut, m_sil, r_sil, rng)
+        p_raw = {key: predicted_volatile_fraction(
+                     univ[key], lo, hi, m_sil, r_sil, rng, mass_min=mcut,
+                     repeats=N_FRAC_REP, error=SIMULATED_MEASUREMENT_ERROR)
                  for key, _, _ in UNIVERSES}
         p_by = {key: v[0] for key, v in p_raw.items()}
         p_sigma = {key: v[1] for key, v in p_raw.items()}
-        k, n = nasa_bin(nasa, lo, hi, mcut, m_sil, r_sil)
+        k, n = observed_volatile_count(
+            nasa, lo, hi, m_sil, r_sil, mass_min=mcut
+        )
         if n == 0:
             print(f"  {lbl:<24} NASA n=0 — skipped")
             continue
-        _, nasa_sigma = nasa_frac_sigma(nasa, lo, hi, mcut, m_sil, r_sil, rng)
-        logl, post = model_posterior(p_by, k, n)
+        _, nasa_sigma = observed_fraction_uncertainty(
+            nasa, lo, hi, m_sil, r_sil, rng,
+            mass_min=mcut, repeats=N_FRAC_REP,
+        )
+        logl, post = binomial_model_posterior(p_by, k, n)
         L = {key: float(np.exp(logl[key])) for key in logl}
         ftxt = "  ".join(f"{lbl2[:5]}={p_by[key]:.3f}+-{p_sigma[key]:.3f}" for key, lbl2, _ in UNIVERSES)
         Ltxt = "  ".join(f"{lbl2[:5]}={L[key]:.2e}" for key, lbl2, _ in UNIVERSES)
@@ -309,7 +154,7 @@ def save_stats_table(rows, tag):
             O_esc=round(r["post"]["escape_only"], 3),
             BF_esc_over_prim=Le / max(Lp, 1e-300)))
     df = pd.DataFrame(recs)
-    out = os.path.join(OUT_DIRS[MISSION], "model_stats.csv")
+    out = os.path.join(ANALYSIS_DIR, _OUT_NAME[MISSION], "model_stats.csv")
     df.to_csv(out, index=False)
     print(f"--> Saved: {out}")
     return df
@@ -332,16 +177,19 @@ def print_bayes_factors(rows):
 def _nasa_overlay(ax, nasa, lo, hi, norm, mass_min=None):
     """NASA planets in insolation bin: grey error bars + points colored by log insolation.
     mass_min, if given, applies the same super-Earth cut used by the panel it is drawn on."""
-    nsel = (nasa["ins"] >= lo) & (nasa["ins"] < hi)
+    nsel = nasa["insolation"].between(lo, hi, inclusive="left")
     if mass_min:
-        nsel = nsel & (nasa["m"] > mass_min)
+        nsel &= nasa["mass"] > mass_min
     if nsel.sum() == 0:
         return None
-    ax.errorbar(nasa["m"][nsel], nasa["r"][nsel],
-                xerr=[nasa["me2"][nsel], nasa["me1"][nsel]],
-                yerr=[nasa["re2"][nsel], nasa["re1"][nsel]],
+    ax.errorbar(nasa.loc[nsel, "mass"], nasa.loc[nsel, "radius"],
+                xerr=[nasa.loc[nsel, "mass_error_minus"],
+                      nasa.loc[nsel, "mass_error_plus"]],
+                yerr=[nasa.loc[nsel, "radius_error_minus"],
+                      nasa.loc[nsel, "radius_error_plus"]],
                 fmt="none", ecolor="0.8", elinewidth=0.7, capsize=0, zorder=4)
-    return ax.scatter(nasa["m"][nsel], nasa["r"][nsel], c=np.log10(nasa["ins"][nsel]),
+    return ax.scatter(nasa.loc[nsel, "mass"], nasa.loc[nsel, "radius"],
+                      c=np.log10(nasa.loc[nsel, "insolation"]),
                       cmap="plasma", norm=norm, s=34, edgecolor="k", lw=0.5, zorder=5)
 
 
@@ -360,13 +208,15 @@ def fig_likelihood_maps(univ, nasa):
     """1x3 by insolation: the detectability field l_b(M,R) (detected fraction among transiting,
     uniform-parameter universe, ALL masses) in Figure-3 format — filled viridis + white contours,
     NASA planets (mass > MASS_MIN only) colored by log insolation with error bars."""
-    Ds = [detection_map(univ["uniform"], lo, hi)[0] for _, lo, hi in INSOL_BINS]
+    Ds = [detection_fraction_map(
+        univ["uniform"], lo, hi, M_EDGES, R_EDGES, min_count=MIN_CELL
+    )[0] for _, lo, hi in INSOLATION_BINS]
     vmax = max((np.nanmax(D) for D in Ds if np.isfinite(D).any()), default=1.0)
     levels = np.round(np.linspace(0.2, vmax, 4), 2)
     norm = Normalize(vmin=np.log10(BOX["f_lo"]), vmax=np.log10(BOX["f_hi"]))
     fig, axes = plt.subplots(1, 3, figsize=(18, 6.2), sharey=True, constrained_layout=True)
     sc = None
-    for ax, (lbl, lo, hi), D in zip(axes, INSOL_BINS, Ds):
+    for ax, (lbl, lo, hi), D in zip(axes, INSOLATION_BINS, Ds):
         _field_image(ax, D, vmax, levels)
         s = _nasa_overlay(ax, nasa, lo, hi, norm, mass_min=MASS_MIN)
         if s is not None:
@@ -385,7 +235,7 @@ def fig_likelihood_maps(univ, nasa):
                  "viridis = detected fraction among transiting (uniform-parameter universe); "
                  "white contours",
                  fontsize=13)
-    out = os.path.join(OUT_DIRS[MISSION], "likelihood_detection_maps.png")
+    out = os.path.join(ANALYSIS_DIR, _OUT_NAME[MISSION], "likelihood_detection_maps.png")
     fig.savefig(out, dpi=160, bbox_inches="tight")
     plt.close(fig)
     print(f"--> Saved: {out}")
@@ -397,7 +247,7 @@ def fig_posterior_predictive(univ, nasa, m_sil, r_sil):
     color), white contours, NASA planets colored by log insolation with error bars, silicate
     line. Linear mass axis; no red highlight (per request)."""
     ms = np.linspace(BOX["m_lo"], BOX["m_hi"], 250)
-    r_sil_line = np.interp(ms, m_sil, r_sil)
+    r_sil_line = radius_on_curve(ms, m_sil, r_sil)
     norm = Normalize(vmin=np.log10(BOX["f_lo"]), vmax=np.log10(BOX["f_hi"]))
     X, Y = np.meshgrid(M_CENT, R_CENT)
     fig, axes = plt.subplots(len(UNIVERSES), 3, figsize=(17, 9.5), sharex=True, sharey=True,
@@ -405,9 +255,10 @@ def fig_posterior_predictive(univ, nasa, m_sil, r_sil):
     sc = None
     for i, (key, plabel, _) in enumerate(UNIVERSES):
         u = univ[key]
-        for j, (blabel, lo, hi) in enumerate(INSOL_BINS):
+        for j, (blabel, lo, hi) in enumerate(INSOLATION_BINS):
             ax = axes[i, j]
-            sel = (u["det"] & (u["flux"] >= lo) & (u["flux"] < hi)     # detected ⊂ transiting
+            sel = (u["joint_detected"]
+                   & u["insolation"].between(lo, hi, inclusive="left")
                    & (u["mass"] > MASS_MIN))
             H, _, _ = np.histogram2d(u["mass"][sel], u["radius"][sel], bins=[M_EDGES, R_EDGES])
             # log stretch: the uniform-in-R track dams a density spike at the M=12 box wall that a
@@ -442,7 +293,7 @@ def fig_posterior_predictive(univ, nasa, m_sil, r_sil):
                  "(points colored by log insolation, with error bars)\n"
                  "rows = universes (priors); columns = insolation panels; "
                  "black dashed = silicate line", fontsize=13)
-    out = os.path.join(OUT_DIRS[MISSION], "posterior_predictive_maps.png")
+    out = os.path.join(ANALYSIS_DIR, _OUT_NAME[MISSION], "posterior_predictive_maps.png")
     fig.savefig(out, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"--> Saved: {out}")
@@ -467,7 +318,7 @@ def fig_model_odds(rows):
                  "headline = I<50 cold super-Earth desert (M>2); transiting planets only", fontsize=11)
     ax.grid(alpha=0.2, axis="y"); ax.legend(fontsize=9)
     fig.tight_layout()
-    out = os.path.join(OUT_DIRS[MISSION], "model_odds.png")
+    out = os.path.join(ANALYSIS_DIR, _OUT_NAME[MISSION], "model_odds.png")
     fig.savefig(out, dpi=160, bbox_inches="tight")
     plt.close(fig)
     print(f"--> Saved: {out}")
@@ -520,7 +371,7 @@ def fig_model_stats(rows):
     fig.suptitle(f"Why the odds saturate — {_MISSION_LABEL[MISSION]} transit + RV, precision-cut sample",
                  fontsize=12)
     fig.tight_layout()
-    out = os.path.join(OUT_DIRS[MISSION], "model_stats.png")
+    out = os.path.join(ANALYSIS_DIR, _OUT_NAME[MISSION], "model_stats.png")
     fig.savefig(out, dpi=160, bbox_inches="tight")
     plt.close(fig)
     print(f"--> Saved: {out}")
@@ -529,8 +380,8 @@ def fig_model_stats(rows):
 def main(mission="kepler"):
     global MISSION
     MISSION = mission
-    os.makedirs(OUT_DIRS[MISSION], exist_ok=True)
-    m_sil, r_sil = load_silicate()
+    os.makedirs(os.path.join(ANALYSIS_DIR, _OUT_NAME[MISSION]), exist_ok=True)
+    m_sil, r_sil = load_mass_radius_curve()
     rng = np.random.default_rng(RNG_SEED)
 
     print(f"=== Cold super-Earth desert Bayesian comparison — transit mission: {_MISSION_LABEL[MISSION]} ===")
@@ -543,16 +394,31 @@ def main(mission="kepler"):
                                         "All 0.43 / Vol 0.70"),
                                        ("cold I<50, M>2", BOX["f_lo"], COLD_MAX, MASS_MIN,
                                         "All 0.44 / Vol 0.74")]:
-            pa = predicted_frac(univ["rocky_formation"], lo, hi, mcut, m_sil, r_sil, rng)[0]
-            pv = predicted_frac(univ["escape_only"], lo, hi, mcut, m_sil, r_sil, rng)[0]
+            pa = predicted_volatile_fraction(
+                univ["rocky_formation"], lo, hi, m_sil, r_sil, rng,
+                mass_min=mcut, repeats=N_FRAC_REP,
+                error=SIMULATED_MEASUREMENT_ERROR,
+            )[0]
+            pv = predicted_volatile_fraction(
+                univ["escape_only"], lo, hi, m_sil, r_sil, rng,
+                mass_min=mcut, repeats=N_FRAC_REP,
+                error=SIMULATED_MEASUREMENT_ERROR,
+            )[0]
             print(f"    {lbl:<20} rocky-formation f_vol={pa:.2f}  escape-only f_vol={pv:.2f}   "
                   f"[paper Table 6: {ref}]")
 
     rows_prec, nasa_prec = None, None
     for precision, tag in [(True, f"{_MISSION_LABEL[MISSION]} — precision-cut NASA (primary)"),
                            (False, f"{_MISSION_LABEL[MISSION]} — full measured-mass NASA (sensitivity)")]:
-        nasa = load_nasa(precision)
-        print(f"\n--> {tag}: N={nasa['n']} in box")
+        nasa = load_measured_planets(
+            NASA_FILE,
+            mass_bounds=(BOX["m_lo"], BOX["m_hi"]),
+            radius_bounds=(BOX["r_lo"], BOX["r_hi"]),
+            insolation_bounds=(BOX["f_lo"], BOX["f_hi"]),
+            max_relative_error=NASA_MEASUREMENT_ERROR if precision else None,
+            missing_relative_error=SIMULATED_MEASUREMENT_ERROR,
+        )
+        print(f"\n--> {tag}: N={len(nasa)} in box")
         rows = desert_table(univ, nasa, m_sil, r_sil, rng, tag)
         print_bayes_factors(rows)
         if precision:

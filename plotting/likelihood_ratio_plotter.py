@@ -1,7 +1,6 @@
 """TEST LR: does NASA's catalog look like flat universe A (cold rocky M>2 corner removed) or B (kept)?
 Both pass the same Kepler+RV detectors and noise; a classifier learns p_B/p_A per planet, and
-NASA's summed log-ratio is compared to resampled A and B catalogs.
-Run: python -m plotting.likelihood_ratio_plotter
+NASA's summed log-ratio is compared to resampled A and B catalogs. Run via the flat_ab line in sim.py.
 """
 
 from __future__ import annotations
@@ -13,8 +12,10 @@ import sys
 from pathlib import Path
 
 from tools.paths import REPO_ROOT, PSCOMPPARS_CSV, ANALYSIS_DIR
-from tools.exoplanet_catalog import read_nasa_csv
-from science.populations.universes.flat_curves import load_silicate
+from science.catalogs import load_measured_planets
+from science.physics import is_rocky, load_mass_radius_curve, radius_on_curve
+from science.comparison import COLD_DESERT_MAX_INSOLATION
+from science.statistics import fractional_error_to_log10_sigma
 ROOT = Path(REPO_ROOT)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -36,8 +37,6 @@ try:
 except Exception:
     pass
 
-
-
 NASA_FILE = Path(PSCOMPPARS_CSV)
 OUT_DIR = os.path.join(ANALYSIS_DIR, "likelihood_ratio_catalog")
 
@@ -45,7 +44,7 @@ FLAT_N_POOL = 1_000_000
 RNG_SEED = 0
 RV_MAG_TARGET = 12.0
 MASS_MIN = 2.0
-COLD_MAX = 50.0
+COLD_MAX = COLD_DESERT_MAX_INSOLATION
 NASA_MASS_PREC = 0.25
 NASA_RAD_PREC = 0.08
 BOX = dict(r_lo=0.5, r_hi=2.2, m_lo=0.1, m_hi=12.0, f_lo=1e-2, f_hi=1e4)
@@ -71,52 +70,52 @@ CLF_KW = dict(max_iter=200, learning_rate=0.08, min_samples_leaf=60,
 CONFIGS = [("precision", True, 11), ("full", False, 12)]   # (name, precision cut, noise seed)
 
 
-def _sigma_log(err_hi, err_lo, value, floor, missing):
-    e = np.maximum(np.abs(err_hi), np.abs(err_lo))
-    s = (e / value) / np.log(10.0)
-    s = s.where(s.notna(), missing)
-    return np.maximum(s, floor)
-
-
 def load_nasa(precision: bool):
-    df = read_nasa_csv(NASA_FILE)
-    m = pd.to_numeric(df["pl_bmasse"], errors="coerce")
-    r = pd.to_numeric(df["pl_rade"], errors="coerce")
-    ins = pd.to_numeric(df["pl_insol"], errors="coerce")
-    teff = pd.to_numeric(df["st_teff"], errors="coerce")
-    prov = df.get("pl_bmassprov", pd.Series("", index=df.index)).astype(str)
-    meas = prov.str.contains("Mass|Msini", case=False, na=False) & \
-        ~prov.str.contains("Calc", case=False, na=False)
-    me1 = pd.to_numeric(df["pl_bmasseerr1"], errors="coerce")
-    me2 = pd.to_numeric(df["pl_bmasseerr2"], errors="coerce")
-    re1 = pd.to_numeric(df["pl_radeerr1"], errors="coerce")
-    re2 = pd.to_numeric(df["pl_radeerr2"], errors="coerce")
-    ie1 = pd.to_numeric(df["pl_insolerr1"], errors="coerce")
-    ie2 = pd.to_numeric(df["pl_insolerr2"], errors="coerce")
+    frame = load_measured_planets(
+        NASA_FILE,
+        mass_bounds=(BOX["m_lo"], BOX["m_hi"]),
+        radius_bounds=(BOX["r_lo"], BOX["r_hi"]),
+        insolation_bounds=(BOX["f_lo"], BOX["f_hi"]),
+        max_relative_error=(
+            {"mass": NASA_MASS_PREC, "radius": NASA_RAD_PREC}
+            if precision else None
+        ),
+        temperature_bounds=TEFF_STRATA,
+    )
+    m = frame["mass"].to_numpy(float)
+    r = frame["radius"].to_numpy(float)
+    ins = frame["insolation"].to_numpy(float)
+    teff = frame["effective_temperature"].to_numpy(float)
+    me1 = frame["mass_error_plus"].to_numpy(float)
+    me2 = frame["mass_error_minus"].to_numpy(float)
+    re1 = frame["radius_error_plus"].to_numpy(float)
+    re2 = frame["radius_error_minus"].to_numpy(float)
+    ie1 = frame["insolation_error_plus"].to_numpy(float)
+    ie2 = frame["insolation_error_minus"].to_numpy(float)
 
-    keep = (meas & r.between(BOX["r_lo"], BOX["r_hi"]) & m.between(BOX["m_lo"], BOX["m_hi"])
-            & ins.between(BOX["f_lo"], BOX["f_hi"]) & teff.between(*TEFF_STRATA))
-    if precision:
-        me = np.maximum(me1.abs(), me2.abs())
-        re = np.maximum(re1.abs(), re2.abs())
-        keep = keep & (me / m <= NASA_MASS_PREC) & (re / r <= NASA_RAD_PREC)
-
-    sig_m = _sigma_log(me1, me2, m, SIGMA_LOGM_FLOOR, SIGMA_LOGM_MISSING)
-    sr = _sigma_log(re1, re2, r, SIGMA_LOGR_FLOOR, np.nan)
-    si = _sigma_log(ie1, ie2, ins, SIGMA_LOGI_FLOOR, np.nan)
-    sig_r = sr.fillna(np.nanmedian(sr[keep]))
-    sig_i = si.fillna(np.nanmedian(si[keep]))
-    n_miss = (int(np.maximum(me1.abs(), me2.abs())[keep].isna().sum()),
-              int(sr[keep].isna().sum()), int(si[keep].isna().sum()))
+    sig_m = fractional_error_to_log10_sigma(
+        me1, me2, m, floor=SIGMA_LOGM_FLOOR, missing=SIGMA_LOGM_MISSING
+    )
+    sig_r = fractional_error_to_log10_sigma(
+        re1, re2, r, floor=SIGMA_LOGR_FLOOR
+    )
+    sig_i = fractional_error_to_log10_sigma(
+        ie1, ie2, ins, floor=SIGMA_LOGI_FLOOR
+    )
+    n_miss = (
+        int((~np.isfinite(np.maximum(me1, me2))).sum()),
+        int((~np.isfinite(sig_r)).sum()),
+        int((~np.isfinite(sig_i)).sum()),
+    )
+    sig_r = np.where(np.isfinite(sig_r), sig_r, np.nanmedian(sig_r))
+    sig_i = np.where(np.isfinite(sig_i), sig_i, np.nanmedian(sig_i))
 
     tag = "precision-cut" if precision else "full measured-mass"
-    print(f"    NASA ({tag}): {int(keep.sum())} planets in box + Teff window "
+    print(f"    NASA ({tag}): {len(frame)} planets in box + Teff window "
           f"{TEFF_STRATA} K; missing errors (m/r/I) = {n_miss} "
           f"-> fallbacks {SIGMA_LOGM_MISSING}/median/median dex")
-    return dict(m=m[keep].to_numpy(), r=r[keep].to_numpy(), ins=ins[keep].to_numpy(),
-                teff=teff[keep].to_numpy(),
-                sig_m=sig_m[keep].to_numpy(), sig_r=sig_r[keep].to_numpy(),
-                sig_i=sig_i[keep].to_numpy())
+    return dict(m=m, r=r, ins=ins, teff=teff,
+                sig_m=sig_m, sig_r=sig_r, sig_i=sig_i)
 
 
 # ---------------------------------------------------------------- STEP 1: forward sim
@@ -127,14 +126,14 @@ def get_detected_pool(df):
     pool = df[df["universe_type"] == "B"]
     joint = (pool["kepler_detected"].to_numpy(bool)
              & pool["rv_detected"].to_numpy(bool))
-    m_sil, r_sil = load_silicate()
+    m_sil, r_sil = load_mass_radius_curve()
     det = pd.DataFrame({
         "mass": pool["mass_p"].to_numpy(float)[joint],
         "radius": pool["radius_p"].to_numpy(float)[joint],
         "flux": pool["flux_p"].to_numpy(float)[joint],
         "teff": pool["teff_s"].to_numpy(float)[joint],
     })
-    rocky = det["radius"].to_numpy() < np.interp(det["mass"].to_numpy(), m_sil, r_sil)
+    rocky = is_rocky(det["mass"].to_numpy(), det["radius"].to_numpy(), m_sil, r_sil)
     det["corner"] = rocky & (det["mass"].to_numpy() > MASS_MIN) & \
         (det["flux"].to_numpy() < COLD_MAX)
     print(f"    joint-detected {len(det)}/{len(pool)} ({100*len(det)/len(pool):.2f}%)")
@@ -369,7 +368,8 @@ def panel_map(ax, fig, cfg, m_sil, r_sil):
                        norm=TwoSlopeNorm(vcenter=0.0, vmin=-vmax, vmax=vmax))
     fig.colorbar(pc, ax=ax, label=r"$\ell_{\rm cond}(x)=\log\,p_B/p_A\,(M,R\,|\,I,T_{\rm eff})$")
     ms = np.logspace(np.log10(BOX["m_lo"]), np.log10(BOX["m_hi"]), 200)
-    ax.plot(ms, np.interp(ms, m_sil, r_sil), color="k", lw=1.5, label="silicate line")
+    ax.plot(ms, radius_on_curve(ms, m_sil, r_sil, outside="edge"),
+            color="k", lw=1.5, label="silicate line")
     ax.axvline(MASS_MIN, color="red", ls="--", lw=1.2, label=f"M = {MASS_MIN:g} M⊕")
     nasa = cfg["nasa"]
     cold = nasa["ins"] < COLD_MAX
@@ -464,11 +464,12 @@ EXPL_SUB = 900
 
 def _mr_axis(ax, m_sil, r_sil, shade_corner=True):
     ms = np.logspace(np.log10(BOX["m_lo"]), np.log10(BOX["m_hi"]), 200)
-    ax.plot(ms, np.interp(ms, m_sil, r_sil), "k-", lw=1.4, label="silicate line")
+    ax.plot(ms, radius_on_curve(ms, m_sil, r_sil, outside="edge"),
+            "k-", lw=1.4, label="silicate line")
     ax.axvline(MASS_MIN, color="red", ls="--", lw=1.1, label=f"M = {MASS_MIN:g} M⊕")
     if shade_corner:
         mc = np.logspace(np.log10(MASS_MIN), np.log10(BOX["m_hi"]), 120)
-        ax.fill_between(mc, BOX["r_lo"], np.clip(np.interp(mc, m_sil, r_sil),
+        ax.fill_between(mc, BOX["r_lo"], np.clip(radius_on_curve(mc, m_sil, r_sil, outside="edge"),
                                                  BOX["r_lo"], BOX["r_hi"]),
                         color="red", alpha=0.07, zorder=0)
     ax.set_xscale("log")
@@ -574,8 +575,8 @@ def explainer_verdict(cfg, m_sil, r_sil):
     XB_ca, cor_ca, nasa = cfg["XB_ca"], cfg["cor_ca"], cfg["nasa"]
     n = cfg["n_nasa"]
     m, r, i = 10.0 ** XB_ca[:, 0], 10.0 ** XB_ca[:, 1], 10.0 ** XB_ca[:, 2]
-    obs_corner = (r < np.interp(m, m_sil, r_sil)) & (m > MASS_MIN) & (i < COLD_MAX)
-    nasa_corner = int(((nasa["r"] < np.interp(nasa["m"], m_sil, r_sil))
+    obs_corner = is_rocky(m, r, m_sil, r_sil) & (m > MASS_MIN) & (i < COLD_MAX)
+    nasa_corner = int((is_rocky(nasa["m"], nasa["r"], m_sil, r_sil)
                        & (nasa["m"] > MASS_MIN) & (nasa["ins"] < COLD_MAX)).sum())
 
     Xn = np.column_stack([np.log10(nasa["m"]), np.log10(nasa["r"]),
@@ -633,7 +634,7 @@ def explainer_verdict(cfg, m_sil, r_sil):
 
 def main(df):
     os.makedirs(OUT_DIR, exist_ok=True)
-    m_sil, r_sil = load_silicate()
+    m_sil, r_sil = load_mass_radius_curve()
 
     print("STEP 1 — FORWARD SIM (shared): flat pool -> joint Kepler+RV detection")
     det = get_detected_pool(df)
@@ -683,5 +684,5 @@ def main(df):
 
 
 if __name__ == "__main__":
-    from run.flat_universe import run_flat_universe
-    main(run_flat_universe.main(seed=RNG_SEED, n_planets=FLAT_N_POOL, run_anew=False))
+    from run.flat_universe.run_flat_universe import main as run_flat
+    main(run_flat(seed=RNG_SEED, n_planets=FLAT_N_POOL, run_anew=False))

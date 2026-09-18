@@ -12,7 +12,9 @@ htmlcov/
 
 # Editor / OS
 .DS_Store
-.vscode/
+.vscode/*
+!.vscode/launch.json
+!.vscode/settings.json
 .idea/
 
 # Everything generated lives under results/ -- one rule, so a new
@@ -42,7 +44,6 @@ texput.log
 # `*.md` is deliberate, but these record who wrote what and must ship
 *.md
 !README.md
-!MANIFEST.in
 !PPop/UPSTREAM.md
 !lifesim/UPSTREAM.md
 !results/README.md

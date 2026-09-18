@@ -1,7 +1,7 @@
 """Rocky-planet figures: FGKM detection-fraction maps from stacked Gaia-60pc Kepler/TESS catalogs
 with NASA rocky planets overlaid, plus the paper's rocky_mr_insolation_3panel / rocky_scatter_standalone.
 Run: python plotting/scripts/analysis/rocky_scatter_gaia60pc.py [--full]
-The paper figures need no universes. --full adds the maps, from the 10 Gaia-60pc universes run_sim.py writes (~3-4 h).
+The paper figures need no universes. --full adds the maps, from the 10 Gaia-60pc universes the Kepler/TESS lines in `sim.py` write (~3-4 h).
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ import sys
 import numpy as np
 import pandas as pd
 
-from tools.paths import SILICON_CURVE, ANALYSIS_DIR, PAPER_FIGURES_DIR, KEPLER_DATA_DIR, TESS_DATA_DIR, KEPLER_REF_CURVE
+from tools.paths import SILICON_CURVE, ANALYSIS_DIR, PAPER_FIGURES_DIR, KEPLER_DATA_DIR, TESS_DATA_DIR, KEPLER_REF_CURVE, PSCOMPPARS_TRANSITING_CSV
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch, Rectangle
@@ -50,7 +50,7 @@ def _ppop_files(directory: Path, stem: str) -> list[Path]:
     if not present:
         raise FileNotFoundError(
             f"No P-Pop catalogs found in {directory} for stem '{stem}' "
-            f"(expected {stem}_0.csv .. {stem}_{N_UNIVERSES - 1}.csv); run `python run/run_sim.py` first (~3-4 h)"
+            f"(expected {stem}_0.csv .. {stem}_{N_UNIVERSES - 1}.csv); run the Kepler/TESS lines in `sim.py` first (~3-4 h)"
         )
     missing = [f.name for f in wanted if not f.exists()]
     if missing:
@@ -67,10 +67,7 @@ REF_CURVE_PATH = Path(KEPLER_REF_CURVE)
 ROCKY_CURVE_PATH  = Path(SILICON_CURVE)
 ROCKY_CURVE_LABEL = "silicate rocky curve"
 
-NASA_DATA_DIR = Path(KEPLER_DATA_DIR) / "NASA"
-NASA_FLAGS_CACHE = (
-    NASA_DATA_DIR / "NASA_PSCompPars_transiting_confirmed_RM_insolation_errors_limits.csv"
-)
+NASA_CSV = Path(PSCOMPPARS_TRANSITING_CSV)
 
 OUT_DIR = Path(ANALYSIS_DIR) / "rocky_scatter_gaia60pc"
 
@@ -83,8 +80,7 @@ LHS1140B_RADIUS_REARTH = 1.730
 
 # ── NASA quality settings ────────────────────────────────────────────────────
 
-FORCE_REDOWNLOAD_NASA    = False
-DOWNLOAD_NASA_IF_MISSING = True
+DOWNLOAD_NASA_DATA = False  # True re-queries the NASA Archive and overwrites NASA_CSV
 
 EXCLUDE_MASS_LIMITS       = True
 EXCLUDE_RADIUS_LIMITS     = True
@@ -243,11 +239,9 @@ def _build_nasa_query() -> str:
 
 
 def load_nasa_raw() -> pd.DataFrame:
-    if not FORCE_REDOWNLOAD_NASA and NASA_FLAGS_CACHE.exists():
-        print(f"Loading NASA PSCompPars from cache:\n  {NASA_FLAGS_CACHE}")
-        return pd.read_csv(NASA_FLAGS_CACHE)
-    if not DOWNLOAD_NASA_IF_MISSING:
-        raise FileNotFoundError(f"NASA cache missing: {NASA_FLAGS_CACHE}")
+    if not DOWNLOAD_NASA_DATA:
+        print(f"Loading NASA PSCompPars: {NASA_CSV}")
+        return pd.read_csv(NASA_CSV)
     url = (
         "https://exoplanetarchive.ipac.caltech.edu/TAP/sync?query="
         + quote(_build_nasa_query())
@@ -255,9 +249,8 @@ def load_nasa_raw() -> pd.DataFrame:
     )
     print("Downloading NASA PSCompPars with limit flags...")
     df = pd.read_csv(url)
-    NASA_DATA_DIR.mkdir(parents=True, exist_ok=True)
-    df.to_csv(NASA_FLAGS_CACHE, index=False)
-    print(f"Saved to: {NASA_FLAGS_CACHE}  ({len(df):,} rows)")
+    df.to_csv(NASA_CSV, index=False)
+    print(f"Saved to: {NASA_CSV}  ({len(df):,} rows)")
     return df
 
 
@@ -1253,7 +1246,6 @@ def plot_rocky_scatter_standalone(rocky_win: pd.DataFrame, shift: float) -> Path
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
-    NASA_DATA_DIR.mkdir(parents=True, exist_ok=True)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     PAPER_FIG_DIR.mkdir(parents=True, exist_ok=True)
     print("=" * 70)

@@ -1,7 +1,7 @@
 """RV detector calibration against published semi-amplitudes (PSCompPars pl_rvamp): model K vs
 published K, recovery per K bin, K ratio; plus P-Pop stage checks (noise budget, losses).
 Run: python plotting/scripts/calibration/rv_detector_check.py [--instrument NIRPS]
-The P-Pop stage check needs the 10 Gaia-60pc universes from `python run/run_sim.py` (~3-4 h); --fig1-only skips it.
+The P-Pop stage check needs the 10 Gaia-60pc universes from the Kepler/TESS lines in `sim.py` (~3-4 h); --fig1-only skips it.
 """
 
 from __future__ import annotations
@@ -538,7 +538,7 @@ def _unused_plot_rv_2x2_paper(df: pd.DataFrame, args) -> dict:
 def load_ppop(n_catalogs):
     files = sorted(PPOP_DIR.glob("tess_catalog_*.csv"))[:n_catalogs]
     if not files:
-        raise FileNotFoundError(f"No tess_catalog_*.csv in {PPOP_DIR}; run `python run/run_sim.py` first (~3-4 h), or pass --fig1-only")
+        raise FileNotFoundError(f"No tess_catalog_*.csv in {PPOP_DIR}; run the Kepler/TESS lines in `sim.py` first (~3-4 h), or pass --fig1-only")
     df = pd.concat([pd.read_csv(f, usecols=lambda c: c in PPOP_COLS, low_memory=False)
                     for f in files], ignore_index=True)
     for c in ["radius_p", "mass_p", "p_orb", "flux_p"]:

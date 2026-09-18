@@ -13,7 +13,7 @@ figures/
                 data, and the three planet generators against each other
   other/        the standalone scripts in plotting/scripts/
 paper/        publication figures (README.md "Paper figures" says which script makes each)
-logs/         per-run logs written by run_sim
+logs/         per-run logs written by sim.py
 ```
 
 Catalogs are large — a single Gaia-60pc universe is roughly 300 MB per pipeline,

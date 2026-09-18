@@ -17,10 +17,10 @@
             "cwd": "${workspaceFolder}"
         },
         {
-            "name": "run_sim.py",
+            "name": "sim.py",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/run/run_sim.py",
+            "program": "${workspaceFolder}/sim.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}"
         },

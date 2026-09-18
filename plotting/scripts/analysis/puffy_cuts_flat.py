@@ -1,7 +1,7 @@
 """Sub-Neptune fraction of flat and P-Pop universes (A/B each) vs NASA under four cuts: all, M > 2,
 I < 50, both. Detection is transit+RV with NASA-like measurement error. Also loaded by
 flat_rocky_mr_vs_nasa.py. Run: python plotting/scripts/analysis/puffy_cuts_flat.py
-Needs Kepler Gaia-60pc universe 0 from `python run/run_sim.py` (~3-4 h for all 20; see README). Not a paper figure.
+Needs Kepler Gaia-60pc universe 0 from the Kepler/TESS lines in `sim.py` (~3-4 h for all 20; see README). Not a paper figure.
 """
 
 from __future__ import annotations
@@ -63,7 +63,7 @@ def build_pool(population, m_sil, r_sil):
         pool = flat_superearths_subneptunes(FLAT_N_POOL, seed=RNG_SEED)
     else:
         if not PPOP_CATALOG.exists():
-            raise FileNotFoundError(f"{PPOP_CATALOG} not found; run `python run/run_sim.py` first (~3-4 h)")
+            raise FileNotFoundError(f"{PPOP_CATALOG} not found; run the Kepler/TESS lines in `sim.py` first (~3-4 h)")
         cols = ["radius_p", "mass_p", "p_orb", "inc_p", "ecc_p", "semimajor_p", "radius_s",
                 "mass_s", "temp_s", "teff_s", "distance_s", "l_sun", "flux_p", "detected"]
         pool = pd.read_csv(PPOP_CATALOG, usecols=lambda c: c in cols, low_memory=False)

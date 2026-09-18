@@ -30,7 +30,10 @@ class PlanetDetectionPlotter(BasePlotter):
         total_counts = total_counts / self.nruns
         
         mask_best, _ = self._get_detection_masks()
-        detected_counts, _ = np.histogram(df[mask_best][x_col], bins=bins)
+        # ``df`` is often a filtered subset with non-consecutive indices. Align
+        # the full-catalog detection mask explicitly before applying it.
+        mask_best = mask_best.reindex(df.index, fill_value=False)
+        detected_counts, _ = np.histogram(df.loc[mask_best, x_col], bins=bins)
         detected_counts = detected_counts / self.nruns
         
         with np.errstate(divide='ignore', invalid='ignore'):

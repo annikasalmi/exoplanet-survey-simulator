@@ -1,7 +1,4 @@
 import os
-import time
-import multiprocessing as mp
-from functools import partial
 from pathlib import Path
 
 import numpy as np
@@ -9,6 +6,7 @@ import pandas as pd
 
 from science.populations.ppop import PPop, set_star_catalog
 from science.telescopes.kepler.detection_model import KeplerData
+from run.multi_run import run_universes
 from tools.paths import KEPLER_DATA_DIR, PSCOMPPARS_CSV
 from tools.exoplanet_catalog import read_nasa_csv
 
@@ -125,25 +123,8 @@ def main(parallel=False, nruns=np.arange(1), star_catalog='Gaia', run_anew=True,
         return run_nasa_pscomppars()
     if population != 'ppop':
         raise ValueError(f"Unknown population: {population}")
-
-    start = time.time()
-
-    if run_anew:
-        runner = partial(run_single, star_catalog=star_catalog)
-    else:
-        runner = partial(run_kepler_import_catalog, star_catalog=star_catalog)
-
-    if parallel:
-        with mp.Pool(processes=min(len(nruns), MAX_WORKERS)) as pool:
-            results = pool.map(runner, nruns)
-    else:
-        results = [runner(i) for i in nruns]
-
-    df_concat = pd.concat(results, keys=nruns).reset_index(level=0).rename(columns={'level_0': 'run'}).reset_index(drop=True)
-
-    print(f"Total time: {time.time() - start:.2f} seconds")
-
-    return df_concat
+    return run_universes(run_single, run_kepler_import_catalog, nruns, star_catalog,
+                         run_anew, parallel, MAX_WORKERS)
 
 
 if __name__ == '__main__':

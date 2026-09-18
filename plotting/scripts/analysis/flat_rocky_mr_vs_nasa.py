@@ -1,5 +1,5 @@
 """Which rocky M-R relation (Chen & Kipping 2017, Otegi 2020, Edmondson 2023, Müller 2024), imposed
-on the flat universe, best matches NASA's volatile (sub-Neptune) fraction? Makes the 2x4 grids and the
+on flat_nonphysical, best matches NASA's volatile (sub-Neptune) fraction? Makes the 2x4 grids and the
 paper's Otegi panels. Run: python plotting/scripts/analysis/flat_rocky_mr_vs_nasa.py
 """
 

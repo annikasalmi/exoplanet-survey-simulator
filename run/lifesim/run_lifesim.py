@@ -6,16 +6,16 @@ import numpy as np
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 import lifesim
 from science.populations.ppop import PPop, set_star_catalog
-import multiprocessing as mp
-import time
 import pandas as pd
 import numpy as np
-from functools import partial
 
+from run.multi_run import run_universes
 from tools.paths import PPOP_DATA_DIR, LIFESIM_DATA_DIR
 from plotting.plot import plot_all
 
 RUN_PPOP = False
+# Universes run at once; defaults to every core.
+MAX_WORKERS = os.cpu_count()
 
 def run_lifesim_single(i, star_catalog='Gaia'):
     print(f"Running LIFEsim for run {i} with star catalog {star_catalog}")
@@ -86,33 +86,9 @@ def run_lifesim_import_catalog(i, star_catalog='Gaia'):
     return bus.data.catalog
 
 def main(parallel=True, nruns=np.arange(1), star_catalog='Gaia', run_anew=True):
-    start=time.time()
+    return run_universes(run_lifesim_single, run_lifesim_import_catalog, nruns, star_catalog,
+                         run_anew, parallel, MAX_WORKERS)
 
-    if run_anew:
-        runner = partial(run_lifesim_single, star_catalog=star_catalog)
-        if parallel:
-            with mp.Pool(processes=mp.cpu_count()) as pool:
-                results = pool.map(runner, nruns)
-        else:
-            results = [run_lifesim_single(i=i, star_catalog=star_catalog) for i in nruns]
-    else:
-        runner = partial(run_lifesim_import_catalog, star_catalog=star_catalog)
-        if parallel:
-            with mp.Pool(processes=mp.cpu_count()) as pool:
-                results = pool.map(runner, nruns)
-        else:
-            results = [run_lifesim_import_catalog(i=i, star_catalog=star_catalog) for i in nruns]
-            
-    print(f"Finished {len(nruns)} runs in {time.time() - start:.2f} seconds")
-
-    # Combine all runs into one DataFrame
-    df_concat = pd.concat(results, keys=nruns).reset_index(level=0).rename(columns={'level_0': 'run'}).reset_index(drop=True)
-
-    print(f"Total time: {time.time() - start:.2f} seconds")
-
-    return df_concat
 
 if __name__ == '__main__':
-    
-    mp.set_start_method('spawn')
     main()

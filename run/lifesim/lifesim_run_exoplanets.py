@@ -12,7 +12,7 @@ from tools.paths import LIFESIM_DATA_DIR, EXOPLANETS_2026_CSV
 os.makedirs(LIFESIM_DATA_DIR, exist_ok=True)
 from tools.exoplanet_catalog import load_and_filter_exoplanets
 
-from run.run_sim import plot_all
+from plotting.plot import plot_all
 
 def load_exoplanets_csv(csv_path=EXOPLANETS_2026_CSV):
     df = load_and_filter_exoplanets(csv_path, instrument='LIFE')

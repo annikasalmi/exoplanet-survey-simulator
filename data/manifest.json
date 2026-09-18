@@ -1,0 +1,456 @@
+{
+  "manifest_version": 1,
+  "last_reviewed": "2026-09-18",
+  "scope": "Tracked exoplanet catalog snapshots and Gaia/TESS reference inputs used by the simulator.",
+  "coverage": {
+    "globs": [
+      "data/exoplanet_csv/*.csv",
+      "PPop/StarCatalogs/gaia_within_*pc.csv",
+      "science/telescopes/tess/data/spoc_cdpp_tmag.csv",
+      "science/telescopes/tess/data/sector_grid.npz"
+    ]
+  },
+  "providers": {
+    "nasa-exoplanet-archive": {
+      "name": "NASA Exoplanet Archive",
+      "homepage": "https://exoplanetarchive.ipac.caltech.edu/",
+      "schema_documentation": "https://exoplanetarchive.ipac.caltech.edu/docs/TAP/usingTAP.html",
+      "license_status": "No SPDX license is stated. The archive says its published data may be reused with appropriate acknowledgements.",
+      "terms_url": "https://exoplanetarchive.ipac.caltech.edu/docs/faq.html#14",
+      "citation_url": "https://exoplanetarchive.ipac.caltech.edu/docs/acknowledge.html"
+    },
+    "exofop-tess": {
+      "name": "Exoplanet Follow-up Observing Program for TESS (ExoFOP-TESS)",
+      "homepage": "https://exofop.ipac.caltech.edu/tess/",
+      "license_status": "No SPDX license is stated. Treat as an archive dataset requiring ExoFOP and contributing-source acknowledgement.",
+      "terms_url": "https://exoplanetarchive.ipac.caltech.edu/docs/faq.html#14",
+      "citation_url": "https://exoplanetarchive.ipac.caltech.edu/docs/acknowledge.html"
+    },
+    "gaia-dr3": {
+      "name": "ESA Gaia Archive, Data Release 3",
+      "homepage": "https://gea.esac.esa.int/archive/",
+      "schema_documentation": "https://gea.esac.esa.int/archive/documentation/GDR3/",
+      "license_status": "Open and free to use with required ESA/Gaia/DPAC credit under the Gaia Archive terms.",
+      "terms_url": "https://gea.esac.esa.int/archive/documentation/GDR3/Miscellaneous/sec_credit_and_citation_instructions/",
+      "citation_url": "https://gea.esac.esa.int/archive/documentation/GDR3/Miscellaneous/sec_credit_and_citation_instructions/"
+    },
+    "mast-tess": {
+      "name": "Mikulski Archive for Space Telescopes (MAST), TESS mission products",
+      "homepage": "https://archive.stsci.edu/tess/",
+      "license_status": "Public mission data. MAST says most hosted data are public domain and requests mission/STScI acknowledgement; check its policy for exceptions.",
+      "terms_url": "https://archive.stsci.edu/publishing/data-use",
+      "citation_url": "https://archive.stsci.edu/publishing/mission-acknowledgements"
+    },
+    "tess-point": {
+      "name": "TESS-Point",
+      "homepage": "https://github.com/tessgi/tess-point",
+      "license_status": "MIT",
+      "terms_url": "https://github.com/tessgi/tess-point/blob/master/LICENSE"
+    }
+  },
+  "datasets": [
+    {
+      "id": "exofop-tess-toi-2026",
+      "path": "data/exoplanet_csv/exofop_toi.csv",
+      "description": "ExoFOP-TESS Objects of Interest snapshot used to calibrate the TESS detector.",
+      "format": "csv",
+      "provider": "exofop-tess",
+      "license_policy_ref": "exofop-tess",
+      "source": {
+        "landing_url": "https://exofop.ipac.caltech.edu/tess/view_toi.php",
+        "retrieval": {
+          "kind": "url",
+          "url": "https://exofop.ipac.caltech.edu/tess/download_toi.php?sort=toi&output=csv"
+        },
+        "query_provenance": "The endpoint is defined in plotting/scripts/calibration/tess_calibration.py; the historical retrieval time was not recorded."
+      },
+      "snapshot": {
+        "downloaded_at": null,
+        "date_evidence": "Unknown; the file was first committed on 2026-09-04.",
+        "first_committed_at": "2026-09-04T15:49:25+02:00",
+        "first_commit": "115770cbbb3a4108d45302fe9ca10df65d64db74",
+        "row_count": 8148
+      },
+      "schema": {
+        "documentation_url": "https://exofop.ipac.caltech.edu/tess/view_toi.php",
+        "column_count": 63,
+        "header_sha256": "6bcffd5c7de724213de0105d8d183368ace9074b9aaf9624fdff9568edfa8d6f",
+        "columns": [
+          "TIC ID", "TOI", "Previous CTOI", "Master", "SG1A", "SG1B", "SG2", "SG3", "SG4", "SG5", "ESM", "TSM", "Predicted Mass (M_Earth)", "Predicted RV Semi-amplitude (m/s)", "Time Series Observations", "Spectroscopy Observations", "Imaging Observations", "TESS Disposition", "TFOPWG Disposition", "TESS Mag", "TESS Mag err", "Planet Name", "Pipeline Signal ID", "Source", "Detection", "RA", "Dec", "PM RA (mas/yr)", "PM RA err (mas/yr)", "PM Dec (mas/yr)", "PM Dec err (mas/yr)", "Epoch (BJD)", "Epoch (BJD) err", "Period (days)", "Period (days) err", "Duration (hours)", "Duration (hours) err", "Depth (mmag)", "Depth (mmag) err", "Depth (ppm)", "Depth (ppm) err", "Planet Radius (R_Earth)", "Planet Radius (R_Earth) err", "Planet Insolation (Earth Flux)", "Planet Equil Temp (K)", "Planet SNR", "Stellar Distance (pc)", "Stellar Distance (pc) err", "Stellar Eff Temp (K)", "Stellar Eff Temp (K) err", "Stellar log(g) (cm/s^2)", "Stellar log(g) (cm/s^2) err", "Stellar Radius (R_Sun)", "Stellar Radius (R_Sun) err", "Stellar Metallicity", "Stellar Metallicity err", "Stellar Mass (M_Sun)", "Stellar Mass (M_Sun) err", "Sectors", "Date TOI Alerted (UTC)", "Date TOI Updated (UTC)", "Date Modified", "Comments"
+        ]
+      },
+      "update": {
+        "mode": "in_place_snapshot",
+        "command": "curl -L 'https://exofop.ipac.caltech.edu/tess/download_toi.php?sort=toi&output=csv' -o data/exoplanet_csv/exofop_toi.csv"
+      },
+      "integrity": {
+        "bytes": 3856006,
+        "sha256": "abcf33fa311d676d42319d601ee085f206f61a8c38b80b5cc2e9a86be0f0094d"
+      }
+    },
+    {
+      "id": "nasa-ps-all-solutions-2026",
+      "path": "data/exoplanet_csv/exoplanets_2026.csv",
+      "description": "NASA Planetary Systems table snapshot with one row per planet/reference solution.",
+      "format": "csv",
+      "provider": "nasa-exoplanet-archive",
+      "license_policy_ref": "nasa-exoplanet-archive",
+      "source": {
+        "landing_url": "https://exoplanetarchive.ipac.caltech.edu/docs/API_PS_columns.html",
+        "retrieval": {
+          "kind": "nasa_tap",
+          "endpoint": "https://exoplanetarchive.ipac.caltech.edu/TAP/sync",
+          "query": "SELECT pl_name, hostname, default_flag, sy_snum, sy_pnum, discoverymethod, disc_year, disc_facility, soltype, pl_controv_flag, pl_refname, pl_orbper, pl_orbpererr1, pl_orbpererr2, pl_orbperlim, pl_orbsmax, pl_orbsmaxerr1, pl_orbsmaxerr2, pl_orbsmaxlim, pl_rade, pl_radeerr1, pl_radeerr2, pl_radelim, pl_radj, pl_radjerr1, pl_radjerr2, pl_radjlim, pl_bmasse, pl_bmasseerr1, pl_bmasseerr2, pl_bmasselim, pl_bmassj, pl_bmassjerr1, pl_bmassjerr2, pl_bmassjlim, pl_bmassprov, pl_orbeccen, pl_orbeccenerr1, pl_orbeccenerr2, pl_orbeccenlim, pl_insol, pl_insolerr1, pl_insolerr2, pl_insollim, pl_eqt, pl_eqterr1, pl_eqterr2, pl_eqtlim, ttv_flag, st_refname, st_spectype, st_teff, st_tefferr1, st_tefferr2, st_tefflim, st_rad, st_raderr1, st_raderr2, st_radlim, st_mass, st_masserr1, st_masserr2, st_masslim, st_met, st_meterr1, st_meterr2, st_metlim, st_metratio, st_logg, st_loggerr1, st_loggerr2, st_logglim, sy_refname, rastr, ra, decstr, dec, sy_dist, sy_disterr1, sy_disterr2, sy_vmag, sy_vmagerr1, sy_vmagerr2, sy_kmag, sy_kmagerr1, sy_kmagerr2, sy_gaiamag, sy_gaiamagerr1, sy_gaiamagerr2, rowupdate, pl_pubdate, releasedate FROM ps"
+        },
+        "query_provenance": "Reconstructed from the embedded NASA export metadata, exact 92-column schema, and PS row semantics; the original query string was not retained."
+      },
+      "snapshot": {
+        "downloaded_at": "2026-05-20T06:23:40",
+        "date_evidence": "Timestamp embedded by the NASA Exoplanet Archive at the top of the CSV.",
+        "first_committed_at": "2026-05-26T17:22:14+02:00",
+        "first_commit": "c02a02e4f94594037ced60e15cbefc49907344a1",
+        "row_count": 39860
+      },
+      "schema": {
+        "documentation_url": "https://exoplanetarchive.ipac.caltech.edu/docs/API_PS_columns.html",
+        "column_count": 92,
+        "header_sha256": "17d3db22c6309f55a9622049ed18377bb0f896c17fcfb14ebc351c6636a00594",
+        "columns": [
+          "pl_name", "hostname", "default_flag", "sy_snum", "sy_pnum", "discoverymethod", "disc_year", "disc_facility", "soltype", "pl_controv_flag", "pl_refname", "pl_orbper", "pl_orbpererr1", "pl_orbpererr2", "pl_orbperlim", "pl_orbsmax", "pl_orbsmaxerr1", "pl_orbsmaxerr2", "pl_orbsmaxlim", "pl_rade", "pl_radeerr1", "pl_radeerr2", "pl_radelim", "pl_radj", "pl_radjerr1", "pl_radjerr2", "pl_radjlim", "pl_bmasse", "pl_bmasseerr1", "pl_bmasseerr2", "pl_bmasselim", "pl_bmassj", "pl_bmassjerr1", "pl_bmassjerr2", "pl_bmassjlim", "pl_bmassprov", "pl_orbeccen", "pl_orbeccenerr1", "pl_orbeccenerr2", "pl_orbeccenlim", "pl_insol", "pl_insolerr1", "pl_insolerr2", "pl_insollim", "pl_eqt", "pl_eqterr1", "pl_eqterr2", "pl_eqtlim", "ttv_flag", "st_refname", "st_spectype", "st_teff", "st_tefferr1", "st_tefferr2", "st_tefflim", "st_rad", "st_raderr1", "st_raderr2", "st_radlim", "st_mass", "st_masserr1", "st_masserr2", "st_masslim", "st_met", "st_meterr1", "st_meterr2", "st_metlim", "st_metratio", "st_logg", "st_loggerr1", "st_loggerr2", "st_logglim", "sy_refname", "rastr", "ra", "decstr", "dec", "sy_dist", "sy_disterr1", "sy_disterr2", "sy_vmag", "sy_vmagerr1", "sy_vmagerr2", "sy_kmag", "sy_kmagerr1", "sy_kmagerr2", "sy_gaiamag", "sy_gaiamagerr1", "sy_gaiamagerr2", "rowupdate", "pl_pubdate", "releasedate"
+        ]
+      },
+      "update": {
+        "mode": "in_place_snapshot",
+        "command": "Run source.retrieval.query at source.retrieval.endpoint with format=csv and save the response to data/exoplanet_csv/exoplanets_2026.csv."
+      },
+      "integrity": {
+        "bytes": 38197090,
+        "sha256": "d514207d1579c77336e3f0e2c68e084f530eb50c2e69c93f8fdc9e16263ee8ad"
+      }
+    },
+    {
+      "id": "nasa-ps-tess-confirmed-2025",
+      "path": "data/exoplanet_csv/exoplanets_all_2025.csv",
+      "description": "NASA Planetary Systems default solutions for planets discovered by TESS.",
+      "format": "csv",
+      "provider": "nasa-exoplanet-archive",
+      "license_policy_ref": "nasa-exoplanet-archive",
+      "source": {
+        "landing_url": "https://exoplanetarchive.ipac.caltech.edu/docs/API_PS_columns.html",
+        "retrieval": {
+          "kind": "nasa_tap",
+          "endpoint": "https://exoplanetarchive.ipac.caltech.edu/TAP/sync",
+          "query": "SELECT pl_name, hostname, default_flag, sy_snum, sy_pnum, discoverymethod, disc_year, disc_facility, soltype, pl_controv_flag, pl_refname, pl_orbper, pl_orbpererr1, pl_orbpererr2, pl_orbperlim, pl_orbsmax, pl_orbsmaxerr1, pl_orbsmaxerr2, pl_orbsmaxlim, pl_rade, pl_radeerr1, pl_radeerr2, pl_radelim, pl_radj, pl_radjerr1, pl_radjerr2, pl_radjlim, pl_bmasse, pl_bmasseerr1, pl_bmasseerr2, pl_bmasselim, pl_bmassj, pl_bmassjerr1, pl_bmassjerr2, pl_bmassjlim, pl_bmassprov, pl_orbeccen, pl_orbeccenerr1, pl_orbeccenerr2, pl_orbeccenlim, pl_insol, pl_insolerr1, pl_insolerr2, pl_insollim, pl_eqt, pl_eqterr1, pl_eqterr2, pl_eqtlim, ttv_flag, st_refname, st_spectype, st_teff, st_tefferr1, st_tefferr2, st_tefflim, st_rad, st_raderr1, st_raderr2, st_radlim, st_mass, st_masserr1, st_masserr2, st_masslim, st_met, st_meterr1, st_meterr2, st_metlim, st_metratio, st_logg, st_loggerr1, st_loggerr2, st_logglim, sy_refname, rastr, ra, decstr, dec, sy_dist, sy_disterr1, sy_disterr2, sy_vmag, sy_vmagerr1, sy_vmagerr2, sy_kmag, sy_kmagerr1, sy_kmagerr2, sy_gaiamag, sy_gaiamagerr1, sy_gaiamagerr2, rowupdate, pl_pubdate, releasedate FROM ps WHERE default_flag = 1 AND disc_facility = 'Transiting Exoplanet Survey Satellite (TESS)'"
+        },
+        "query_provenance": "The original query was not retained. This reconstruction exactly matches the file invariants: all 638 rows have default_flag=1 and the TESS discovery facility."
+      },
+      "snapshot": {
+        "downloaded_at": null,
+        "date_evidence": "Unknown; the file was first committed on 2025-07-08.",
+        "first_committed_at": "2025-07-08T19:37:05+01:00",
+        "first_commit": "693b63377005086f8881bba2f93427e8eee396a5",
+        "row_count": 638
+      },
+      "schema": {
+        "documentation_url": "https://exoplanetarchive.ipac.caltech.edu/docs/API_PS_columns.html",
+        "column_count": 92,
+        "header_sha256": "17d3db22c6309f55a9622049ed18377bb0f896c17fcfb14ebc351c6636a00594",
+        "columns": [
+          "pl_name", "hostname", "default_flag", "sy_snum", "sy_pnum", "discoverymethod", "disc_year", "disc_facility", "soltype", "pl_controv_flag", "pl_refname", "pl_orbper", "pl_orbpererr1", "pl_orbpererr2", "pl_orbperlim", "pl_orbsmax", "pl_orbsmaxerr1", "pl_orbsmaxerr2", "pl_orbsmaxlim", "pl_rade", "pl_radeerr1", "pl_radeerr2", "pl_radelim", "pl_radj", "pl_radjerr1", "pl_radjerr2", "pl_radjlim", "pl_bmasse", "pl_bmasseerr1", "pl_bmasseerr2", "pl_bmasselim", "pl_bmassj", "pl_bmassjerr1", "pl_bmassjerr2", "pl_bmassjlim", "pl_bmassprov", "pl_orbeccen", "pl_orbeccenerr1", "pl_orbeccenerr2", "pl_orbeccenlim", "pl_insol", "pl_insolerr1", "pl_insolerr2", "pl_insollim", "pl_eqt", "pl_eqterr1", "pl_eqterr2", "pl_eqtlim", "ttv_flag", "st_refname", "st_spectype", "st_teff", "st_tefferr1", "st_tefferr2", "st_tefflim", "st_rad", "st_raderr1", "st_raderr2", "st_radlim", "st_mass", "st_masserr1", "st_masserr2", "st_masslim", "st_met", "st_meterr1", "st_meterr2", "st_metlim", "st_metratio", "st_logg", "st_loggerr1", "st_loggerr2", "st_logglim", "sy_refname", "rastr", "ra", "decstr", "dec", "sy_dist", "sy_disterr1", "sy_disterr2", "sy_vmag", "sy_vmagerr1", "sy_vmagerr2", "sy_kmag", "sy_kmagerr1", "sy_kmagerr2", "sy_gaiamag", "sy_gaiamagerr1", "sy_gaiamagerr2", "rowupdate", "pl_pubdate", "releasedate"
+        ]
+      },
+      "update": {
+        "mode": "in_place_snapshot",
+        "command": "Run source.retrieval.query at source.retrieval.endpoint with format=csv and save the response to data/exoplanet_csv/exoplanets_all_2025.csv.",
+        "note": "Prefer a newly dated filename and manifest id if the snapshot year is meant to remain meaningful."
+      },
+      "integrity": {
+        "bytes": 706379,
+        "sha256": "ab1a0ebce7278621a21bfc4d3438627f025b60a777c31f74f8e9a1725b1d8604"
+      }
+    },
+    {
+      "id": "nasa-kepler-koi-dr25-cdpp-2026",
+      "path": "data/exoplanet_csv/koi_cumulative_stellar.csv",
+      "description": "KOI cumulative table joined to Kepler stellar CDPP, reduced to one longest-baseline row per KOI.",
+      "format": "csv",
+      "provider": "nasa-exoplanet-archive",
+      "license_policy_ref": "nasa-exoplanet-archive",
+      "source": {
+        "landing_url": "https://exoplanetarchive.ipac.caltech.edu/docs/Kepler_stellar_docs.html",
+        "retrieval": {
+          "kind": "nasa_tap",
+          "endpoint": "https://exoplanetarchive.ipac.caltech.edu/TAP/sync",
+          "query": "SELECT c.kepid, c.kepoi_name, c.koi_disposition, c.koi_pdisposition, c.koi_period, c.koi_prad, c.koi_sma, c.koi_insol, c.koi_depth, c.koi_duration, c.koi_incl, c.koi_steff, c.koi_srad, c.koi_smass, c.koi_kepmag, c.koi_max_sngle_ev, c.koi_max_mult_ev, c.koi_model_snr, c.koi_num_transits, c.koi_tce_delivname, s.dataspan, s.dutycycle, s.rrmscdpp01p5, s.rrmscdpp02p0, s.rrmscdpp02p5, s.rrmscdpp03p0, s.rrmscdpp03p5, s.rrmscdpp04p5, s.rrmscdpp05p0, s.rrmscdpp06p0, s.rrmscdpp07p5, s.rrmscdpp09p0, s.rrmscdpp10p5, s.rrmscdpp12p0, s.rrmscdpp12p5, s.rrmscdpp15p0 FROM cumulative c JOIN keplerstellar s ON c.kepid = s.kepid WHERE c.koi_period IS NOT NULL AND c.koi_prad IS NOT NULL AND c.koi_srad IS NOT NULL AND c.koi_depth IS NOT NULL AND c.koi_duration IS NOT NULL"
+        },
+        "transform": {
+          "kind": "koi_longest_dataspan",
+          "key": "kepoi_name",
+          "sort_by": "dataspan",
+          "required_value": "rrmscdpp07p5"
+        },
+        "query_provenance": "Exact query and reduction are defined in plotting/scripts/calibration/kepler_calibration.py."
+      },
+      "snapshot": {
+        "downloaded_at": null,
+        "date_evidence": "Unknown; the file was first committed on 2026-09-04.",
+        "first_committed_at": "2026-09-04T15:49:25+02:00",
+        "first_commit": "115770cbbb3a4108d45302fe9ca10df65d64db74",
+        "row_count": 9201
+      },
+      "schema": {
+        "documentation_url": "https://exoplanetarchive.ipac.caltech.edu/docs/Kepler_stellar_docs.html",
+        "column_count": 36,
+        "header_sha256": "d4086a61e618d37be10cfb3910203befc30dba5b95acc2c56c1f46af37ca071a",
+        "columns": [
+          "kepid", "kepoi_name", "koi_disposition", "koi_pdisposition", "koi_period", "koi_prad", "koi_sma", "koi_insol", "koi_depth", "koi_duration", "koi_incl", "koi_steff", "koi_srad", "koi_smass", "koi_kepmag", "koi_max_sngle_ev", "koi_max_mult_ev", "koi_model_snr", "koi_num_transits", "koi_tce_delivname", "dataspan", "dutycycle", "rrmscdpp01p5", "rrmscdpp02p0", "rrmscdpp02p5", "rrmscdpp03p0", "rrmscdpp03p5", "rrmscdpp04p5", "rrmscdpp05p0", "rrmscdpp06p0", "rrmscdpp07p5", "rrmscdpp09p0", "rrmscdpp10p5", "rrmscdpp12p0", "rrmscdpp12p5", "rrmscdpp15p0"
+        ]
+      },
+      "update": {
+        "mode": "in_place_snapshot",
+        "command": "Run source.retrieval.query at source.retrieval.endpoint with format=csv, apply source.transform, and save the result to data/exoplanet_csv/koi_cumulative_stellar.csv."
+      },
+      "integrity": {
+        "bytes": 2598821,
+        "sha256": "76224f4f7952a53d72a36a619746eb2bc75d7c2e2110d73b2224a9522b2c8c4f"
+      }
+    },
+    {
+      "id": "nasa-pscomppars-analysis-2026",
+      "path": "data/exoplanet_csv/pscomppars_2026.csv",
+      "description": "Selected PSCompPars columns used by population and detector analyses.",
+      "format": "csv",
+      "provider": "nasa-exoplanet-archive",
+      "license_policy_ref": "nasa-exoplanet-archive",
+      "source": {
+        "landing_url": "https://exoplanetarchive.ipac.caltech.edu/docs/API_PS_columns.html",
+        "retrieval": {
+          "kind": "nasa_tap",
+          "endpoint": "https://exoplanetarchive.ipac.caltech.edu/TAP/sync",
+          "query": "SELECT pl_name, hostname, disc_year, disc_facility, discoverymethod, pl_orbper, pl_orbsmax, pl_orbeccen, pl_orbincl, pl_rade, pl_radeerr1, pl_radeerr2, pl_radelim, pl_bmasse, pl_bmasseerr1, pl_bmasseerr2, pl_bmasselim, pl_bmassprov, pl_insol, pl_insolerr1, pl_insolerr2, pl_eqt, pl_trandep, pl_trandur, pl_ratror, pl_rvamp, pl_rvamperr1, pl_rvamperr2, st_teff, st_tefferr1, st_rad, st_raderr1, st_mass, st_masserr1, st_lum, st_logg, st_met, st_rotp, sy_dist, sy_vmag, sy_kmag, sy_jmag, sy_gaiamag, sy_tmag, sy_kepmag, ra, dec, tran_flag, rv_flag FROM pscomppars"
+        },
+        "query_provenance": "Reconstructed from the exact selected-column schema; the original query string and retrieval time were not retained."
+      },
+      "snapshot": {
+        "downloaded_at": null,
+        "date_evidence": "Unknown; the file was first committed on 2026-09-04.",
+        "first_committed_at": "2026-09-04T15:49:25+02:00",
+        "first_commit": "115770cbbb3a4108d45302fe9ca10df65d64db74",
+        "row_count": 6360
+      },
+      "schema": {
+        "documentation_url": "https://exoplanetarchive.ipac.caltech.edu/docs/API_PS_columns.html",
+        "column_count": 49,
+        "header_sha256": "d7ef835b85bda8bf2f240b5182f1b242564397b65e1123a4c8694feb88cbfd70",
+        "columns": [
+          "pl_name", "hostname", "disc_year", "disc_facility", "discoverymethod", "pl_orbper", "pl_orbsmax", "pl_orbeccen", "pl_orbincl", "pl_rade", "pl_radeerr1", "pl_radeerr2", "pl_radelim", "pl_bmasse", "pl_bmasseerr1", "pl_bmasseerr2", "pl_bmasselim", "pl_bmassprov", "pl_insol", "pl_insolerr1", "pl_insolerr2", "pl_eqt", "pl_trandep", "pl_trandur", "pl_ratror", "pl_rvamp", "pl_rvamperr1", "pl_rvamperr2", "st_teff", "st_tefferr1", "st_rad", "st_raderr1", "st_mass", "st_masserr1", "st_lum", "st_logg", "st_met", "st_rotp", "sy_dist", "sy_vmag", "sy_kmag", "sy_jmag", "sy_gaiamag", "sy_tmag", "sy_kepmag", "ra", "dec", "tran_flag", "rv_flag"
+        ]
+      },
+      "update": {
+        "mode": "in_place_snapshot",
+        "command": "Run source.retrieval.query at source.retrieval.endpoint with format=csv and save the response to data/exoplanet_csv/pscomppars_2026.csv."
+      },
+      "integrity": {
+        "bytes": 1923280,
+        "sha256": "b79bf94bebc11f0adaa28b3c866f29825af5bd0858f34a68c71de47dee3e8b37"
+      }
+    },
+    {
+      "id": "nasa-pscomppars-transiting-mass-insolation-2026",
+      "path": "data/exoplanet_csv/pscomppars_transiting_mass_insol.csv",
+      "description": "Transiting PSCompPars planets with radius, mass, and insolation for the offline quickstart and rocky-planet figures.",
+      "format": "csv",
+      "provider": "nasa-exoplanet-archive",
+      "license_policy_ref": "nasa-exoplanet-archive",
+      "source": {
+        "landing_url": "https://exoplanetarchive.ipac.caltech.edu/docs/API_PS_columns.html",
+        "retrieval": {
+          "kind": "nasa_tap",
+          "endpoint": "https://exoplanetarchive.ipac.caltech.edu/TAP/sync",
+          "query": "SELECT pl_name, hostname, discoverymethod, disc_facility, tran_flag, pl_insol, pl_insolerr1, pl_insolerr2, pl_insollim, pl_rade, pl_radeerr1, pl_radeerr2, pl_radelim, pl_rade_reflink, pl_bmasse, pl_bmasseerr1, pl_bmasseerr2, pl_bmasselim, pl_bmassprov, pl_bmasse_reflink, st_teff, st_rad, st_mass, st_lum, sy_dist FROM pscomppars WHERE tran_flag = 1 AND pl_rade IS NOT NULL AND pl_bmasse IS NOT NULL AND pl_insol IS NOT NULL"
+        },
+        "query_provenance": "Exact query is defined by _build_nasa_query() in plotting/scripts/analysis/rocky_scatter_gaia60pc.py."
+      },
+      "snapshot": {
+        "downloaded_at": "2026-09-10",
+        "date_evidence": "Recorded in README.md when the offline snapshot was added.",
+        "first_committed_at": "2026-09-18T14:14:41+02:00",
+        "first_commit": "94e33a7f0b4100a5416c859a007408912af97146",
+        "row_count": 4500
+      },
+      "schema": {
+        "documentation_url": "https://exoplanetarchive.ipac.caltech.edu/docs/API_PS_columns.html",
+        "column_count": 25,
+        "header_sha256": "5362087ff94e4e697aab35ac8ef52d5b16bcc68ebcc0c18355851742564a7462",
+        "columns": [
+          "pl_name", "hostname", "discoverymethod", "disc_facility", "tran_flag", "pl_insol", "pl_insolerr1", "pl_insolerr2", "pl_insollim", "pl_rade", "pl_radeerr1", "pl_radeerr2", "pl_radelim", "pl_rade_reflink", "pl_bmasse", "pl_bmasseerr1", "pl_bmasseerr2", "pl_bmasselim", "pl_bmassprov", "pl_bmasse_reflink", "st_teff", "st_rad", "st_mass", "st_lum", "sy_dist"
+        ]
+      },
+      "update": {
+        "mode": "in_place_snapshot",
+        "command": "Run source.retrieval.query at source.retrieval.endpoint with format=csv and save the response to data/exoplanet_csv/pscomppars_transiting_mass_insol.csv."
+      },
+      "integrity": {
+        "bytes": 1740370,
+        "sha256": "8d9f1438114cd5e0d98163c4f05060ab703cd7ca9fa2ed79ee845cd69e3e6ded"
+      }
+    },
+    {
+      "id": "gaia-dr3-20pc-legacy",
+      "path": "PPop/StarCatalogs/gaia_within_20pc.csv",
+      "description": "Legacy Gaia DR3 20 pc stellar sample; retained for small tests but superseded by the documented 60 pc catalog.",
+      "format": "csv",
+      "provider": "gaia-dr3",
+      "license_policy_ref": "gaia-dr3",
+      "source": {
+        "landing_url": "https://gea.esac.esa.int/archive/",
+        "query": "Original ADQL query not retained. The path implies a 20 pc parallax cut and the selected columns are recorded below.",
+        "query_provenance": "Incomplete legacy provenance. Do not treat a guessed query as equivalent to this frozen snapshot."
+      },
+      "snapshot": {
+        "downloaded_at": null,
+        "date_evidence": "Unknown; the file was first committed on 2025-06-17.",
+        "first_committed_at": "2025-06-17T14:31:59+01:00",
+        "first_commit": "573ed92c3df7864e1958ee4c3011b792e1ec37ae",
+        "row_count": 289
+      },
+      "schema": {
+        "documentation_url": "https://gea.esac.esa.int/archive/documentation/GDR3/Gaia_archive/chap_datamodel/sec_dm_main_source_catalogue/ssec_dm_gaia_source.html",
+        "column_count": 13,
+        "header_sha256": "19a9e37dec7b6a5c80eaf6f14ea6c0569c6163b9b578b35356e78bda9f04a99b",
+        "columns": [
+          "SOURCE_ID", "ra", "dec", "parallax", "parallax_error", "phot_g_mean_mag", "pmra", "pmdec", "radial_velocity", "teff_gspphot", "radius_gspphot", "mass_flame", "bp_rp"
+        ]
+      },
+      "update": {
+        "mode": "frozen_legacy",
+        "command": null,
+        "note": "Use gaia-dr3-60pc for new work. A refresh would require choosing and documenting a new ADQL query rather than overwriting this unidentified selection."
+      },
+      "integrity": {
+        "bytes": 70046,
+        "sha256": "078d08ec05637cd97983a2c9c9e6bbdf80248aac31bba037ce37c30687cf5573"
+      }
+    },
+    {
+      "id": "gaia-dr3-60pc",
+      "path": "PPop/StarCatalogs/gaia_within_60pc.csv",
+      "description": "Gaia DR3 sources within 60 pc after parallax precision, RUWE, and photometry quality cuts.",
+      "format": "csv",
+      "provider": "gaia-dr3",
+      "license_policy_ref": "gaia-dr3",
+      "source": {
+        "landing_url": "https://gea.esac.esa.int/archive/",
+        "query_language": "ADQL",
+        "query": "SELECT source_id, ra, dec, parallax, parallax_error, phot_g_mean_mag, bp_rp, ruwe FROM gaiadr3.gaia_source WHERE parallax > 16.667 AND parallax_over_error > 5 AND ruwe < 1.4 AND phot_g_mean_mag IS NOT NULL AND bp_rp IS NOT NULL",
+        "query_provenance": "Exact ADQL is defined as ADQL in PPop/StarCatalogs/build_gaia_60pc.py."
+      },
+      "snapshot": {
+        "downloaded_at": null,
+        "date_evidence": "Unknown; generated no later than its first commit on 2026-09-13.",
+        "first_committed_at": "2026-09-13T19:51:46+02:00",
+        "first_commit": "a7c68c45d3c43de8857251806ffe1d3ccff1bf22",
+        "row_count": 59279
+      },
+      "schema": {
+        "documentation_url": "https://gea.esac.esa.int/archive/documentation/GDR3/Gaia_archive/chap_datamodel/sec_dm_main_source_catalogue/ssec_dm_gaia_source.html",
+        "column_count": 8,
+        "header_sha256": "f330c017d4ce9a632dd0a4d9f3df5c74c66903c4ed7a5d41c1a3c1e3b9f67e79",
+        "columns": [
+          "SOURCE_ID", "ra", "dec", "parallax", "parallax_error", "phot_g_mean_mag", "bp_rp", "ruwe"
+        ]
+      },
+      "update": {
+        "mode": "rebuild",
+        "command": "python PPop/StarCatalogs/build_gaia_60pc.py"
+      },
+      "integrity": {
+        "bytes": 6922634,
+        "sha256": "0a58a3e12c252f0e9f91566e2da23fa3930357302e5c92401468febd05a0280f"
+      }
+    },
+    {
+      "id": "tess-spoc-cdpp-tmag-sectors-1-106",
+      "path": "science/telescopes/tess/data/spoc_cdpp_tmag.csv",
+      "description": "Median SPOC robust RMS CDPP by sector and 0.5-mag Tmag bin, derived from MAST single-sector tables 1-106.",
+      "format": "csv",
+      "provider": "mast-tess",
+      "license_policy_ref": "mast-tess",
+      "source": {
+        "landing_url": "https://archive.stsci.edu/tess/bulk_downloads/bulk_downloads_tce.html",
+        "upstream_url_template": "https://archive.stsci.edu/missions/tess/catalogs/cdpp/{filename}",
+        "transform": "science/telescopes/tess/build_reference_data.py build_noise: keep sectors <=106, bin Tmag to 0.5 mag, take median CDPP per sector/bin and across all sectors (sector 0), retain bins with at least 10 target-sectors.",
+        "query_provenance": "Exact discovery/download and aggregation code is in science/telescopes/tess/download_cdpp.py and build_reference_data.py."
+      },
+      "snapshot": {
+        "downloaded_at": null,
+        "date_evidence": "Upstream download/build time was not recorded; the derived file was first committed on 2026-09-15.",
+        "first_committed_at": "2026-09-15T10:52:34+02:00",
+        "first_commit": "8f2c8dbc2db180311b7feedb7c809339977927af",
+        "row_count": 3550
+      },
+      "schema": {
+        "documentation_url": "https://archive.stsci.edu/tess/bulk_downloads/bulk_downloads_tce.html",
+        "column_count": 18,
+        "header_sha256": "5159bc4a7926fd268568e533caf5bba3897de0732ccd08300cdbc6219b5bfc8e",
+        "columns": [
+          "sector", "tmag_bin", "rrmscdpp00p5", "rrmscdpp01p0", "rrmscdpp01p5", "rrmscdpp02p0", "rrmscdpp02p5", "rrmscdpp03p0", "rrmscdpp03p5", "rrmscdpp04p5", "rrmscdpp05p0", "rrmscdpp06p0", "rrmscdpp07p5", "rrmscdpp09p0", "rrmscdpp10p5", "rrmscdpp12p5", "rrmscdpp15p0", "n_stars"
+        ]
+      },
+      "update": {
+        "mode": "rebuild",
+        "command": "python science/telescopes/tess/download_cdpp.py && python science/telescopes/tess/build_reference_data.py noise",
+        "note": "MAX_SECTOR=106 is part of this snapshot definition; review and rename the dataset if extending it."
+      },
+      "integrity": {
+        "bytes": 478776,
+        "sha256": "37c0055443e2512fb9e389a236443c41a0172342e64a386875524344a4549f87"
+      }
+    },
+    {
+      "id": "tess-sector-grid-through-106",
+      "path": "science/telescopes/tess/data/sector_grid.npz",
+      "description": "Equal-area sky grid of TESS sector coverage through sector 106, generated with tess-point 0.9.5.post1.",
+      "format": "npz",
+      "provider": "tess-point",
+      "license_policy_ref": "tess-point",
+      "source": {
+        "landing_url": "https://github.com/tessgi/tess-point",
+        "generator": "science/telescopes/tess/build_reference_data.py build_grid",
+        "parameters": {
+          "max_sector": 106,
+          "n_lon": 360,
+          "n_sinlat": 180,
+          "obliquity_deg": 23.439,
+          "tess_point_version": "0.9.5.post1"
+        }
+      },
+      "snapshot": {
+        "downloaded_at": null,
+        "date_evidence": "Generated locally; build time was not recorded. The file was first committed on 2026-09-15.",
+        "first_committed_at": "2026-09-15T10:52:34+02:00",
+        "first_commit": "8f2c8dbc2db180311b7feedb7c809339977927af"
+      },
+      "schema": {
+        "container": "NumPy compressed archive",
+        "arrays": {
+          "covered_bits": {"dtype": "uint8", "shape": [64800, 14]},
+          "n_lon": {"dtype": "int64", "shape": [], "value": 360},
+          "n_sinlat": {"dtype": "int64", "shape": [], "value": 180},
+          "max_sector": {"dtype": "int64", "shape": [], "value": 106},
+          "obliquity_deg": {"dtype": "float64", "shape": [], "value": 23.439},
+          "tess_point_version": {"dtype": "<U11", "shape": [], "value": "0.9.5.post1"}
+        }
+      },
+      "update": {
+        "mode": "rebuild",
+        "command": "python science/telescopes/tess/build_reference_data.py grid",
+        "note": "Requires the tess extra: pip install -e \".[tess]\"."
+      },
+      "integrity": {
+        "bytes": 49041,
+        "sha256": "41e69af362e2d0d790bcfcac36bee740063116568696ca058051311c2a45cbf0"
+      }
+    }
+  ]
+}

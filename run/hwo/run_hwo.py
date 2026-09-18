@@ -1,13 +1,14 @@
-import time
 import os
 import pandas as pd
-import multiprocessing as mp
 import numpy as np
-from functools import partial
 
 from science.populations.ppop import PPop, set_star_catalog
 from science.telescopes.hwo.detection_model import HWOData
+from run.multi_run import run_universes
 from tools.paths import HWO_DATA_DIR
+
+# Universes run at once; defaults to every core.
+MAX_WORKERS = os.cpu_count()
 
 def run_single(i, star_catalog='Gaia'):
     '''
@@ -40,31 +41,11 @@ def run_hwo_import_catalog(i, star_catalog):
     return df
 
 def main(parallel=False, nruns=np.arange(1), star_catalog='Gaia', run_anew=True):
-    start = time.time()
-
-    if run_anew:
-        runner = partial(run_single, star_catalog=star_catalog)
-        if parallel:
-            with mp.Pool(processes=mp.cpu_count()) as pool:
-                results = pool.map(runner, nruns)
-        else:
-            results = [run_single(i=i, star_catalog=star_catalog) for i in nruns]
-    else:
-        runner = partial(run_hwo_import_catalog, star_catalog=star_catalog)
-        if parallel:
-            with mp.Pool(processes=mp.cpu_count()) as pool:
-                results = pool.map(runner, nruns)
-        else:
-            results = [run_hwo_import_catalog(i=i, star_catalog=star_catalog) for i in nruns]
-
-    df_concat = pd.concat(results, keys=nruns).reset_index(level=0).rename(columns={'level_0': 'run'}).reset_index(drop=True)
-    print(f"Total time: {time.time() - start:.2f} seconds")
-
-    return df_concat
+    return run_universes(run_single, run_hwo_import_catalog, nruns, star_catalog,
+                         run_anew, parallel, MAX_WORKERS)
 
 
 if __name__ == '__main__':
     NRUNS = np.arange(3)
     STAR_CATALOG = 'Gaia'#ExoCat_1'  # or 'LTC_3'
-    mp.set_start_method('spawn')
     main(nruns=NRUNS, star_catalog=STAR_CATALOG, parallel=True)

@@ -9,6 +9,7 @@
                         results/catalogs/tess/CDPP (MAST TCE bulk-download page).
 
 Run from repo root:  python science/telescopes/tess/build_reference_data.py [grid|noise|all] [cdpp_dir]
+The grid step needs tess-point:  pip install -e ".[tess]"
 """
 
 import sys

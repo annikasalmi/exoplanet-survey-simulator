@@ -42,11 +42,14 @@ setup(
                       'PyQt5>=5.15.4,<6',
                       'pyyaml',
                       'requests',
+                      'scikit-learn',
                       'scipy>=1.7.0',
                       'spectres',
                       'tables>=3.8.0',
                       'tqdm>=4.64.1'],
-    extras_require={'test': ['pytest>=6.0.0', 'pytest-cov>=2.10.0']},
+    # `tess`: only for rebuilding the committed TESS sector grid (build_reference_data.py).
+    extras_require={'test': ['pytest>=6.0.0', 'pytest-cov>=2.10.0'],
+                    'tess': ['tess-point']},
     license='GPLv3',
     zip_safe=False,
     keywords='exoplanets astronomy survey selection transit radial-velocity rocky '

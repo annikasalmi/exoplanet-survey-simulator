@@ -1,13 +1,11 @@
 import os
-import time
-import multiprocessing as mp
-from functools import partial
 
 import numpy as np
 import pandas as pd
 
 from science.populations.ppop import PPop, set_star_catalog
 from science.telescopes.tess.detection_model import TESSData
+from run.multi_run import run_universes
 from tools.paths import TESS_DATA_DIR
 
 # A TESS worker holds CDPP tables, tess-point and an exozodi KDE on top of the
@@ -53,24 +51,8 @@ def run_tess_import_catalog(i, star_catalog):
     return df
 
 def main(parallel=False, nruns=np.arange(1), star_catalog='Gaia', run_anew=True):
-    start = time.time()
-
-    if run_anew:
-        runner = partial(run_single, star_catalog=star_catalog)
-    else:
-        runner = partial(run_tess_import_catalog, star_catalog=star_catalog)
-
-    if parallel:
-        with mp.Pool(processes=min(len(nruns), MAX_WORKERS)) as pool:
-            results = pool.map(runner, nruns)
-    else:
-        results = [runner(i) for i in nruns]
-
-    df_concat = pd.concat(results, keys=nruns).reset_index(level=0).rename(columns={'level_0': 'run'}).reset_index(drop=True)
-
-    print(f"Total time: {time.time() - start:.2f} seconds")
-
-    return df_concat
+    return run_universes(run_single, run_tess_import_catalog, nruns, star_catalog,
+                         run_anew, parallel, MAX_WORKERS)
 
 
 if __name__ == '__main__':

@@ -15,13 +15,13 @@ import plotting.likelihood_ratio_plotter as likelihood_ratio_plotter
 from plotting.plot_flat_universe import plot_flat_universe
 import run.flat_universe.run_flat_universe as flat
 from science.populations.universes import is_super_earth
-import run.hwo.hwo_run_multiple as hwo
+import run.hwo.run_hwo as hwo
 import run.kepler.run_kepler as kepler
-import run.lifesim.lifesim_run_multiple as lifesim
+import run.lifesim.run_lifesim as lifesim
 import run.rv.run_rv as rv
-import run.run_sim as run_sim_module
 import run.tess.run_tess as tess
 from science.populations.ppop import PPop
+import sim
 
 # Gaia stars within 10 pc: ~220 stars and ~700 planets per universe, a few seconds
 # each, and still enough planets that Kepler and TESS detect some.
@@ -82,7 +82,7 @@ def sandbox(tmp_path_factory):
         (root / 'flat_universe').mkdir()
         mp.setattr(base_plotter, 'PLOTS_DIR', str(root / 'figures'))
         mp.setattr(likelihood_ratio_plotter, 'OUT_DIR', str(root / 'likelihood_ratio'))
-        mp.setattr(run_sim_module, 'LOGGING', str(root / 'logs'))
+        mp.setattr(sim, 'LOGGING', str(root / 'logs'))
         yield root
 
 
@@ -91,7 +91,7 @@ def ppop_run(request, sandbox):
     """One run_sim call per pipeline (two universes, with plots), shared by the tests below."""
     name = request.param
     module, _, detected_col = PPOP_PIPELINES[name]
-    df = run_sim_module.run_sim(func=module.main, name=name, parallel=False, nruns=NRUNS,
+    df = sim.run_sim(func=module.main, name=name, parallel=False, nruns=NRUNS,
                                 star_catalog='Gaia', run_anew=True, plot=True)
     return name, module, detected_col, df
 
@@ -131,7 +131,7 @@ def test_ppop_pipeline_is_seeded(ppop_run):
 
 def test_flat_universe(sandbox):
     n_planets = 20_000
-    df = run_sim_module.run_sim(func=flat.main, name='flat_universe', parallel=False,
+    df = sim.run_sim(func=flat.main, name='flat_ab', parallel=False,
                                 nruns=np.arange(1), run_anew=True, plot=False,
                                 seed=0, n_planets=n_planets)
 
@@ -168,3 +168,13 @@ def test_kepler_on_nasa_pscomppars(sandbox):
 def test_kepler_rejects_unknown_population():
     with pytest.raises(ValueError):
         kepler.main(population='not_a_population')
+
+
+def test_run_sim_accepts_integer_nruns(sandbox):
+    def fake_pipeline(**kwargs):
+        assert kwargs["nruns"] == [0, 1, 2]
+        return pd.DataFrame({"radius_p": [1.0, 2.0], "run": [0, 1]})
+
+    df = sim.run_sim(func=fake_pipeline, name="fake", parallel=False, nruns=3, plot=False)
+
+    assert list(df["radius_bin"].astype(str)) == ["<1.5", "1.5–3.0"]

@@ -25,10 +25,9 @@ jobs:
           python-version: '3.11'
           cache: pip
 
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install -e .
+      # The README install, plus the test extra.
+      - name: Install
+        run: pip install -e ".[test]"
 
       # Every pipeline end to end on stars within 10 pc, plus the detector unit tests.
       - name: Run tests
@@ -37,5 +36,5 @@ jobs:
       # The README quickstart; also check the figure landed where the README says.
       - name: Run the quickstart demo
         run: |
-          python simulation_demo.py
+          python sim.py
           test -f results/figures/analysis/flat_transit_rv_3x3/flat_transit_rv_3x3_otegi.png

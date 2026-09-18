@@ -1,6 +1,6 @@
 """TEST LR: does NASA's catalog look like flat universe A (cold rocky M>2 corner removed) or B (kept)?
 Both pass the same Kepler+RV detectors and noise; a classifier learns p_B/p_A per planet, and
-NASA's summed log-ratio is compared to resampled A and B catalogs. Run via simulation_demo.py.
+NASA's summed log-ratio is compared to resampled A and B catalogs. Run via the flat_ab line in sim.py.
 """
 
 from __future__ import annotations

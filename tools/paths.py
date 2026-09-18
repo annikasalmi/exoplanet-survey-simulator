@@ -41,5 +41,7 @@ EXOPLANETS_ALL_2025_CSV = os.path.join(EXOPLANET_CSV_DIR, "exoplanets_all_2025.c
 KOI_CUMULATIVE_CSV = os.path.join(EXOPLANET_CSV_DIR, "koi_cumulative_stellar.csv")
 EXOFOP_TOI_CSV = os.path.join(EXOPLANET_CSV_DIR, "exofop_toi.csv")
 PSCOMPPARS_CSV = os.path.join(EXOPLANET_CSV_DIR, "pscomppars_2026.csv")
+# Transiting PSCompPars planets with mass and insolation, pulled 2026-09-10.
+PSCOMPPARS_TRANSITING_CSV = os.path.join(EXOPLANET_CSV_DIR, "pscomppars_transiting_mass_insol.csv")
 KEPLER_REF_CURVE = os.path.join(
     REPO_ROOT, "science", "telescopes", "kepler", "reference_curves", "ref.ddat")

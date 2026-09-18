@@ -121,7 +121,15 @@ These read the universes it writes, and none of their output is in the paper:
 - `tools/`: shared paths and constants
 - `data/`: input data (tracked)
 - `results/`: everything the pipelines write (git-ignored, see `results/README.md`)
-- `lifesim/`, `PPop/`: the vendored forks
+- `lifesim/`, `PPop/`: modified copies of outside code (see below)
+
+## Vendored code
+
+Only `PPop/` and `lifesim/` come from other projects; their `UPSTREAM.md` files list the changes.
+
+- `PPop/`: [P-pop](https://github.com/kammerje/P-pop) with [Forecaster](https://github.com/chenjj2/forecaster).
+  Draws the occurrence-rate universes, called through `science/populations/ppop.py`.
+- `lifesim/`: [LIFEsim](https://github.com/fdannert/LIFEsim). The LIFE detection model, run by `run/lifesim/`.
 
 ## Tests
 

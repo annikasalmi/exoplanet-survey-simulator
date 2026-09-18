@@ -15,7 +15,6 @@ recursive-include PPop/MassModels/Forecaster *.h5
 
 global-exclude *.py[cod] .DS_Store
 prune *.egg-info
-prune docs
 prune tests
 prune logs
 prune results

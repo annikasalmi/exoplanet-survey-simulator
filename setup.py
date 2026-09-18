@@ -22,7 +22,7 @@ setup(
     # Clone + editable install only: code expects the repo layout.
     # `lifesim/` is listed by hand so the inherited tree needs no added
     # __init__.py files. It is frozen at a2b8eeb, so the list will not drift.
-    packages=find_packages(exclude=['tests', 'tests.*', 'docs', 'docs.*', 'data', 'data.*',
+    packages=find_packages(exclude=['tests', 'tests.*', 'data', 'data.*',
                                     'plotting', 'plotting.*', 'lifesim', 'lifesim.*',
                                     '*.data', '*.data.*'])
              + ['lifesim',

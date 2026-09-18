@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 
 from science.physics import infer_stellar_type
+from science.telescopes import transit_shape
 
 try:
     from lifesim.core.data import Data
@@ -33,13 +34,13 @@ class KeplerData:
         6.0, 7.5, 9.0, 10.5, 12.0, 12.5, 15.0,
     ])
 
-    # KeplerPORTs uses this small factor so approximate MES better matches TPS MES.
-    MES_CORRECTION = 1.003
-
-    # Calibration against official Kepler DR25 MES (koi_max_mult_ev): the boxcar MES runs ~1.19x
-    # high, so this ~1/1.19 factor brings the median model/official ratio to ~1.0.
-    # Re-derive with plotting/scripts/calibration/kepler_calibration.py.
-    MES_OFFICIAL_CALIBRATION = 0.84
+    # Measured duration dependence of Kepler noise: median rrmscdpp(T) / rrmscdpp(6 h) over the DR25
+    # KOI hosts in data/exoplanet_csv/koi_cumulative_stellar.csv. Redder than white noise (T^-0.5).
+    # Scales the magnitude-based fallback CDPP, which is a 6.5-hr value, to the transit's T14.
+    CDPP_SCALING_HR = np.array([1.5, 2.0, 2.5, 3.0, 3.5, 4.5, 5.0, 6.0, 7.5, 9.0, 10.5, 12.0, 12.5, 15.0])
+    CDPP_SCALING = np.array([1.607, 1.435, 1.358, 1.264, 1.206, 1.104, 1.062, 1.000, 0.933,
+                             0.882, 0.845, 0.817, 0.810, 0.772])
+    FALLBACK_CDPP_DURATION_HR = 6.5
 
     # Earth-size planet across Sun-size star gives roughly 84 ppm.
     # This is geometry, not a universal Kepler detection threshold.
@@ -64,11 +65,6 @@ class KeplerData:
         # Kepler-ish detector settings.
         min_transits: int = 3,
         mes_threshold: float = 7.1,
-        # Multiplicative calibration of toy MES to the official DR25 pipeline MES.
-        # Default = MES_OFFICIAL_CALIBRATION (~1/1.19). Pass 1.0 to recover the
-        # raw, uncalibrated (optimistic) boxcar MES, e.g. for the before/after
-        # comparison in plotting/scripts/calibration/kepler_calibration.py.
-        mes_calibration: Optional[float] = None,
         kepler_mag_limit: float = 16.0,
         fallback_cdpp_ppm: float = CDPP_NONSTELLAR_KP12_PPM,
         use_kepmag_cdpp_fallback: bool = True,
@@ -107,10 +103,6 @@ class KeplerData:
         self.mission_duration_days = mission_duration_days
         self.min_transits = min_transits
         self.mes_threshold = mes_threshold
-        self.mes_calibration = (
-            float(self.MES_OFFICIAL_CALIBRATION) if mes_calibration is None
-            else float(mes_calibration)
-        )
         self.kepler_mag_limit = kepler_mag_limit
         self.fallback_cdpp_ppm = fallback_cdpp_ppm
         self.use_kepmag_cdpp_fallback = use_kepmag_cdpp_fallback
@@ -375,36 +367,63 @@ class KeplerData:
         """P-Pop: use geometric inclination. NASA PSCompPars/KOI: optionally use tran_flag,
         since those planets are already observed to transit.
         """
+        b = self._impact_from_inclination()
+        self.catalog["impact_parameter"] = b
         if self._is_nasa_like() and self.use_observed_transit_flag_for_nasa and "tran_flag" in self.catalog.columns:
             tran_flag = pd.to_numeric(self.catalog["tran_flag"], errors="coerce").fillna(0)
-            transiting = tran_flag.astype(int) == 1
-            self.catalog["impact_parameter_toy"] = np.nan
             self.catalog["transiting_source"] = "tran_flag"
-            return transiting.fillna(False)
-
-        inc_col = next(
-            (name for name in ["inc_p", "inclination", "pl_orbincl", "koi_incl"] if name in self.catalog.columns),
-            None,
-        )
-        if inc_col is None:
+            return (tran_flag.astype(int) == 1).fillna(False)
+        if b.isna().all():
             raise ValueError(
                 "No inclination column found. Need inc_p for P-Pop geometry, "
                 "or tran_flag for NASA observed transiting planets."
             )
+        self.catalog["transiting_source"] = "inc_p_geometry"
+        return (b <= 1 + self._radius_ratio()).fillna(False)
 
+    def _radius_ratio(self) -> pd.Series:
+        """k = Rp / R*: fitted ratio (KOI), else the radii, else a measured depth."""
+        rp = pd.to_numeric(self.catalog["radius_p"], errors="coerce")
+        rs = pd.to_numeric(self.catalog["radius_s"], errors="coerce") * self.R_SUN_IN_R_EARTH
+        k = pd.to_numeric(self.catalog.get("observed_radius_ratio", pd.Series(np.nan, index=self.catalog.index)), errors="coerce")
+        observed = pd.to_numeric(self.catalog.get("observed_transit_depth_ppm", pd.Series(np.nan, index=self.catalog.index)), errors="coerce")
+        return k.fillna(rp / rs).fillna(np.sqrt(observed.clip(lower=0) / 1e6))
+
+    def _a_over_rstar(self) -> pd.Series:
+        a = pd.to_numeric(self.catalog["semimajor_p"], errors="coerce")
+        return a / (pd.to_numeric(self.catalog["radius_s"], errors="coerce") * self.R_SUN_IN_AU)
+
+    def _impact_from_inclination(self) -> pd.Series:
+        inc_col = next((c for c in ["inc_p", "inclination", "pl_orbincl", "koi_incl"] if c in self.catalog.columns), None)
+        if inc_col is None:
+            return pd.Series(np.nan, index=self.catalog.index)
         inc = pd.to_numeric(self.catalog[inc_col], errors="coerce")
         inc_rad = inc if inc.max(skipna=True) <= 3.2 else np.deg2rad(inc)
+        return self._a_over_rstar() * np.abs(np.cos(inc_rad))
 
-        a_au = pd.to_numeric(self.catalog["semimajor_p"], errors="coerce")
-        r_star_au = pd.to_numeric(self.catalog["radius_s"], errors="coerce") * self.R_SUN_IN_AU
-        r_planet_au = pd.to_numeric(self.catalog["radius_p"], errors="coerce") * self.R_EARTH_IN_AU
+    def impact_parameter(self) -> pd.Series:
+        """b from a measured T14, else the inclination, else (1 + k) / 2, the mean for isotropic
+        orbits that transit. Catalogued inclinations come from fits with their own a/R*, so pairing
+        them with the stellar a/R* here can put an observed transit off the star."""
+        k = self._radius_ratio()
+        b = pd.to_numeric(self.catalog["impact_parameter"], errors="coerce")
+        observed = self._observed_duration()
+        p = pd.to_numeric(self.catalog["p_orb"], errors="coerce")
+        from_duration = pd.Series(transit_shape.impact_from_t14(observed, p, self._a_over_rstar(), k),
+                                  index=self.catalog.index).where(observed.notna())
+        source = np.where(from_duration.notna(), "observed_duration", np.where(b.notna(), "inclination", "mean_for_transiting"))
+        b = from_duration.fillna(b).fillna((1 + k) / 2)
+        self.catalog["impact_parameter"] = b
+        self.catalog["impact_parameter_source"] = source
+        return b
 
-        b = (a_au * np.abs(np.cos(inc_rad))) / r_star_au
-        transiting = b <= (1 + r_planet_au / r_star_au)
-
-        self.catalog["impact_parameter_toy"] = b
-        self.catalog["transiting_source"] = "inc_p_geometry"
-        return transiting.fillna(False)
+    def signal_rms_ppm(self) -> pd.Series:
+        """rms of the limb-darkened transit dip over T14 (see transit_shape); what the MES uses."""
+        observed = None
+        if self._is_nasa_like() and self.use_observed_transit_depth_for_nasa and "observed_transit_depth_ppm" in self.catalog.columns:
+            observed = pd.to_numeric(self.catalog["observed_transit_depth_ppm"], errors="coerce")
+        rms = transit_shape.signal_rms_ppm(self._radius_ratio(), self.catalog["impact_parameter"], "Kepler", observed)
+        return pd.Series(rms, index=self.catalog.index)
 
     def calc_star_brightness_proxy(self):
         """Fallback only. Prefer real Kepler magnitude."""
@@ -463,44 +482,21 @@ class KeplerData:
     # Kepler-ish MES/depth significance
     # ============================================================
 
-    def estimate_transit_duration_hours(self):
-        # Prefer observed duration if NASA provides it.
+    def _observed_duration(self) -> pd.Series:
         if self._is_nasa_like() and "observed_transit_duration_hr" in self.catalog.columns:
-            observed = pd.to_numeric(self.catalog["observed_transit_duration_hr"], errors="coerce")
-        else:
-            observed = pd.Series(np.nan, index=self.catalog.index)
+            return pd.to_numeric(self.catalog["observed_transit_duration_hr"], errors="coerce")
+        return pd.Series(np.nan, index=self.catalog.index)
 
+    def estimate_transit_duration_hours(self):
+        """T14 in hours: the observed value for NASA rows, else a circular orbit with impact parameter b."""
+        observed = self._observed_duration()
         p_days = pd.to_numeric(self.catalog["p_orb"], errors="coerce")
-        r_star_au = pd.to_numeric(self.catalog["radius_s"], errors="coerce") * self.R_SUN_IN_AU
-        a_au = pd.to_numeric(self.catalog["semimajor_p"], errors="coerce")
-
-        model = (p_days * 24.0 / np.pi) * (r_star_au / a_au)
-        duration_hr = observed.fillna(model)
-        duration_hr = duration_hr.replace([np.inf, -np.inf], np.nan).fillna(6.0)
-        duration_hr = duration_hr.clip(
-            lower=self.KEPLER_TPS_DURATIONS_HR.min(),
-            upper=self.KEPLER_TPS_DURATIONS_HR.max(),
-        )
-
+        model = pd.Series(transit_shape.t14_hours(p_days, self._a_over_rstar(), self._radius_ratio(),
+                                                  self.catalog["impact_parameter"]), index=self.catalog.index)
+        duration_hr = observed.fillna(model).replace([np.inf, -np.inf], np.nan).fillna(6.0).clip(0.05, 48.0)
         self.catalog["transit_duration_hr_est"] = duration_hr
-        self.catalog["transit_duration_source"] = np.where(observed.notna(), "observed", "model")
+        self.catalog["transit_duration_source"] = np.where(observed.notna(), "observed", "model_t14")
         return duration_hr
-
-    def nearest_kepler_duration_label(self, duration_hr):
-        durations = self.KEPLER_TPS_DURATIONS_HR
-        arr = np.asarray(duration_hr, dtype=float)
-        idx = np.abs(arr[:, None] - durations[None, :]).argmin(axis=1)
-        nearest = durations[idx]
-
-        labels = []
-        for d in nearest:
-            whole = int(np.floor(d))
-            frac = int(round((d - whole) * 10))
-            labels.append(f"{whole:02d}p{frac}")
-
-        self.catalog["nearest_kepler_duration_hr"] = nearest
-        self.catalog["nearest_kepler_duration_label"] = labels
-        return labels
 
     def estimate_cdpp_from_kepler_mag(self):
         """Photon-noise CDPP fallback for rows without real rrmscdpp columns (e.g. P-Pop/Gaia):
@@ -528,29 +524,31 @@ class KeplerData:
         return cdpp.clip(lower=self.cdpp_min_ppm, upper=self.cdpp_max_ppm)
 
     def get_cdpp_ppm_for_duration(self, duration_hr):
-        labels = self.nearest_kepler_duration_label(duration_hr)
-        fallback_from_mag = self.estimate_cdpp_from_kepler_mag()
-        cdpp_values = []
-        cdpp_sources = []
+        """CDPP at T14: the star's own rrmscdpp columns interpolated log-log (extrapolated past 1.5
+        or 15 h), else the magnitude fallback scaled from 6.5 h by the measured CDPP_SCALING."""
+        duration_hr = np.asarray(duration_hr, float)
+        grid = self.KEPLER_TPS_DURATIONS_HR
+        cols = [f"rrmscdpp{int(d):02d}p{int(round((d - int(d)) * 10))}" for d in grid]
+        table = np.column_stack([
+            pd.to_numeric(self.catalog[c], errors="coerce").to_numpy(float) if c in self.catalog.columns
+            else np.full(len(self.catalog), np.nan) for c in cols])
+        lo = np.clip(np.searchsorted(np.log(grid), np.log(duration_hr)) - 1, 0, len(grid) - 2)
+        w = (np.log(duration_hr) - np.log(grid[lo])) / (np.log(grid[lo + 1]) - np.log(grid[lo]))
+        rows = np.arange(len(self.catalog))
+        c_lo, c_hi = table[rows, lo], table[rows, lo + 1]
+        with np.errstate(divide="ignore", invalid="ignore"):
+            own = np.exp(np.log(c_lo) + w * (np.log(c_hi) - np.log(c_lo)))
+        has_own = np.isfinite(own) & (c_lo > 0) & (c_hi > 0)
 
-        for i, label in enumerate(labels):
-            col = f"rrmscdpp{label}"
-            if col in self.catalog.columns:
-                val = pd.to_numeric(pd.Series([self.catalog.iloc[i][col]]), errors="coerce").iloc[0]
-                if pd.notna(val):
-                    cdpp_values.append(float(val))
-                    cdpp_sources.append(col)
-                    continue
+        scale = (transit_shape.loglog_interp(duration_hr, self.CDPP_SCALING_HR, self.CDPP_SCALING)
+                 / transit_shape.loglog_interp(self.FALLBACK_CDPP_DURATION_HR, self.CDPP_SCALING_HR, self.CDPP_SCALING))
+        fallback = self.estimate_cdpp_from_kepler_mag().to_numpy(float) * scale
 
-            cdpp_values.append(float(fallback_from_mag.iloc[i]))
-            if self.use_kepmag_cdpp_fallback:
-                cdpp_sources.append("kepmag_cdpp_fallback")
-            else:
-                cdpp_sources.append("fallback_cdpp_ppm")
-
-        cdpp_ppm = pd.Series(cdpp_values, index=self.catalog.index, dtype=float)
+        cdpp_ppm = pd.Series(np.where(has_own, own, fallback), index=self.catalog.index)
         self.catalog["kepler_cdpp_ppm"] = cdpp_ppm
-        self.catalog["kepler_cdpp_source"] = cdpp_sources
+        self.catalog["kepler_cdpp_source"] = np.where(
+            has_own, "rrmscdpp_interpolated",
+            "kepmag_cdpp_fallback" if self.use_kepmag_cdpp_fallback else "fallback_cdpp_ppm")
         return cdpp_ppm
 
     def calc_number_of_observed_transits_keplerish(self):
@@ -576,24 +574,23 @@ class KeplerData:
         return n_transits
 
     def calc_kepler_mes(self):
+        """MES = rms dip over T14 / CDPP(T14) * sqrt(N transits)."""
         transit_depth_ppm = self.calc_transit_depth_ppm()
+        signal_ppm = self.signal_rms_ppm()
         duration_hr = self.estimate_transit_duration_hours()
         cdpp_ppm = self.get_cdpp_ppm_for_duration(duration_hr)
         n_transits = self.calc_number_of_observed_transits_keplerish()
 
         sqrt_n = np.sqrt(n_transits.clip(lower=1))
-        mes = (transit_depth_ppm / cdpp_ppm.replace(0, np.nan) * sqrt_n
-               * self.MES_CORRECTION * self.mes_calibration)
-        mes = mes.replace([np.inf, -np.inf], np.nan).fillna(0.0)
-
-        one_sigma_depth_ppm = cdpp_ppm / (sqrt_n * self.MES_CORRECTION * self.mes_calibration)
-        min_detectable_depth_ppm = self.mes_threshold * one_sigma_depth_ppm
+        mes = (signal_ppm / cdpp_ppm.replace(0, np.nan) * sqrt_n).replace([np.inf, -np.inf], np.nan).fillna(0.0)
+        one_sigma_ppm = cdpp_ppm / sqrt_n
 
         self.catalog["transit_depth_ppm"] = transit_depth_ppm
+        self.catalog["signal_rms_ppm"] = signal_ppm
         self.catalog["kepler_mes"] = mes
         self.catalog["kepler_mes_threshold"] = self.mes_threshold
-        self.catalog["one_sigma_depth_ppm"] = one_sigma_depth_ppm
-        self.catalog["min_detectable_depth_ppm"] = min_detectable_depth_ppm
+        self.catalog["one_sigma_depth_ppm"] = one_sigma_ppm
+        self.catalog["min_detectable_depth_ppm"] = self.mes_threshold * one_sigma_ppm
         return mes
 
     def calc_depth_good_keplerish(self):
@@ -635,6 +632,7 @@ class KeplerData:
         self._validate_detection_columns()
 
         transiting = self.calc_transiting_from_inclination()
+        self.impact_parameter()
         transit_depth_fraction = self.calc_transit_depth_fraction()
         transit_depth_ppm = self.calc_transit_depth_ppm()
         bright_enough_kepler = self.calc_bright_enough_kepler()

@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 
 from science.physics import infer_stellar_type
+from science.telescopes import transit_shape
 
 try:
     from lifesim.core.data import Data
@@ -39,12 +40,6 @@ class TESSData:
         6.0: "rrmscdpp06p0", 7.5: "rrmscdpp07p5", 9.0: "rrmscdpp09p0",
         10.5: "rrmscdpp10p5", 12.5: "rrmscdpp12p5", 15.0: "rrmscdpp15p0",
     }
-
-    # Calibration against official SPOC SNR: on 1,551 SPOC multi-sector TOIs, given their searched
-    # sectors and per-sector SPOC CDPP, the boxcar SNR runs 1.26x high (median over official SNR
-    # 10-100); after this factor model/official is 0.92-1.03 in every SNR bin.
-    # Re-derive with plotting/scripts/calibration/tess_calibration.py.
-    SNR_OFFICIAL_CALIBRATION = 0.80
 
     DATA_DIR = Path(__file__).resolve().parent / "data"
 
@@ -73,10 +68,6 @@ class TESSData:
         default_n_sectors: int = 5,
         min_transits: int = 2,
         snr_threshold: float = 7.1,
-        # Multiplicative calibration of toy SNR to the official SPOC pipeline SNR.
-        # Default = SNR_OFFICIAL_CALIBRATION (1/1.26). Pass 1.0 to recover the raw, uncalibrated
-        # (optimistic) boxcar SNR, as plotting/scripts/calibration/tess_calibration.py does.
-        snr_calibration: Optional[float] = None,
         tmag_limit: float = 16.0,
         phase_mode: str = "random",  # random or expected
         random_seed: int = 42,
@@ -100,8 +91,6 @@ class TESSData:
         # (Sullivan et al. 2015 with its 60 ppm/hr systematic floor), within 10% for Tmag 6-12.
         smooth_noise_ref_ppm_1hr: float = 200.0,
         smooth_noise_floor_ppm_1hr: float = 60.0,
-        # upgrade #3: apply impact-parameter b correction to modelled transit duration
-        apply_b_to_duration: bool = True,
         # upgrade #4: Teff-based color correction for proxy Tmag (critical for M dwarfs)
         apply_mdwarf_tmag_correction: bool = True,
         # CVZ tagging, and an optional larger fixed sector count for CVZ stars (None = no special case)
@@ -126,10 +115,6 @@ class TESSData:
         self.default_n_sectors = int(default_n_sectors)
         self.min_transits = int(min_transits)
         self.snr_threshold = float(snr_threshold)
-        self.snr_calibration = (
-            float(self.SNR_OFFICIAL_CALIBRATION) if snr_calibration is None
-            else float(snr_calibration)
-        )
         self.tmag_limit = float(tmag_limit)
         self.phase_mode = phase_mode.lower().strip()
         self.rng = np.random.default_rng(random_seed)
@@ -147,7 +132,6 @@ class TESSData:
         self.smooth_noise_floor_ppm_1hr = float(smooth_noise_floor_ppm_1hr)
 
         # upgrade parameters
-        self.apply_b_to_duration = bool(apply_b_to_duration)
         self.apply_mdwarf_tmag_correction = bool(apply_mdwarf_tmag_correction)
         self.cvz_ecliptic_lat_deg = float(cvz_ecliptic_lat_deg)
         self.cvz_n_sectors = int(cvz_n_sectors) if cvz_n_sectors is not None else None
@@ -634,53 +618,72 @@ class TESSData:
 
     def transiting(self) -> pd.Series:
         """True if the planet crosses the stellar disk; NASA transiting catalogs may use tran_flag."""
+        b = self._impact_from_inclination()
+        self.catalog["tess_impact_parameter"] = b
         if self.source in {"pscomppars", "nasa", "koi"} and "tran_flag" in self.catalog.columns:
-            out = pd.to_numeric(self.catalog["tran_flag"], errors="coerce").fillna(0).astype(int).eq(1)
             self.catalog["tess_transiting_source"] = "tran_flag"
-            self.catalog["tess_impact_parameter_toy"] = np.nan
-            return out
+            return pd.to_numeric(self.catalog["tran_flag"], errors="coerce").fillna(0).astype(int).eq(1)
         if "inc_p" not in self.catalog.columns:
             raise ValueError("Need inc_p for geometric transits, or tran_flag for observed NASA transiting planets.")
-        inc = pd.to_numeric(self.catalog["inc_p"], errors="coerce")
-        inc_rad = inc if inc.max(skipna=True) <= 3.2 else np.deg2rad(inc)
-        a = pd.to_numeric(self.catalog["semimajor_p"], errors="coerce")
-        rs = pd.to_numeric(self.catalog["radius_s"], errors="coerce") * self.R_SUN_AU
-        rp = pd.to_numeric(self.catalog["radius_p"], errors="coerce") * self.R_EARTH_AU
-        b = a * np.abs(np.cos(inc_rad)) / rs
-        self.catalog["tess_impact_parameter_toy"] = b
         self.catalog["tess_transiting_source"] = "inclination_geometry"
-        return (b <= 1 + rp / rs).fillna(False)
+        return (b <= 1 + self._radius_ratio()).fillna(False)
 
-    def depth_ppm(self) -> pd.Series:
-        """Transit depth in ppm; use observed depth for NASA rows when present."""
+    def _radius_ratio(self) -> pd.Series:
+        """k = Rp / R*, from the radii, else from a measured depth."""
         rp = pd.to_numeric(self.catalog["radius_p"], errors="coerce")
         rs = pd.to_numeric(self.catalog["radius_s"], errors="coerce") * self.R_SUN_REARTH
-        model = (rp / rs) ** 2 * 1e6
         observed = pd.to_numeric(self.catalog.get("observed_depth_ppm", pd.Series(np.nan, index=self.catalog.index)), errors="coerce")
-        depth = observed.fillna(model)
-        self.catalog["tess_transit_depth_source"] = np.where(observed.notna(), "observed", "model_Rp_Rstar")
-        return depth
+        return (rp / rs).fillna(np.sqrt(observed.clip(lower=0) / 1e6))
 
-    def duration_hr(self) -> pd.Series:
-        """Transit duration (h): the observed value when available, else a circular-orbit model,
-        shortened by sqrt(1 - b^2) when apply_b_to_duration is set.
-        """
+    def _a_over_rstar(self) -> pd.Series:
+        a = pd.to_numeric(self.catalog["semimajor_p"], errors="coerce")
+        return a / (pd.to_numeric(self.catalog["radius_s"], errors="coerce") * self.R_SUN_AU)
+
+    def _impact_from_inclination(self) -> pd.Series:
+        if "inc_p" not in self.catalog.columns:
+            return pd.Series(np.nan, index=self.catalog.index)
+        inc = pd.to_numeric(self.catalog["inc_p"], errors="coerce")
+        inc_rad = inc if inc.max(skipna=True) <= 3.2 else np.deg2rad(inc)
+        return self._a_over_rstar() * np.abs(np.cos(inc_rad))
+
+    def impact_parameter(self) -> pd.Series:
+        """b from a measured T14, else the inclination, else (1 + k) / 2, the mean for isotropic
+        orbits that transit. Catalogued inclinations come from fits with their own a/R*, so pairing
+        them with the stellar a/R* here can put an observed transit off the star."""
+        k = self._radius_ratio()
+        b = pd.to_numeric(self.catalog["tess_impact_parameter"], errors="coerce")
         observed = pd.to_numeric(self.catalog.get("observed_duration_hr", pd.Series(np.nan, index=self.catalog.index)), errors="coerce")
         p = pd.to_numeric(self.catalog["p_orb"], errors="coerce")
-        rs_au = pd.to_numeric(self.catalog["radius_s"], errors="coerce") * self.R_SUN_AU
-        a_au = pd.to_numeric(self.catalog["semimajor_p"], errors="coerce")
-        model = (p * 24 / np.pi) * (rs_au / a_au)
+        from_duration = pd.Series(transit_shape.impact_from_t14(observed, p, self._a_over_rstar(), k),
+                                  index=self.catalog.index).where(observed.notna())
+        source = np.where(from_duration.notna(), "observed_duration", np.where(b.notna(), "inclination", "mean_for_transiting"))
+        b = from_duration.fillna(b).fillna((1 + k) / 2)
+        self.catalog["tess_impact_parameter"] = b
+        self.catalog["tess_impact_parameter_source"] = source
+        return b
 
-        if self.apply_b_to_duration and "tess_impact_parameter_toy" in self.catalog.columns:
-            b = pd.to_numeric(self.catalog["tess_impact_parameter_toy"], errors="coerce").clip(0.0, 0.9999)
-            b_factor = np.sqrt(1.0 - b ** 2).fillna(1.0)
-            model = model * b_factor
-            dur_source = np.where(observed.notna(), "observed", "model_with_b_correction")
-        else:
-            dur_source = np.where(observed.notna(), "observed", "model")
+    def depth_ppm(self) -> pd.Series:
+        """Mid-transit depth in ppm: the observed depth for NASA rows when present, else (Rp/R*)^2."""
+        model = self._radius_ratio() ** 2 * 1e6
+        observed = pd.to_numeric(self.catalog.get("observed_depth_ppm", pd.Series(np.nan, index=self.catalog.index)), errors="coerce")
+        self.catalog["tess_transit_depth_source"] = np.where(observed.notna(), "observed", "model_Rp_Rstar")
+        return observed.fillna(model)
 
-        dur = observed.fillna(model).replace([np.inf, -np.inf], np.nan).fillna(3.0).clip(0.25, 24.0)
-        self.catalog["tess_transit_duration_source"] = dur_source
+    def signal_rms_ppm(self) -> pd.Series:
+        """rms of the limb-darkened transit dip over T14 (see transit_shape); what the SNR uses."""
+        observed = pd.to_numeric(self.catalog.get("observed_depth_ppm", pd.Series(np.nan, index=self.catalog.index)), errors="coerce")
+        rms = transit_shape.signal_rms_ppm(self._radius_ratio(), self.catalog["tess_impact_parameter"],
+                                           "TESS", observed)
+        return pd.Series(rms, index=self.catalog.index)
+
+    def duration_hr(self) -> pd.Series:
+        """T14 in hours: the observed value when available, else a circular orbit with impact parameter b."""
+        observed = pd.to_numeric(self.catalog.get("observed_duration_hr", pd.Series(np.nan, index=self.catalog.index)), errors="coerce")
+        p = pd.to_numeric(self.catalog["p_orb"], errors="coerce")
+        model = pd.Series(transit_shape.t14_hours(p, self._a_over_rstar(), self._radius_ratio(),
+                                                  self.catalog["tess_impact_parameter"]), index=self.catalog.index)
+        dur = observed.fillna(model).replace([np.inf, -np.inf], np.nan).fillna(3.0).clip(0.05, 48.0)
+        self.catalog["tess_transit_duration_source"] = np.where(observed.notna(), "observed", "model_t14")
         return dur
 
     def transit_counts(self) -> pd.DataFrame:
@@ -708,33 +711,39 @@ class TESSData:
         return pairs
 
     def snr(self, pairs: Optional[pd.DataFrame] = None) -> pd.Series:
-        """TESS transit SNR over all observed sectors: SNR = depth * sqrt(sum_i N_i / CDPP_i^2).
-        tess_cdpp_ppm is the effective per-transit CDPP, sqrt(sum N_i / sum(N_i / CDPP_i^2)).
-        """
+        """TESS transit SNR over all observed sectors: SNR = rms dip * sqrt(sum_i N_i / CDPP_i^2), with
+        CDPP interpolated log-log to T14. tess_cdpp_ppm is the effective per-transit CDPP."""
         if pairs is None:
             pairs = self.transit_counts()
         n_rows = len(self.catalog)
-        depth = self.depth_ppm().to_numpy(float)
+        signal = self.signal_rms_ppm().to_numpy(float)
         dur = self.duration_hr().to_numpy(float)
         tmag = pd.to_numeric(self.catalog["tess_tmag"], errors="coerce").to_numpy(float)
         tic = pd.to_numeric(self.catalog.get("ticid", pd.Series(np.nan, index=self.catalog.index)), errors="coerce").to_numpy(float)
         dilution = pd.to_numeric(self.catalog.get("tess_dilution", self.catalog.get("dilution", pd.Series(1.0, index=self.catalog.index))), errors="coerce").fillna(1.0).clip(lower=1.0)
-        clipped_dur = np.clip(dur, self.CDPP_DURATIONS_HR.min(), self.CDPP_DURATIONS_HR.max())
-        col_idx = np.abs(clipped_dur[:, None] - self.CDPP_DURATIONS_HR[None, :]).argmin(axis=1)
+        # Bracketing tabulated durations; beyond the table the nearest pair extrapolates.
+        grid = np.log(self.CDPP_DURATIONS_HR)
+        lo = np.clip(np.searchsorted(grid, np.log(dur)) - 1, 0, len(grid) - 2)
+        w = (np.log(dur) - grid[lo]) / (grid[lo + 1] - grid[lo])
 
         obs = pairs[pairs["n"] > 0]
         rows = obs["row"].to_numpy()
-        cdpp, rank = self._pair_cdpp(rows, obs["sector"].to_numpy(), col_idx, tmag, tic)
+        sectors = obs["sector"].to_numpy()
+        cdpp_lo, rank_lo = self._pair_cdpp(rows, sectors, lo, tmag, tic)
+        cdpp_hi, rank_hi = self._pair_cdpp(rows, sectors, lo + 1, tmag, tic)
+        cdpp = np.exp(np.log(cdpp_lo) + w[rows] * (np.log(cdpp_hi) - np.log(cdpp_lo)))
+        rank = np.maximum(rank_lo, rank_hi)
         inv_var = np.bincount(rows, weights=obs["n"].to_numpy() / cdpp ** 2, minlength=n_rows)
         n_used = np.bincount(rows, weights=obs["n"].to_numpy(), minlength=n_rows)
         best = np.full(n_rows, len(self.NOISE_SOURCES), dtype=np.int64)
         np.minimum.at(best, rows, rank)
 
-        snr = np.where(inv_var > 0, depth / dilution.to_numpy() * np.sqrt(inv_var) * self.snr_calibration, 0.0)
+        snr = np.where(inv_var > 0, signal / dilution.to_numpy() * np.sqrt(inv_var), 0.0)
         with np.errstate(divide="ignore", invalid="ignore"):
             self.catalog["tess_cdpp_ppm"] = np.where(inv_var > 0, np.sqrt(n_used / inv_var), np.nan)
         self.catalog["tess_dilution"] = dilution
-        self.catalog["tess_cdpp_duration_hr"] = np.where(inv_var > 0, self.CDPP_DURATIONS_HR[col_idx], np.nan)
+        self.catalog["tess_signal_rms_ppm"] = signal
+        self.catalog["tess_cdpp_duration_hr"] = np.where(inv_var > 0, dur, np.nan)
         self.catalog["tess_noise_source"] = np.array(self.NOISE_SOURCES + ["no_transits"], dtype=object)[best]
         self.catalog["tess_snr"] = snr
         self.catalog["tess_snr_threshold"] = self.snr_threshold
@@ -772,7 +781,7 @@ class TESSData:
         """Run the full TESS detector and add the shared detected/detected_best/detected_worst columns."""
         self._validate()
         self.catalog["tess_transiting_geometric"] = self.transiting()
-        # upgrade #3: duration_hr() reads tess_impact_parameter_toy set by transiting() above
+        self.impact_parameter()
         self.catalog["tess_transit_duration_hr"] = self.duration_hr()
         self.catalog["tess_transit_depth_ppm"] = self.depth_ppm()
         counts = self.transit_counts()

@@ -1,8 +1,8 @@
 """TESS detector calibration: model SNR vs official SPOC SNR for TOIs (tess_3in1_calibration.png).
 Each TOI gets the sectors of the SPOC multi-sector run that produced its SNR (Source, e.g.
-spoc-s01-s69) and its own per-sector SPOC CDPP by TIC, so what is left is the SNR formula itself.
-Prints the SNR_OFFICIAL_CALIBRATION to put in TESSData. Needs the SPOC CDPP CSVs in
-results/catalogs/tess/CDPP (MAST TCE bulk-download page).
+spoc-s01-s69), limited to sectors where it was a 2-min target, and its own per-sector SPOC CDPP by
+TIC, so what is left is the SNR formula itself. No correction factor. Needs the SPOC CDPP CSVs in
+results/catalogs/tess/CDPP (science/telescopes/tess/download_cdpp.py).
 Run from repo root: python plotting/scripts/calibration/tess_calibration.py
 """
 
@@ -71,8 +71,6 @@ DISP_COLORS = {
 
 CDPP_DIR = Path(TESS_DATA_DIR) / "CDPP"
 MAX_CDPP_SECTOR = 106
-# Fit the calibration away from the 7.1 cut, where TOIs are biased to upward noise fluctuations.
-CAL_SNR_RANGE = (10.0, 100.0)
 
 
 def searched_sectors(sectors_text, source_text):
@@ -196,8 +194,8 @@ def prepare(df: pd.DataFrame) -> pd.DataFrame:
             rs_rearth = pd.to_numeric(df["radius_s"], errors="coerce") * 109.076
             df["radius_p"] = rs_rearth * np.sqrt(depth_frac.clip(lower=0))
 
-    # Inclination: set to 90 deg (KOI-style, tran_flag=1 triggers observed path).
-    df["inc_p"] = 90.0
+    # Inclination unknown: every TOI transits, and TESSData solves b from the measured T14.
+    df["tran_flag"] = 1
 
     required = ["p_orb", "radius_s", "radius_p", "tmag"]
     df = df.dropna(subset=[c for c in required if c in df.columns]).copy()
@@ -217,39 +215,28 @@ def prepare(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def run_detector(df: pd.DataFrame) -> pd.DataFrame:
-    """Run TESSData on the TOIs' own searched sectors and per-TIC SPOC CDPP, derive the SNR
-    calibration from the uncalibrated run, then rerun with it.
-    """
+    """Run TESSData on each TOI's searched 2-min sectors with its own per-TIC SPOC CDPP."""
     if not CDPP_DIR.exists():
         raise FileNotFoundError(f"SPOC CDPP CSVs not found in {CDPP_DIR}")
+    # SPOC 2-min runs only search sectors where the star was a 2-min target, i.e. is in that
+    # sector's CDPP table; the TOI's Sectors column also lists FFI-only sectors.
+    cdpp = TESSData._load_cdpp_tables(TESSData.__new__(TESSData), CDPP_DIR)
+    two_min = set(zip(cdpp["ticid"].astype("Int64").astype(int), cdpp["sector"].astype(int)))
+    tic = pd.to_numeric(df["ticid"], errors="coerce")
+    df = df.copy()
+    df["tess_sectors"] = [
+        ";".join(x for x in str(secs).split(";") if x and pd.notna(t) and (int(t), int(x)) in two_min) or None
+        for secs, t in zip(df["tess_sectors"], tic)]
+    df = df.dropna(subset=["tess_sectors"])
+    print(f"TOIs with at least one searched 2-min sector: {len(df):,}")
 
-    detector_options = {
-        "source": "auto", "min_transits": 2, "snr_threshold": SNR_THRESHOLD,
-        "tmag_limit": 16.0, "use_catalog_sectors": True, "phase_mode": "expected",
-        "cdpp_dir": CDPP_DIR, "validate_for_detection": True,
-    }
-    raw = TESSData(
-        df, snr_calibration=1.0, **detector_options
-    ).determine_detectable()
-    official = pd.to_numeric(raw["official_snr"], errors="coerce")
-    in_range = official.between(*CAL_SNR_RANGE)
-    cal = float(1.0 / (raw.loc[in_range, "tess_snr"] / official[in_range]).median())
-    print(f"Derived SNR calibration: {cal:.3f} (median official/model over {in_range.sum():,} TOIs "
-          f"with official SNR {CAL_SNR_RANGE[0]:g}-{CAL_SNR_RANGE[1]:g}); "
-          f"TESSData.SNR_OFFICIAL_CALIBRATION is {TESSData.SNR_OFFICIAL_CALIBRATION}")
-
-    td = TESSData(df, snr_calibration=cal, **detector_options)
-    out = td.determine_detectable()
+    out = TESSData(df, source="nasa", min_transits=2, snr_threshold=SNR_THRESHOLD, tmag_limit=16.0,
+                   use_catalog_sectors=True, phase_mode="expected", cdpp_dir=CDPP_DIR,
+                   validate_for_detection=True).determine_detectable()
     out["toy_over_official_snr"] = (
         pd.to_numeric(out["tess_snr"], errors="coerce") /
         pd.to_numeric(out.get("official_snr", pd.Series(np.nan, index=out.index)), errors="coerce").replace(0, np.nan)
     )
-    # Raw (pre-calibration) toy SNR = optimistic boxcar value before the
-    # SNR_OFFICIAL_CALIBRATION factor, so the figure can show before vs after.
-    cal = float(getattr(td, "snr_calibration", 1.0)) or 1.0
-    out.attrs["snr_calibration"] = cal
-    out["tess_snr_raw"] = pd.to_numeric(out["tess_snr"], errors="coerce") / cal
-    out["toy_over_official_snr_raw"] = pd.to_numeric(out["toy_over_official_snr"], errors="coerce") / cal
     out["snr_bin"] = pd.cut(
         pd.to_numeric(out.get("official_snr", pd.Series(np.nan, index=out.index)), errors="coerce"),
         bins=SNR_BINS, labels=SNR_BIN_LABELS, include_lowest=True,
@@ -352,24 +339,15 @@ def make_3in1(out: pd.DataFrame) -> None:
         ).reset_index()
     )
     s2["x"] = np.arange(len(s2))
-    cal = float(out.attrs.get("snr_calibration", 1.0)) or 1.0
-    # Raw (pre-calibration) ratio per bin — the optimistic boxcar SNR.
-    if "toy_over_official_snr_raw" in d_rat.columns:
-        s2raw = (d_rat.dropna(subset=["snr_bin"])
-                 .groupby("snr_bin", observed=True)["toy_over_official_snr_raw"]
-                 .median().reset_index())
-        ax_ratio.plot(np.arange(len(s2raw)), s2raw["toy_over_official_snr_raw"], "s--",
-                      color="#c04040", lw=1.3, markersize=4, alpha=0.8,
-                      label=f"Raw boxcar (uncalibrated, x{1/cal:.2f})")
     ax_ratio.errorbar(s2["x"], s2["med"],
                       yerr=np.vstack([s2["med"] - s2["q25"], s2["q75"] - s2["med"]]),
                       fmt="o-", capsize=3, lw=1.5, color="#2060c0",
-                      label=f"Calibrated (x{cal:.2f})")
+                      label="Model (median, IQR)")
     ax_ratio.axhline(1.0, color="black", ls="--", lw=1.0, label="Perfect (1:1)")
     ax_ratio.set_yscale("log")
     ax_ratio.set_xticks(s2["x"]); ax_ratio.set_xticklabels(s2["snr_bin"].astype(str), rotation=25, ha="right")
     ax_ratio.set_ylabel("Model / official SNR"); ax_ratio.set_xlabel("Official SPOC SNR bin")
-    ax_ratio.set_title("C. SNR ratio: raw vs calibrated")
+    ax_ratio.set_title("C. Model / official SNR")
     ax_ratio.legend(fontsize=13); ax_ratio.grid(axis="y", alpha=0.25)
 
     out_path = OUT_DIR / "tess_3in1_calibration.png"
@@ -392,8 +370,6 @@ def write_summary(out: pd.DataFrame) -> None:
         f"Total TOI rows analysed: {len(out):,}",
         f"Toy/official SNR ratio:  median={ratio_col.median():.3f}  mean={ratio_col.mean():.3f}",
         "  (1.0 = perfect; < 1.0 = toy is conservative)",
-        f"SNR calibration applied: x{out.attrs.get('snr_calibration', float('nan')):.3f} "
-        f"(fit on official SNR {CAL_SNR_RANGE[0]:g}-{CAL_SNR_RANGE[1]:g})",
         "Noise source per TOI: " + ", ".join(f"{k}={v:,}" for k, v in out["tess_noise_source"].value_counts().items()),
         "",
         "Ratio by official SNR bin:",

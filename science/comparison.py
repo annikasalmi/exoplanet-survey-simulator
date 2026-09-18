@@ -36,7 +36,7 @@ def monte_carlo_population_fraction(
     error=SIMULATED_MEASUREMENT_ERROR,
 ):
     """Volatile fractions in repeated detected synthetic surveys."""
-    selected = population["joint_detected"].to_numpy(bool)
+    selected = population["joint_detected"].to_numpy(bool, copy=True)
     if drop_super_earths:
         selected &= ~is_super_earth(population["mass"], population["radius"])
     if cut.get("insol_max") is not None:
@@ -111,7 +111,7 @@ def observed_volatile_count(
     sample, lo, hi, curve_mass, curve_radius, *, mass_min=None,
 ):
     """Count volatile and total observed planets in an insolation interval."""
-    selected = sample["insolation"].between(lo, hi, inclusive="left").to_numpy()
+    selected = sample["insolation"].between(lo, hi, inclusive="left").to_numpy(copy=True)
     if mass_min is not None:
         selected &= sample["mass"].to_numpy() > mass_min
     volatile = is_volatile(
@@ -214,7 +214,7 @@ def mock_survey_volatile_fractions(
     selected = (
         population["joint_detected"]
         & population["insolation"].between(lo, hi, inclusive="left")
-    ).to_numpy()
+    ).to_numpy(copy=True)
     if exclude_super_earths:
         selected &= ~is_super_earth(population["mass"], population["radius"])
     mass = population.loc[selected, "mass"].to_numpy()

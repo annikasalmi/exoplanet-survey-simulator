@@ -1,5 +1,6 @@
 """Kepler detector calibration: model MES vs official DR25 KOI MES (kepler_3in1_calibration.png).
 Uses real per-target CDPP (rrmscdpp*) from the KOI stellar table instead of the magnitude fallback.
+No correction factor.
 Run from repo root: python plotting/scripts/calibration/kepler_calibration.py
 """
 
@@ -191,12 +192,6 @@ def run_detector(df: pd.DataFrame) -> pd.DataFrame:
         pd.to_numeric(out["kepler_mes"], errors="coerce") /
         pd.to_numeric(out["koi_max_mult_ev"], errors="coerce").replace(0, np.nan)
     )
-    # Raw (pre-calibration) toy MES = the optimistic boxcar value before the
-    # MES_OFFICIAL_CALIBRATION factor, so the figure can show before vs after.
-    cal = float(getattr(kd, "mes_calibration", 1.0)) or 1.0
-    out.attrs["mes_calibration"] = cal
-    out["kepler_mes_raw"] = pd.to_numeric(out["kepler_mes"], errors="coerce") / cal
-    out["toy_over_koi_mes_raw"] = pd.to_numeric(out["toy_over_koi_mes"], errors="coerce") / cal
     out["koi_mes_bin"] = pd.cut(
         pd.to_numeric(out["koi_max_mult_ev"], errors="coerce"),
         bins=MES_BINS, labels=MES_BIN_LABELS, include_lowest=True,
@@ -293,24 +288,15 @@ def make_3in1(out: pd.DataFrame) -> None:
         ).reset_index()
     )
     s2["x"] = np.arange(len(s2))
-    cal = float(out.attrs.get("mes_calibration", 1.0)) or 1.0
-    # Raw (pre-calibration) ratio per bin — the optimistic boxcar MES.
-    if "toy_over_koi_mes_raw" in d_rat.columns:
-        s2raw = (d_rat.dropna(subset=["koi_mes_bin"])
-                 .groupby("koi_mes_bin", observed=True)["toy_over_koi_mes_raw"]
-                 .median().reset_index())
-        ax_ratio.plot(np.arange(len(s2raw)), s2raw["toy_over_koi_mes_raw"], "s--",
-                      color="#c04040", lw=1.3, markersize=4, alpha=0.8,
-                      label=f"Raw boxcar (uncalibrated, x{1/cal:.2f})")
     ax_ratio.errorbar(s2["x"], s2["med"],
                       yerr=np.vstack([s2["med"] - s2["q25"], s2["q75"] - s2["med"]]),
                       fmt="o-", capsize=3, linewidth=1.5, color="#2060c0",
-                      label=f"Calibrated (x{cal:.2f})")
+                      label="Model (median, IQR)")
     ax_ratio.axhline(1.0, color="black", ls="--", lw=1.0, label="Perfect agreement")
     ax_ratio.set_yscale("log")
     ax_ratio.set_xticks(s2["x"]); ax_ratio.set_xticklabels(s2["koi_mes_bin"].astype(str), rotation=25, ha="right")
     ax_ratio.set_ylabel("Model / official MES"); ax_ratio.set_xlabel("Official KOI MES bin")
-    ax_ratio.set_title("C. MES ratio: raw vs calibrated")
+    ax_ratio.set_title("C. Model / official MES")
     ax_ratio.legend(fontsize=13); ax_ratio.grid(axis="y", alpha=0.25)
 
     # ── Save ─────────────────────────────────────────────────────────────────

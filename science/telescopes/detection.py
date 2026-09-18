@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from functools import partial
+import hashlib
+from functools import lru_cache, partial
 from pathlib import Path
 
 import numpy as np
@@ -272,6 +273,17 @@ def build_detected_population(
     })
 
 
+@lru_cache(maxsize=1)
+def _science_code_fingerprint() -> str:
+    """Hash of every science/ module, so a cached pool is rebuilt when detectors or generators change."""
+    root = Path(__file__).resolve().parents[1]
+    digest = hashlib.sha1()
+    for path in sorted(root.rglob("*.py")):
+        digest.update(path.relative_to(root).as_posix().encode())
+        digest.update(path.read_bytes())
+    return digest.hexdigest()[:10]
+
+
 def make_detected_pool(
     pool_name,
     *,
@@ -286,7 +298,7 @@ def make_detected_pool(
     """Generate, detect, and cache a population in bounded-memory chunks."""
     cache_dir = Path(cache_dir)
     cache_dir.mkdir(parents=True, exist_ok=True)
-    cache = cache_dir / f"selection_{mission}_{pool_name}_N{pool_size}_s{seed}.npz"
+    cache = cache_dir / f"selection_{mission}_{pool_name}_N{pool_size}_s{seed}_{_science_code_fingerprint()}.npz"
     if cache.exists():
         with np.load(cache) as archive:
             return pd.DataFrame({field: archive[field] for field in archive.files})

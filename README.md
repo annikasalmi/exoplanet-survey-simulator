@@ -22,7 +22,7 @@ This table summarizes the detectors:
 | TESS | Transit geometry, phase, sector windows, CDPP, optional dilution and 7.1 S/N | Five sectors and binned SPOC CDPP by default; 0.80 factor calibrated to SPOC TOIs | Target completeness, detailed gaps, injection recovery and vetting |
 | HARPS/NIRPS-like RV | Keplerian amplitude, V/J brightness, noise/jitter, 100 epochs and 5-sigma threshold | Population-level magnitudes, masses and jitter; checked against published amplitudes | Real schedules, aliases, multi-planet fits, activity mitigation and target allocation |
 | HWO | IWA, blackbody flux ratio, photon rate and exozodi best/worst cuts | Fixed wavelength endpoints and thresholds; uncalibrated | Phase completeness, reflected light, contrast curves, exposure S/N, systematics and scheduling |
-| LIFE | Nulling transmission, planet signal, photon backgrounds, baseline and time optimization | LIFEsim baseline with 4 m diameter; no flown-instrument calibration | Empirical completeness and unconfigured hardware/systematic noise |
+| LIFE | Nulling transmission, planet signal, photon backgrounds, baseline and time optimization | LIFEsim baseline with 4 m diameter | Empirical completeness and unconfigured hardware/systematic noise |
 
 Treat the toy models as selection-effect experiments, not absolute mission-yield predictions.
 

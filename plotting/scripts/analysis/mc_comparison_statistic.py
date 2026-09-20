@@ -24,6 +24,7 @@ from science.comparison import (
 from science.telescopes.detection import make_detected_pool, split_universes
 from science.statistics import NASA_MEASUREMENT_ERROR
 from tools.paths import ANALYSIS_DIR, PAPER_FIGURES_DIR, PSCOMPPARS_CSV
+from plotting.figure_style import PAPER_STYLE
 
 OUT_DIR = os.path.join(ANALYSIS_DIR, "mc_comparison_statistic")
 
@@ -56,8 +57,7 @@ def main():
         "universe_B", pool_size=MC_POOL_SIZE, chunk_size=MC_CHUNK_SIZE,
         cache_dir=OUT_DIR, box=COMPARISON_PARAMETER_BOX))
 
-    plt.rcParams.update({"font.size": 24, "axes.titlesize": 28, "axes.labelsize": 28,
-                         "xtick.labelsize": 24, "ytick.labelsize": 24, "legend.fontsize": 21})
+    plt.rcParams.update(PAPER_STYLE)
     rng = np.random.default_rng(0)
     fig, axes = plt.subplots(1, 3, figsize=(24, 7.5), layout="constrained")
     for ax, (blabel, lo, hi) in zip(axes, INSOLATION_BINS):

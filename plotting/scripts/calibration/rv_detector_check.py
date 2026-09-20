@@ -26,6 +26,7 @@ from tools.paths import TESS_DATA_DIR, PAPER_FIGURES_DIR, CALIBRATION_DIR, KEPLE
 from science.catalogs import nasa_tap_url
 from science.physics import infer_stellar_type
 from science.telescopes.rv.detection_model import RVData
+from plotting.figure_style import PAPER_STYLE
 
 PPOP_DIR = Path(TESS_DATA_DIR) / "Gaia"
 RVAMP_CACHE = Path(KEPLER_DATA_DIR) / "NASA" / "NASA_PSCompPars_rvamp_calibration.csv"
@@ -39,11 +40,7 @@ STYPE_COLORS = {"F": "#e6ab02", "G": "#66a61e", "K": "#7570b3", "M": "#d95f02", 
 PPOP_COLS = ["radius_p", "mass_p", "p_orb", "inc_p", "ecc_p",
              "radius_s", "mass_s", "teff_s", "l_sun", "distance_s", "flux_p", "stype"]
 
-plt.rcParams.update({
-    "figure.dpi": 120, "savefig.dpi": 260,
-    "font.size": 13, "axes.titlesize": 14, "axes.labelsize": 13,
-    "legend.fontsize": 10, "xtick.labelsize": 11, "ytick.labelsize": 11,
-})
+plt.rcParams.update(PAPER_STYLE)
 
 
 # ───────────────────────── Figure 1: K vs published pl_rvamp ──────────────────
@@ -90,7 +87,94 @@ def model_k_from_published(df: pd.DataFrame) -> pd.Series:
             / np.sqrt(1 - ecc ** 2))
 
 
-def plot_k_calibration(df: pd.DataFrame, args) -> dict:
+ESO_TARGETS_CACHE = Path(KEPLER_DATA_DIR) / "NASA" / "eso_harps_nirps_targets.csv"
+ESO_TAP = "http://archive.eso.org/tap_obs/sync"
+ESO_QUERY = ("select instrument,object,min(ra) as ra,min(dec) as dec,count(*) as n_exp "
+             "from dbo.raw where instrument in ('HARPS','NIRPS') and dp_cat='SCIENCE' "
+             "group by instrument,object")
+ESO_MATCH_ARCSEC = 10.0
+# A mass needs a campaign, not a snapshot: count a host as observed only above this many science
+# exposures. Recovery is flat (92-94%) from 1 to 20, so the exact floor is not what drives it.
+ESO_MIN_EXPOSURES = 10
+
+
+def load_eso_targets() -> pd.DataFrame:
+    """Every star HARPS or NIRPS has observed, from the ESO science archive (cached)."""
+    if not ESO_TARGETS_CACHE.exists():
+        url = f"{ESO_TAP}?REQUEST=doQuery&LANG=ADQL&FORMAT=csv&QUERY={quote(ESO_QUERY)}"
+        print("Downloading HARPS/NIRPS target list from the ESO archive ...")
+        frame = pd.read_csv(url)
+        ESO_TARGETS_CACHE.parent.mkdir(parents=True, exist_ok=True)
+        frame.to_csv(ESO_TARGETS_CACHE, index=False)
+    return pd.read_csv(ESO_TARGETS_CACHE)
+
+
+def observed_by_harps_nirps(planet_names: pd.Series) -> np.ndarray:
+    """True where HARPS or NIRPS has pointed at the planet's host, matched on sky position."""
+    from astropy.coordinates import SkyCoord
+    import astropy.units as u
+    from science.catalogs import read_nasa_csv
+    from tools.paths import PSCOMPPARS_CSV
+
+    archive = read_nasa_csv(PSCOMPPARS_CSV)[["pl_name", "ra", "dec"]]
+    hosts = pd.DataFrame({"pl_name": planet_names.to_numpy()}).merge(archive, on="pl_name", how="left")
+    eso = load_eso_targets().dropna(subset=["ra", "dec"])
+    # A few archive rows carry parked-telescope coordinates (dec well outside +-90).
+    eso = eso[eso["dec"].between(-90, 90) & eso["ra"].between(0, 360)]
+    known = hosts["ra"].notna().to_numpy()
+    idx_host, idx_eso, _, _ = SkyCoord(eso.ra.to_numpy() * u.deg, eso.dec.to_numpy() * u.deg).search_around_sky(
+        SkyCoord(hosts.loc[known, "ra"].to_numpy() * u.deg, hosts.loc[known, "dec"].to_numpy() * u.deg),
+        ESO_MATCH_ARCSEC * u.arcsec)
+    exposures = np.zeros(len(hosts))
+    np.add.at(exposures, np.flatnonzero(known)[idx_host], eso["n_exp"].to_numpy()[idx_eso])
+    return exposures >= ESO_MIN_EXPOSURES
+
+
+def plot_k_recovery(df: pd.DataFrame, args) -> None:
+    """One panel for both questions: model K against published K (1:1 = right amplitude), with each
+    planet coloured by whether the model detects it. Misses are split by whether HARPS or NIRPS has
+    actually observed the host (ESO science archive), since those are the instruments modelled; a
+    planet only ever measured elsewhere may need a longer or more precise campaign than this one."""
+    harps_like = observed_by_harps_nirps(df["pl_name"])
+
+    passed = df["rv_pass"].to_numpy(bool)
+    fig, ax = plt.subplots(figsize=(8.0, 7.0), layout="constrained")
+    # x error bars are the archive's published K uncertainty; the model K is computed from the
+    # published mass, period and stellar mass, so it carries no independent error here.
+    err_up = pd.to_numeric(df.get("pl_rvamperr1"), errors="coerce").abs().fillna(0.0)
+    err_dn = pd.to_numeric(df.get("pl_rvamperr2"), errors="coerce").abs().fillna(0.0)
+    groups = [(passed, "#2060c0", "Model detects"),
+              (~passed & harps_like, "#d95f02", "Model misses (HARPS/NIRPS)"),
+              (~passed & ~harps_like, "#909090", "Model misses (other RV telescopes)")]
+    for mask, colour, label in groups:
+        ax.errorbar(df.loc[mask, "pl_rvamp"], df.loc[mask, "k_model"],
+                    xerr=np.vstack([err_dn[mask], err_up[mask]]),
+                    fmt="o", ms=5.5, alpha=0.55, color=colour, ecolor=colour,
+                    elinewidth=0.7, capsize=0, linestyle="none", label=label)
+    lims = [0.3, df["pl_rvamp"].quantile(0.999) * 2]
+    ax.plot(lims, lims, "k--", lw=1.2, label="Equal")
+    ax.set_xscale("log"); ax.set_yscale("log")
+    ax.set_xlim(lims); ax.set_ylim(lims)
+    ax.set_xlabel("Published K [m/s]")
+    ax.set_ylabel("Model K [m/s]")
+    ax.set_title("Radial velocity model planet recovery")
+    ax.tick_params(labelsize=22)
+    ax.legend(loc="upper left", fontsize=16, markerscale=2.2)
+    summary = "\n".join([
+        f"Overall recovery (all telescopes) = {passed.mean():.0%}",
+        f"Overall recovery (HARPS/NIRPS) = {passed[harps_like].mean():.0%}",
+    ])
+    ax.text(0.97, 0.04, summary, transform=ax.transAxes, ha="right", va="bottom", fontsize=16)
+    out = OUT_DIR / "rv_k_recovery.png"
+    fig.savefig(out, bbox_inches="tight")
+    fig.savefig(PAPER_FIG_DIR / "rv_k_recovery.png", bbox_inches="tight")
+    plt.close(fig)
+    print(f"  Recovered {passed.mean():.0%} of {len(df):,} published-K planets; "
+          f"{passed[harps_like].mean():.0%} of the {harps_like.sum():,} hosts HARPS/NIRPS observed")
+    print(f"  Saved paper copy: {PAPER_FIG_DIR / 'rv_k_recovery.png'}")
+
+
+def run_k_comparison(df: pd.DataFrame, args) -> dict:
     df = df.dropna(subset=["pl_rvamp", "pl_orbper", "st_mass"]).copy()
     df = df[(df["pl_rvamp"] > 0) & (df["pl_msinie"].notna() | df["pl_bmasse"].notna())]
     df["k_model"] = model_k_from_published(df)
@@ -100,7 +184,7 @@ def plot_k_calibration(df: pd.DataFrame, args) -> dict:
     print(f"  K calibration sample: {len(df):,}  |  median K_model/K_pub = {ratio.median():.3f}  "
           f"(16-84%: {ratio.quantile(0.16):.3f}-{ratio.quantile(0.84):.3f})")
 
-    # Run the full RV detector on the same planets (for panel B recovery).
+    # Run the full RV detector on the same planets, for the recovery figure.
     rv = RVData(df.rename(columns={
         "pl_orbper": "p_orb", "pl_orbeccen": "ecc_p", "pl_orbincl": "inc_p",
         "pl_msinie": "msini_p", "pl_bmasse": "mass_p", "pl_rade": "radius_p",
@@ -114,71 +198,9 @@ def plot_k_calibration(df: pd.DataFrame, args) -> dict:
     df["sigma_k_model"] = pd.to_numeric(cat["rv_sigma_K_ms"], errors="coerce").to_numpy()
     df["snr_model"] = pd.to_numeric(cat["rv_snr"], errors="coerce").to_numpy()
 
-    # Same 3-in-1 template as the Kepler (47) / TESS (48) calibration figures:
-    # scatter spans the full-height left column; recovery + ratio stack on the right.
-    fig = plt.figure(figsize=(14, 8))
-    gs = fig.add_gridspec(2, 2, width_ratios=[1.3, 1], hspace=0.42, wspace=0.32)
-
-    # A. model K vs published K
-    axA = fig.add_subplot(gs[:, 0])
-    for st in ["F", "G", "K", "M", "A", "Unknown"]:
-        s = df[df["stype"] == st]
-        if len(s) == 0:
-            continue
-        axA.scatter(s["pl_rvamp"], s["k_model"], s=7, alpha=0.45,
-                    color=STYPE_COLORS[st], label=f"{st} (N={len(s)})", linewidths=0)
-    lims = [0.3, df["pl_rvamp"].quantile(0.999) * 2]
-    axA.plot(lims, lims, "k--", lw=1.2, label="1:1 (perfect physics)")
-    axA.set_xscale("log"); axA.set_yscale("log")
-    axA.set_xlim(lims); axA.set_ylim(lims)
-    axA.set_xlabel("Published K  [m/s]")
-    axA.set_ylabel("Model K  [m/s]")
-    axA.set_title("A. Model K vs published K")
-    axA.legend(fontsize=12, loc="upper left"); axA.grid(alpha=0.2, which="both")
-
-    # B. recovery vs published K bin
-    axB = fig.add_subplot(gs[0, 1])
-    kbins = [0, 1, 2, 5, 10, 30, 100, 1e5]
-    klabels = ["<1", "1-2", "2-5", "5-10", "10-30", "30-100", ">100"]
-    df["kbin"] = pd.cut(df["pl_rvamp"], kbins, labels=klabels)
-    s = df.groupby("kbin", observed=True).agg(n=("rv_pass", "size"), f=("rv_pass", "mean"))
-    axB.plot(range(len(s)), s["f"], "o-", color="#2060c0")
-    for i, (lab, row) in enumerate(s.iterrows()):
-        axB.annotate(f"{row['f']:.0%}\nN={int(row['n'])}", (i, row["f"]),
-                     textcoords="offset points", xytext=(0, 6), ha="center", fontsize=9)
-    axB.set_xticks(range(len(s))); axB.set_xticklabels(s.index, rotation=25)
-    axB.set_ylim(-0.05, 1.15); axB.set_xlabel("Published K bin [m/s]")
-    axB.set_ylabel("Model pass fraction")
-    axB.set_title("B. Recovery vs signal strength")
-    axB.grid(alpha=0.25)
-
-    # C. calibration ratio per bin
-    axC = fig.add_subplot(gs[1, 1])
-    med = df.groupby("kbin", observed=True)["k_model"].median() / 1.0
-    stats = df.groupby("kbin", observed=True).apply(
-        lambda g: pd.Series({
-            "med": (g["k_model"] / g["pl_rvamp"]).median(),
-            "lo": (g["k_model"] / g["pl_rvamp"]).quantile(0.16),
-            "hi": (g["k_model"] / g["pl_rvamp"]).quantile(0.84)}),
-        include_groups=False)
-    axC.errorbar(range(len(stats)), stats["med"],
-                 yerr=[stats["med"] - stats["lo"], stats["hi"] - stats["med"]],
-                 fmt="o-", color="#2060c0", capsize=4)
-    axC.axhline(1.0, color="black", ls="--", lw=1)
-    axC.set_yscale("log")
-    axC.set_xticks(range(len(stats))); axC.set_xticklabels(stats.index, rotation=25)
-    axC.set_xlabel("Published K bin [m/s]"); axC.set_ylabel("Model / published K")
-    axC.set_title("C. K ratio (bars = 16-84%)")
-    axC.grid(alpha=0.25, which="both")
-
-    out = OUT_DIR / "rv_k_vs_published_rvamp.png"
-    fig.savefig(out, bbox_inches="tight")
-    fig.savefig(PAPER_FIG_DIR / "rv_k_vs_published_rvamp.png", bbox_inches="tight")
-    plt.close(fig)
-    print(f"  Saved {out}")
-    print(f"  Saved paper copy: {PAPER_FIG_DIR / 'rv_k_vs_published_rvamp.png'}")
     df.to_csv(OUT_DIR / "rv_k_calibration_matched_rows.csv", index=False)
 
+    plot_k_recovery(df, args)
     plot_sigmak_validation(df, args)
     plot_sigmak_3in1(df, args)
     return {"n": len(df), "ratio_med": float(ratio.median()),
@@ -221,7 +243,7 @@ def plot_sigmak_validation(df: pd.DataFrame, args) -> None:
     grid = np.logspace(np.log10(lims[0]), np.log10(lims[1]), 100)
     # Shade y <= x (model <= published) = floor holds.
     axA.fill_between(grid, lims[0], grid, color="#2060c0", alpha=0.06, zorder=0,
-                     label="model ≤ published (floor holds)")
+                     label="Model below published")
     # Context points (giants / non-RV mass): grey.
     o = d[~d["cal_set"]]
     axA.scatter(o["sigma_k_pub"], o["sigma_k_model"], s=6, alpha=0.18,
@@ -235,14 +257,14 @@ def plot_sigmak_validation(df: pd.DataFrame, args) -> None:
     axA.plot(lims, lims, "k--", lw=1.2, label="1:1")
     axA.set_xscale("log"); axA.set_yscale("log")
     axA.set_xlim(lims); axA.set_ylim(lims)
-    axA.set_xlabel("Published σ_K  [m/s]  (pl_rvamperr)")
-    axA.set_ylabel(f"Model σ_K  [m/s]  (√(2/{args.n_obs})·σ_RV)")
+    axA.set_xlabel("Published σ$_K$ [m/s]")
+    axA.set_ylabel("Model σ$_K$ [m/s]")
     axA.set_title("A. σ_K floor test: model = best-case achievable precision")
     axA.text(0.03, 0.97,
              f"floor-pass (model ≤ published)\n  all: {floor_frac_all:.0%}   calibration set: {floor_frac_cal:.0%}",
              transform=axA.transAxes, va="top", ha="left", fontsize=7.5,
              bbox=dict(boxstyle="round", fc="#f7f7f7", ec="0.6"))
-    axA.legend(fontsize=6.5, loc="lower right"); axA.grid(alpha=0.2, which="both")
+    axA.legend(fontsize=6.5, loc="lower right")
 
     # ── B. sigma_K ratio per K bin: calibration-set bins are the claim ────────
     axB = axes[1]
@@ -273,7 +295,6 @@ def plot_sigmak_validation(df: pd.DataFrame, args) -> None:
     axB.set_ylabel("σ_K model / σ_K published")
     axB.set_title(f"B. σ_K ratio per K bin  (blue = calibration set, K≤{K_CAL_CUT_MS:g})\n"
                   "shaded ≤1 = expected: model is a best-case floor")
-    axB.grid(alpha=0.25, which="both")
 
     # ── C. S/N calibration: model K/sigma_K vs published pl_rvamp/pl_rvamperr ──
     axC = axes[2]
@@ -288,7 +309,7 @@ def plot_sigmak_validation(df: pd.DataFrame, args) -> None:
           f"(16-84%: {ratio_snr.quantile(0.16):.2f}-{ratio_snr.quantile(0.84):.2f}, N={len(cc):,})")
     oo = dd[~dd["cal_set"]]
     axC.scatter(oo["snr_pub"], oo["snr_mod"], s=6, alpha=0.18, color="0.6",
-                linewidths=0, label=f"context (N={len(oo)})")
+                linewidths=0, label="Other planets")
     for st in ["F", "G", "K", "M"]:
         s = cc[cc["stype"] == st]
         if len(s):
@@ -304,12 +325,11 @@ def plot_sigmak_validation(df: pd.DataFrame, args) -> None:
     axC.set_ylabel("Model S/N   (K / σ_K)")
     axC.set_title("C. Signal-to-noise calibration (the detection quantity)\n"
                   "folds K and σ_K; not crushed into a flat band")
-    axC.legend(fontsize=6.5, loc="lower right"); axC.grid(alpha=0.2, which="both")
+    axC.legend(fontsize=6.5, loc="lower right")
 
     fig.suptitle(f"RV noise & S/N calibration  ({args.instrument}, N_obs={args.n_obs})",
                  fontsize=12)
     out = OUT_DIR / "rv_sigmaK_vs_published.png"
-    fig.tight_layout(); fig.savefig(out, bbox_inches="tight"); plt.close(fig)
     print(f"  Saved {out}")
 
 
@@ -338,29 +358,29 @@ def plot_sigmak_3in1(df: pd.DataFrame, args) -> dict:
     db["cal_set"] = db["pl_rvamp"].le(15.0) & db["pl_msinie"].notna()
     floor_all = float((db["sigma_k_model"] <= db["sigma_k_pub"]).mean())
 
-    fig = plt.figure(figsize=(14, 8))
-    gs = fig.add_gridspec(2, 2, width_ratios=[1.3, 1], hspace=0.42, wspace=0.32)
+    fig = plt.figure(figsize=(13.0, 7.5), layout="constrained")
+    gs = fig.add_gridspec(2, 2, width_ratios=[1, 1])
 
     # A. sigma_K floor test (noise)
     axA = fig.add_subplot(gs[:, 0])
     lims2 = [max(1e-3, db["sigma_k_pub"].quantile(0.002)), db["sigma_k_pub"].quantile(0.998)]
     grid = np.logspace(np.log10(lims2[0]), np.log10(lims2[1]), 100)
     axA.fill_between(grid, lims2[0], grid, color="#2060c0", alpha=0.06, zorder=0,
-                     label="model ≤ published (floor holds)")
+                     label="Model below published")
     o = db[~db["cal_set"]]
     axA.scatter(o["sigma_k_pub"], o["sigma_k_model"], s=6, alpha=0.15, color="0.6",
-                linewidths=0, label=f"context (N={len(o)})")
+                linewidths=0, label="Other planets")
     for st in ["F", "G", "K", "M"]:
         s = db[db["cal_set"] & (db["stype"] == st)]
         if len(s):
             axA.scatter(s["sigma_k_pub"], s["sigma_k_model"], s=10, alpha=0.55,
-                        color=STYPE_COLORS[st], label=f"{st} cal-set (N={len(s)})", linewidths=0)
-    axA.plot(lims2, lims2, "k--", lw=1.2, label="1:1")
+                        color=STYPE_COLORS[st], label=st, linewidths=0)
+    axA.plot(lims2, lims2, "k--", lw=1.2, label="Equal")
     axA.set_xscale("log"); axA.set_yscale("log"); axA.set_xlim(lims2); axA.set_ylim(lims2)
-    axA.set_xlabel("Published σ_K  [m/s]  (pl_rvamperr)")
-    axA.set_ylabel(f"Model σ_K  [m/s]  (√(2/{args.n_obs})·σ_RV)")
-    axA.set_title(f"A. σ_K floor test  (floor-pass {floor_all:.0%})")
-    axA.legend(fontsize=LEG, loc="lower right"); axA.grid(alpha=0.2, which="both")
+    axA.set_xlabel("Published σ$_K$ [m/s]")
+    axA.set_ylabel("Model σ$_K$ [m/s]")
+    axA.set_title("A. Model versus published")
+    axA.legend(fontsize=LEG, loc="lower right")
 
     # B. detection S/N + small-planet recovery
     axB = fig.add_subplot(gs[0, 1])
@@ -371,20 +391,20 @@ def plot_sigmak_3in1(df: pd.DataFrame, args) -> dict:
     slims = [max(0.5, dd["snr_pub"].quantile(0.01)), dd["snr_pub"].quantile(0.99) * 1.5]
     oo = dd[~dd["cal_set"]]
     axB.scatter(oo["snr_pub"], oo["snr_mod"], s=6, alpha=0.15, color="0.6",
-                linewidths=0, label=f"context (N={len(oo)})")
+                linewidths=0, label="Other planets")
     for st in ["F", "G", "K", "M"]:
         s = cc[cc["stype"] == st]
         if len(s):
             axB.scatter(s["snr_pub"], s["snr_mod"], s=10, alpha=0.55, color=STYPE_COLORS[st],
-                        label=f"{st} cal-set (N={len(s)})", linewidths=0)
-    axB.plot(slims, slims, "k--", lw=1.2, label="1:1")
+                        label=st, linewidths=0)
+    axB.plot(slims, slims, "k--", lw=1.2, label="Equal")
     axB.axhline(thr, color="red", ls=":", lw=1.0)
-    axB.axvline(thr, color="red", ls=":", lw=1.0, label=f"{thr:g}σ threshold")
+    axB.axvline(thr, color="red", ls=":", lw=1.0, label="Detection threshold")
     axB.set_xscale("log"); axB.set_yscale("log"); axB.set_xlim(slims); axB.set_ylim(slims)
-    axB.set_xlabel("Published S/N  (pl_rvamp / pl_rvamperr)")
-    axB.set_ylabel("Model S/N  (K / σ_K)")
-    axB.set_title(f"B. Detection S/N: small-planet recovery {rec_model:.0%} vs {rec_pub:.0%} pub.")
-    axB.legend(fontsize=LEG, loc="lower right"); axB.grid(alpha=0.2, which="both")
+    axB.set_xlabel("Published signal-to-noise")
+    axB.set_ylabel("Model signal-to-noise")
+    axB.set_title("B. Detection signal-to-noise")
+    axB.legend(fontsize=LEG, loc="lower right")
 
     # C. per-spectral-type jitter constants (Bellotti & Korhonen 2021)
     axC = fig.add_subplot(gs[1, 1])
@@ -396,13 +416,11 @@ def plot_sigmak_3in1(df: pd.DataFrame, args) -> dict:
         axC.annotate(f"{v:g} m/s", (i, v), textcoords="offset points", xytext=(0, 4),
                      ha="center", fontsize=12)
     axC.set_ylim(0, max(vals) * 1.25)
-    axC.set_ylabel("HARPS activity jitter σ_jit  [m/s]")
+    axC.set_ylabel("Activity jitter [m/s]")
     axC.set_xlabel("Host spectral type")
-    axC.set_title("C. Per-type jitter (Bellotti & Korhonen 2021,\nTable 3; p2p→RMS ÷2.8)")
-    axC.grid(alpha=0.25, axis="y")
+    axC.set_title("C. Jitter by spectral type")
 
-    fig.suptitle(f"RV noise ($\\sigma_K$) calibration  ({args.instrument}, N_obs={args.n_obs}, ≥{thr:g}σ)",
-                 fontsize=13)
+    fig.suptitle("Radial-velocity noise against published values")
     out = OUT_DIR / "rv_sigmaK_3in1.png"
     fig.savefig(out, bbox_inches="tight")
     fig.savefig(PAPER_FIG_DIR / "rv_sigmaK_3in1.png", bbox_inches="tight")
@@ -453,7 +471,7 @@ def plot_pipeline_check(ppop: pd.DataFrame, args, inst: str) -> None:
     axA.set_xscale("log"); axA.set_yscale("log")
     axA.set_xlabel("Model K [m/s]"); axA.set_ylabel("Count (log)")
     axA.set_title(f"A. K — the RV 'MES'  ({inst}, P-Pop)")
-    axA.legend(fontsize=7); axA.grid(alpha=0.2)
+    axA.legend(fontsize=7)
 
     # B. recovery vs K/sigma_K bins
     axB = fig.add_subplot(gs[0, 1])
@@ -468,7 +486,6 @@ def plot_pipeline_check(ppop: pd.DataFrame, args, inst: str) -> None:
     axB.set_xticks(range(len(s))); axB.set_xticklabels(s.index, rotation=25)
     axB.set_ylim(0, 1.18); axB.set_xlabel("K/σ_K bin"); axB.set_ylabel("Detected fraction")
     axB.set_title(f"B. Recovery vs K/σ_K (threshold {args.snr_threshold:g})")
-    axB.grid(axis="y", alpha=0.2)
 
     # C. sigma decomposition by stype
     axC = fig.add_subplot(gs[0, 2])
@@ -489,7 +506,7 @@ def plot_pipeline_check(ppop: pd.DataFrame, args, inst: str) -> None:
     axC.set_xticks(x); axC.set_xticklabels(stypes)
     axC.set_xlabel("Spectral type"); axC.set_ylabel("σ component [m/s] (median)")
     axC.set_title(f"C. Noise decomposition by stype ({inst} band {rv.band})")
-    axC.legend(fontsize=7); axC.grid(axis="y", alpha=0.2, which="both")
+    axC.legend(fontsize=7)
 
     # D. loss budget overall + by stype
     axD = fig.add_subplot(gs[1, 0])
@@ -524,7 +541,7 @@ def plot_pipeline_check(ppop: pd.DataFrame, args, inst: str) -> None:
     axE.set_yscale("log")
     axE.set_xlabel(f"Band magnitude ({rv.band})"); axE.set_ylabel("σ_RV [m/s] (log)")
     axE.set_title("E. Brightness wall: σ_RV vs band magnitude")
-    axE.legend(fontsize=7); axE.grid(alpha=0.2)
+    axE.legend(fontsize=7)
 
     # F. funnel text panel
     axF = fig.add_subplot(gs[1, 2]); axF.axis("off")
@@ -575,7 +592,7 @@ def main():
     print(f"Output dir: {OUT_DIR}")
     print("\n── Figure 1: K vs published pl_rvamp ──")
     rvamp = load_rvamp_sample()
-    cal = plot_k_calibration(rvamp, args)
+    cal = run_k_comparison(rvamp, args)
 
     if args.fig1_only:
         print(f"\nK calibration: median K_model/K_published = {cal['ratio_med']:.3f} "

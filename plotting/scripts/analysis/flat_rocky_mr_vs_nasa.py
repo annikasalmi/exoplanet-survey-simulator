@@ -34,14 +34,14 @@ from science.statistics import (
     NASA_MEASUREMENT_ERROR, SIMULATED_MEASUREMENT_ERROR, perturb_fractional,
 )
 from tools.paths import PSCOMPPARS_CSV
+from plotting.figure_style import PAPER_STYLE
 
 OUT_DIR = os.path.join(ANALYSIS_DIR, "flat_rocky_mr_vs_nasa")
 PAPER_FIG_DIR = Path(PAPER_FIGURES_DIR)
 
-FIGURE_STYLE = {
-    "font.size": 13, "axes.titlesize": 14, "axes.labelsize": 13,
-    "legend.fontsize": 10, "xtick.labelsize": 11, "ytick.labelsize": 11,
-}
+FIGURE_STYLE = PAPER_STYLE
+MASS_LIMS = (0.0, 12.0)
+RADIUS_LIMS = (0.5, 2.4)
 FLAT_N = 150000
 SEED = 0
 MC_REPEATS = 4000
@@ -56,8 +56,10 @@ RELATIONS = [
 ]
 
 
-def noised_scatter_AB(population, cut, rng, n_plot=400):
-    """One detected + noised draw (with the cut applied); split into flat-A-kept vs dropped-by-A."""
+def noised_scatter_AB(population, cut, rng, n_plot=400, window=None):
+    """One detected + noised draw (with the cut applied); split into flat-A-kept vs dropped-by-A.
+    window=(m_hi, r_lo, r_hi) keeps the draw inside the panel, which spans a fraction of the
+    universe's radius range, so the points shown are not mostly off-scale."""
     mass = population["mass"].to_numpy()
     radius = population["radius"].to_numpy()
     keep = population["joint_detected"].to_numpy().copy()
@@ -70,6 +72,10 @@ def noised_scatter_AB(population, cut, rng, n_plot=400):
         k = mo > cut["mass_min"]
         mo, ro, tmass, trad = mo[k], ro[k], tmass[k], trad[k]
     dropped = is_super_earth(tmass, trad)          # A drops these (true values)
+    if window is not None:
+        m_hi, r_lo, r_hi = window
+        inside = (mo <= m_hi) & (ro >= r_lo) & (ro <= r_hi)
+        mo, ro, dropped = mo[inside], ro[inside], dropped[inside]
     if mo.size > n_plot:
         j = rng.choice(mo.size, n_plot, replace=False)
         mo, ro, dropped = mo[j], ro[j], dropped[j]
@@ -82,8 +88,9 @@ CUTS = [("all (no cut)", {}, "flat_rocky_mr_relations_2x4.png"),
          dict(mass_min=2.0, insol_max=50.0), "flat_rocky_mr_relations_2x4_cold_corner.png")]
 
 # The 2x2 paper figure shows the default relation (Otegi) alone, before/after the cold cut.
-OTEGI_2X2_CUTS = [("Full detected sample", {}),
-                  ("Cold super-Earth cut", dict(mass_min=2.0, insol_max=50.0))]
+OTEGI_2X2_CUTS = [("All detected planets", {}),
+                  (r"Insolation < 50 $I_\oplus$, mass > 2 $M_\oplus$",
+                   dict(mass_min=2.0, insol_max=50.0))]
 
 
 def nasa_cut(nasa, cut):
@@ -119,7 +126,7 @@ def true_sample(population, cut, n, rng, universe_a=False):
     return mass[idx], radius[idx]
 
 
-SCATTER_LABELS = ("Escape-only (kept)", "Primordial-rocky: rocky super-Earths (M>2)")
+SCATTER_LABELS = ("Sub-Neptunes", "Sub-Neptunes and super-Earths")
 
 
 def extend_silicate(m_sil, r_sil, m_lo, m_hi, n=400):
@@ -145,7 +152,7 @@ def _draw_scatter(ax, arr, cut, nasa, m_sil, r_sil, rng, title,
     # sil_range=(lo, hi) draws the curve across that whole mass range.
     m_c, r_c = extend_silicate(m_sil, r_sil, *sil_range) if sil_range else (m_sil, r_sil)
     ax.fill_between(m_c, r_c, 2.6, color="0.965", zorder=0)
-    ax.plot(m_c, r_c, "k-", lw=1.2, zorder=6, label="silicate line")
+    ax.plot(m_c, r_c, "k-", lw=1.2, zorder=6, label="Pure silicate")
     if true_values:
         # One illustrative survey per universe: blue (A) from the planets that
         # survive its cut, orange (B) from every planet.
@@ -161,7 +168,7 @@ def _draw_scatter(ax, arr, cut, nasa, m_sil, r_sil, rng, title,
                         fmt="o", ms=4, color=colour, alpha=0.6, elinewidth=0.6,
                         capsize=0, zorder=z, label=lbl)
     else:
-        mo, ro, dropped = noised_scatter_AB(arr, cut, rng)
+        mo, ro, dropped = noised_scatter_AB(arr, cut, rng, window=(MASS_LIMS[1], *RADIUS_LIMS))
         ax.scatter(mo[~dropped], ro[~dropped], s=15, color="tab:blue", alpha=0.45, lw=0,
                    zorder=3, label=labels[0])
         ax.scatter(mo[dropped], ro[dropped], s=15, color="tab:orange", alpha=0.5, lw=0,
@@ -169,14 +176,12 @@ def _draw_scatter(ax, arr, cut, nasa, m_sil, r_sil, rng, title,
     ax.errorbar(nmc, nrc, xerr=np.array([nme2, nme1]), yerr=np.array([nre2, nre1]),
                 fmt="o", mfc="none", mec="k", ecolor="k", ms=5, mew=1.0,
                 elinewidth=0.6, capsize=1.5, alpha=0.8, zorder=5,
-                label=f"NASA (N={nmc.size})")
-    ax.set_xlim(0, 13); ax.set_ylim(0.5, 2.4)
+                label="Measured exoplanets")
+    ax.set_xlim(*MASS_LIMS); ax.set_ylim(*RADIUS_LIMS)
     ax.set_title(title)
-    ax.grid(alpha=0.2); ax.legend(fontsize=10, loc="lower right", framealpha=0.9)
-    ax.text(0.2, 2.3, "VOLATILE (above)", fontsize=11, color="0.4", va="top")
-    ax.text(4.0, 0.6, "ROCKY (below)", fontsize=11, color="0.4")
-    ax.set_xlabel(r"planet mass [$M_\oplus$]")
-    ax.set_ylabel(r"planet radius [$R_\oplus$]")
+    ax.legend(loc="lower right", framealpha=0.95)
+    ax.set_xlabel(r"Planet mass [$M_\oplus$]")
+    ax.set_ylabel(r"Planet radius [$R_\oplus$]")
 
 
 # Planets per simulated survey in the 1x2: blue ("Sub-Neptunes only") and orange
@@ -185,56 +190,12 @@ N_SURVEY_BLUE = 50
 N_SURVEY_ORANGE = 100
 
 
-def _draw_bells(ax, arr, cut, nasa, m_sil, r_sil, rng, tag=""):
-    """Bottom-row panel: COUNT histograms of the volatile fraction over the MC draws.
-    y = number of the N_REPEATS draws that landed in each bin; N_p = mean planets/draw."""
-    nv, n_nasa = monte_carlo_observed_fraction(
-        nasa, cut, m_sil, r_sil, rng, repeats=MC_REPEATS)
-    n_mu, n_sd = nv.mean(), nv.std()
-    sA, nA = monte_carlo_population_fraction(
-        arr, cut, m_sil, r_sil, rng, drop_super_earths=True,
-        repeats=MC_REPEATS, error=SIMULATED_MEASUREMENT_ERROR)
-    sB, nB = monte_carlo_population_fraction(
-        arr, cut, m_sil, r_sil, rng, drop_super_earths=False,
-        repeats=MC_REPEATS, error=SIMULATED_MEASUREMENT_ERROR)
-    all_bell = [b for b in (nv, sA, sB) if b.size]
-    cat = np.concatenate(all_bell)
-    lo, hi = cat.min(), cat.max(); pad = 0.05 * (hi - lo)
-    gx = np.linspace(lo - pad, hi + pad, 400)
-    # fixed 0.04-wide bins on the k/25 grid, identical across all figures: NASA's
-    # fraction is discrete (same ~25 planets each draw), finer data-driven bins alias it
-    edges = np.arange(-0.02, 1.02 + 1e-9, 0.04)
-    bw = edges[1] - edges[0]
-    # Taller of the bars and the fitted curves, so no curve runs off the top.
-    y_max = max(max(np.histogram(b, bins=edges)[0].max(),
-                    gaussian_density(b.mean(), b.mean(), b.std()) * b.size * bw) for b in all_bell)
-    for lbl, s, ne, colour in [("Escape-only", sA, nA, "tab:orange"),
-                               ("Primordial-rocky", sB, nB, "tab:blue")]:
-        if s.size == 0:
-            continue
-        tens = abs(s.mean() - n_mu) / np.sqrt(s.std() ** 2 + n_sd ** 2)
-        ax.hist(s, bins=edges, color=colour, alpha=0.30)
-        ax.plot(gx, gaussian_density(gx, s.mean(), s.std()) * s.size * bw, color=colour, lw=2.0,
-                label=f"{lbl}: $\\mu$={s.mean():.2f} $\\sigma$={s.std():.3f} "
-                      f"({tens:.1f}$\\sigma$), N$_p$={ne:.0f}")
-        if tag:
-            print(f"    {tag} {lbl}: mu={s.mean():.3f} sd={s.std():.3f} "
-                  f"tension={tens:.1f}sigma N_planets={ne:.0f} N_draws={s.size}")
-    ax.hist(nv, bins=edges, color="tab:green", alpha=0.34)
-    ax.plot(gx, gaussian_density(gx, n_mu, n_sd) * nv.size * bw, color="tab:green", lw=2.4,
-            label=f"NASA: $\\mu$={n_mu:.2f} $\\sigma$={n_sd:.3f}, N$_p$={n_nasa}")
-    ax.set_xlim(gx[0], gx[-1]); ax.set_ylim(0, y_max * 1.15)
-    ax.grid(alpha=0.2); ax.legend(fontsize=9, loc="upper left")
-    ax.set_xlabel("volatile fraction")
-    ax.set_ylabel(f"number of MC draws (of {MC_REPEATS:,})")
-
-
 def make_figure(cut_label, cut, fname, pools, nasa, m_sil, r_sil, rng):
     print(f"\n--> [{cut_label}]")
     fig, axes = plt.subplots(2, 4, figsize=(23, 11))
     for ci, (name, eq, applies, arr) in enumerate(pools):
-        _draw_scatter(axes[0, ci], arr, cut, nasa, m_sil, r_sil, rng, f"{name}\n{eq}")
-        _draw_bells(axes[1, ci], arr, cut, nasa, m_sil, r_sil, rng, tag=f"[{cut_label}] {name}")
+        _draw_scatter(axes[0, ci], arr, cut, nasa, m_sil, r_sil, rng, name)
+        _draw_density_1x2(axes[1, ci], arr, cut, nasa, m_sil, r_sil, rng, tag=f"[{cut_label}] {name}")
     fig.tight_layout()
     out_png = os.path.join(OUT_DIR, fname)
     fig.savefig(out_png, dpi=170, bbox_inches="tight")
@@ -244,42 +205,6 @@ def make_figure(cut_label, cut, fname, pools, nasa, m_sil, r_sil, rng):
         print(f"--> Saved paper copy: {PAPER_FIG_DIR / fname}")
     plt.close(fig)
     print(f"--> Saved: {out_png}")
-
-
-def make_otegi_2x2(arr, nasa, m_sil, r_sil, rng):
-    """Appendix figure: the default (Otegi) relation only — mass-radius plane on top,
-    volatile-fraction count histograms below, before (left) and after (right) the cut."""
-    print("\n--> Otegi 2x2 (before/after the cold super-Earth cut):")
-    fig, axes = plt.subplots(2, 2, figsize=(12.5, 11))
-    for ci, (cut_label, cut) in enumerate(OTEGI_2X2_CUTS):
-        _draw_scatter(axes[0, ci], arr, cut, nasa, m_sil, r_sil, rng, cut_label)
-        _draw_bells(axes[1, ci], arr, cut, nasa, m_sil, r_sil, rng, tag=f"[{cut_label}]")
-    fig.tight_layout()
-    out_png = os.path.join(OUT_DIR, "flat_otegi_2x2_before_after.png")
-    fig.savefig(out_png, dpi=170, bbox_inches="tight")
-    PAPER_FIG_DIR.mkdir(parents=True, exist_ok=True)
-    fig.savefig(PAPER_FIG_DIR / "flat_otegi_2x2_before_after.png", dpi=170, bbox_inches="tight")
-    plt.close(fig)
-    print(f"--> Saved: {out_png}")
-    print(f"--> Saved paper copy: {PAPER_FIG_DIR / 'flat_otegi_2x2_before_after.png'}")
-
-
-def make_otegi_2x1(arr, nasa, m_sil, r_sil, rng):
-    """Main-text figure: Otegi relation, cold super-Earth cut only — mass-radius (top)
-    + volatile-fraction count histogram (bottom), stacked for single-column width."""
-    print("\n--> Otegi 2x1 (cold super-Earth cut only):")
-    cut_label, cut = OTEGI_2X2_CUTS[1]      # the 'after' column (cold super-Earth cut)
-    fig, axes = plt.subplots(2, 1, figsize=(7.0, 10.8))
-    _draw_scatter(axes[0], arr, cut, nasa, m_sil, r_sil, rng, cut_label)
-    _draw_bells(axes[1], arr, cut, nasa, m_sil, r_sil, rng, tag=f"[{cut_label}]")
-    fig.tight_layout()
-    out_png = os.path.join(OUT_DIR, "flat_otegi_2x1_cold_cut.png")
-    fig.savefig(out_png, dpi=170, bbox_inches="tight")
-    PAPER_FIG_DIR.mkdir(parents=True, exist_ok=True)
-    fig.savefig(PAPER_FIG_DIR / "flat_otegi_2x1_cold_cut.png", dpi=170, bbox_inches="tight")
-    plt.close(fig)
-    print(f"--> Saved: {out_png}")
-    print(f"--> Saved paper copy: {PAPER_FIG_DIR / 'flat_otegi_2x1_cold_cut.png'}")
 
 
 def _draw_density_1x2(ax, arr, cut, nasa, m_sil, r_sil, rng, tag=""):
@@ -310,71 +235,60 @@ def _draw_density_1x2(ax, arr, cut, nasa, m_sil, r_sil, rng, tag=""):
     # keep every grid value off a bin edge.
     edges = np.arange(-0.005, 1.02 + 1e-9, 0.02)
     y_max = 0.0
-    for lbl, s, colour in [("Sub-Neptunes only", sA, "tab:blue"),
+    for lbl, s, colour in [("Sub-Neptunes", sA, "tab:blue"),
                            ("Sub-Neptunes and super-Earths", sB, "tab:orange")]:
         heights, _, _ = ax.hist(s, bins=edges, density=True, color=colour, alpha=0.30)
         pdf = gaussian_density(gx, s.mean(), s.std())
-        ax.plot(gx, pdf, color=colour, lw=2.0,
-                label=f"{lbl}: $\\mu$={s.mean():.2f} $\\sigma$={s.std():.3f}")
+        ax.plot(gx, pdf, color=colour, lw=2.0, label=lbl)
         y_max = max(y_max, heights.max(), pdf.max())
         tens = abs(s.mean() - n_mu) / np.sqrt(s.std() ** 2 + n_sd ** 2)
         print(f"    {tag} {lbl}: mu={s.mean():.3f} sd={s.std():.3f} "
               f"tension={tens:.1f}sigma N_draws={s.size}")
     pdf = gaussian_density(gx, n_mu, n_sd)
     ax.fill_between(gx, pdf, color="tab:green", alpha=0.30, lw=0)
-    ax.plot(gx, pdf, color="tab:green", lw=2.4,
-            label=f"Measured exoplanets: $\\mu$={n_mu:.2f} $\\sigma$={n_sd:.3f}")
+    ax.plot(gx, pdf, color="tab:green", lw=2.4, label="Measured exoplanets")
     y_max = max(y_max, pdf.max())
     ax.set_xlim(gx[0], gx[-1]); ax.set_ylim(0, y_max * 1.4)   # headroom for the legend
-    ax.legend(fontsize=16, loc="upper left")
+    ax.legend(loc="upper left", framealpha=0.95)
     ax.set_xlabel("Volatile fraction")
     ax.set_ylabel("Probability density")
 
 
-def make_otegi_1x2(nasa, m_sil, r_sil, rng):
-    """Otegi mass-radius draw (left) beside its volatile-fraction histograms (right), cold cut.
-    Orange = universe B; blue = universe A (B minus its super-Earths). Left shows true
-    values with simulated error bars; histograms use noisy values, so some blue can fall below the line.
-    """
-    print("\n--> Otegi 1x2 (cold super-Earth cut; universes A and B):")
-    cut_label, cut = OTEGI_2X2_CUTS[1]
+def make_otegi_1x2(nasa, m_sil, r_sil, rng, show_full_population=False):
+    """Volatile-fraction density beside the mass-radius draw, for the cool massive cut.
+    show_full_population adds the same pair for the uncut population as a row on top.
+    Orange = universe B; blue = universe A (B minus its super-Earths). The mass-radius panel shows
+    true values with simulated error bars; the densities use noisy values, so some blue can fall
+    below the line."""
+    cuts = list(OTEGI_2X2_CUTS) if show_full_population else [OTEGI_2X2_CUTS[1]]
+    print(f"\n--> Otegi 1x2 ({len(cuts)} column(s); universes A and B):")
     arr = run_transit_rv_selection(
         flat_radii_curves(
             FLAT_N, seed=SEED, variant="superearths_supneptunes"
         ),
         rv_mag_target=RV_MAG_TARGET,
     )
-    fig, axes = plt.subplots(1, 2, figsize=(17.0, 7.5))
-    ax_hist, ax_mr = axes      # histograms on the left, the illustration on the right
-    # The mass-radius draw runs first so the histogram draws use the same random
-    # stream as before the panels were swapped.
-    _draw_scatter(ax_mr, arr, cut, nasa, m_sil, r_sil, rng, "",
-                  labels=("Sub-Neptunes only", "Sub-Neptunes and super-Earths"),
-                  true_values=True, sil_range=(1e-3, 12.0))
-    ax_mr.set_xlim(0, 12)
-    _draw_density_1x2(ax_hist, arr, cut, nasa, m_sil, r_sil, rng, tag=f"[1x2] {cut_label}")
-    # Pared-down styling for this figure: no grid, no VOLATILE/ROCKY labels, and
-    # no sample count on NASA.
-    ax_mr.set_xlabel(r"Planet mass [$M_\oplus$]")
-    ax_mr.set_ylabel(r"Planet radius [$R_\oplus$]")
-    for ax in axes:
-        ax.grid(False)
-        ax.xaxis.label.set_size(24)
-        ax.yaxis.label.set_size(24)
-        ax.tick_params(labelsize=20)
-    for text in [t for t in ax_mr.texts if t.get_text() in ("VOLATILE (above)", "ROCKY (below)")]:
-        text.remove()
-    h, lbl = ax_mr.get_legend_handles_labels()
-    relabel = {"silicate line": r"Pure MgSiO$_3$ mass-radius relation"}
-    ax_mr.legend(h, ["Measured exoplanets" if x.startswith("NASA") else relabel.get(x, x)
-                     for x in lbl],
-                 fontsize=18, loc="lower right", framealpha=0.9)
+    fig, axes = plt.subplots(len(cuts), 2, figsize=(12.5, 5.6 * len(cuts)), squeeze=False)
+    for ci, (cut_label, cut) in enumerate(cuts):
+        ax_hist, ax_mr = axes[ci, 0], axes[ci, 1]
+        # The mass-radius draw runs first so the density draws use the same random
+        # stream as before the panels were swapped.
+        _draw_scatter(ax_mr, arr, cut, nasa, m_sil, r_sil, rng, "",
+                      labels=("Sub-Neptunes", "Sub-Neptunes and super-Earths"),
+                      true_values=True, sil_range=(1e-3, MASS_LIMS[1]))
+        _draw_density_1x2(ax_hist, arr, cut, nasa, m_sil, r_sil, rng, tag=f"[1x2] {cut_label}")
+        ax_mr.set_xlabel(r"Planet mass [$M_\oplus$]")
+        ax_mr.set_ylabel(r"Planet radius [$R_\oplus$]")
+        if show_full_population:
+            ax_hist.set_title(cut_label)
+            ax_mr.set_title(cut_label)
     fig.tight_layout()
-    # Figure-wide title over both panels (placed above the axes; the tight
-    # bounding box on save keeps it).
-    fig.suptitle(r"Simulated Planet Detections at $I < 50\,I_\oplus$ and $M > 2\,M_\oplus$",
-                 fontsize=26, y=1.01, va="bottom")
-    fname = "flat_otegi_1x2_cold_cut.png"
+    if not show_full_population:
+        # Figure-wide title over both panels (placed above the axes; the tight
+        # bounding box on save keeps it).
+        fig.suptitle("Simulated detections of cool, massive planets", y=1.01, va="bottom")
+    fname = ("flat_otegi_1x2_with_full_population.png" if show_full_population
+             else "flat_otegi_1x2_cold_cut.png")
     out_png = os.path.join(OUT_DIR, fname)
     fig.savefig(out_png, dpi=170, bbox_inches="tight")
     PAPER_FIG_DIR.mkdir(parents=True, exist_ok=True)
@@ -384,29 +298,6 @@ def make_otegi_1x2(nasa, m_sil, r_sil, rng):
     print(f"--> Saved paper copy: {PAPER_FIG_DIR / fname}")
 
 
-def make_paper_2col(pools, nasa, m_sil, r_sil, rng):
-    """Paper figure (fig:mrrel): cold super-Earth cut, two representative rocky
-    mass-radius relations (Chen & Kipping, Otegi) side by side, mass-radius draw
-    on top and volatile-fraction histograms below."""
-    print("\n--> Paper 2-col (Chen & Kipping + Otegi, cold super-Earth cut):")
-    cut = dict(mass_min=2.0, insol_max=50.0)
-    wanted = ["Chen & Kipping 2017", "Otegi et al. 2020"]
-    sel = [p for p in pools if p[0] in wanted]
-    fig, axes = plt.subplots(2, 2, figsize=(12.5, 11))
-    for ci, (name, eq, applies, arr) in enumerate(sel):
-        _draw_scatter(axes[0, ci], arr, cut, nasa, m_sil, r_sil, rng, f"{name}\n{eq}")
-        _draw_bells(axes[1, ci], arr, cut, nasa, m_sil, r_sil, rng, tag=f"[2col] {name}")
-    fig.tight_layout()
-    out_png = os.path.join(OUT_DIR, "flat_rocky_mr_2col_chen_otegi_cold.png")
-    fig.savefig(out_png, dpi=170, bbox_inches="tight")
-    PAPER_FIG_DIR.mkdir(parents=True, exist_ok=True)
-    fig.savefig(PAPER_FIG_DIR / "flat_rocky_mr_2col_chen_otegi_cold.png", dpi=170, bbox_inches="tight")
-    plt.close(fig)
-    print(f"--> Saved: {out_png}")
-    print(f"--> Saved paper copy: {PAPER_FIG_DIR / 'flat_rocky_mr_2col_chen_otegi_cold.png'}")
-
-
-@plt.rc_context(FIGURE_STYLE)
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     m_sil, r_sil = load_mass_radius_curve()
@@ -430,9 +321,6 @@ def main():
         make_figure(cut_label, cut, fname, pools, nasa, m_sil, r_sil, rng)
 
     otegi_arr = next(arr for name, eq, applies, arr in pools if "Otegi" in name)
-    make_otegi_2x2(otegi_arr, nasa, m_sil, r_sil, rng)
-    make_otegi_2x1(otegi_arr, nasa, m_sil, r_sil, rng)
-    make_paper_2col(pools, nasa, m_sil, r_sil, rng)
     make_otegi_1x2(nasa, m_sil, r_sil, rng)
 
 

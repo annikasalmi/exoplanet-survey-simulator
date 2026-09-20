@@ -27,6 +27,7 @@ except Exception:
 
 from tools.paths import REPO_ROOT, EXOFOP_TOI_CSV, PAPER_FIGURES_DIR, CALIBRATION_DIR, TESS_DATA_DIR
 from science.catalogs import read_nasa_csv
+from plotting.figure_style import PAPER_STYLE
 ROOT = Path(REPO_ROOT)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -47,11 +48,7 @@ SNR_THRESHOLD = 7.1
 MIN_CELL_N = 20
 DOWNLOAD_NASA_DATA = False  # Set to True to download fresh data, False to use local CSV
 
-plt.rcParams.update({
-    "figure.dpi": 120, "savefig.dpi": 260,
-    "font.size": 13, "axes.titlesize": 14, "axes.labelsize": 13,
-    "legend.fontsize": 10, "xtick.labelsize": 11, "ytick.labelsize": 11,
-})
+plt.rcParams.update(PAPER_STYLE)
 
 SNR_BINS = [7.1, 10, 20, 50, 100, 300, np.inf]
 SNR_BIN_LABELS = ["7.1-10", "10-20", "20-50", "50-100", "100-300", ">300"]
@@ -248,8 +245,8 @@ def run_detector(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def make_3in1(out: pd.DataFrame) -> None:
-    fig = plt.figure(figsize=(14, 8))
-    gs = fig.add_gridspec(2, 2, width_ratios=[1.3, 1], hspace=0.40, wspace=0.35)
+    fig = plt.figure(figsize=(13.0, 7.5), layout="constrained")
+    gs = fig.add_gridspec(2, 2, width_ratios=[1, 1])
     ax_scatter = fig.add_subplot(gs[:, 0])
     ax_recov   = fig.add_subplot(gs[0, 1])
     ax_ratio   = fig.add_subplot(gs[1, 1])
@@ -300,9 +297,9 @@ def make_3in1(out: pd.DataFrame) -> None:
     ax_scatter.axvline(SNR_THRESHOLD, ls=":", lw=1.1, color="black")
     ax_scatter.axhline(SNR_THRESHOLD, ls=":", lw=1.1, color="black")
     ax_scatter.set_xscale("log"); ax_scatter.set_yscale("log")
-    ax_scatter.set_xlabel("Official SPOC SNR")
-    ax_scatter.set_ylabel("Model SNR")
-    ax_scatter.set_title("A. Model SNR vs official SPOC SNR")
+    ax_scatter.set_xlabel("TESS signal-to-noise")
+    ax_scatter.set_ylabel("Model signal-to-noise")
+    ax_scatter.set_title("A. Model versus TESS")
     ax_scatter.text(0.02, 0.02, "Dotted = 7.1 threshold\nBlack = binned median ± IQR",
                    transform=ax_scatter.transAxes, fontsize=10, va="bottom")
     ax_scatter.legend(loc="upper left", fontsize=13)
@@ -321,9 +318,8 @@ def make_3in1(out: pd.DataFrame) -> None:
                       f"{row['pass_frac']:.0%}\nN={int(row['n'])}", ha="center", va="bottom", fontsize=9)
     ax_recov.set_ylim(0, 1.18)
     ax_recov.set_xticks(s["x"]); ax_recov.set_xticklabels(s["snr_bin"].astype(str), rotation=25, ha="right")
-    ax_recov.set_ylabel("Model pass fraction"); ax_recov.set_xlabel("Official SPOC SNR bin")
-    ax_recov.set_title("B. Recovery vs signal strength")
-    ax_recov.grid(axis="y", alpha=0.25)
+    ax_recov.set_ylabel("Fraction recovered"); ax_recov.set_xticklabels([])
+    ax_recov.set_title("B. Recovered fraction")
 
     # ── C: SNR ratio ─────────────────────────────────────────────────────────
     ratio_col = pd.to_numeric(out.get("toy_over_official_snr", pd.Series(np.nan, index=out.index)), errors="coerce")
@@ -342,13 +338,13 @@ def make_3in1(out: pd.DataFrame) -> None:
     ax_ratio.errorbar(s2["x"], s2["med"],
                       yerr=np.vstack([s2["med"] - s2["q25"], s2["q75"] - s2["med"]]),
                       fmt="o-", capsize=3, lw=1.5, color="#2060c0",
-                      label="Model (median, IQR)")
-    ax_ratio.axhline(1.0, color="black", ls="--", lw=1.0, label="Perfect (1:1)")
+                      label="Model")
+    ax_ratio.axhline(1.0, color="black", ls="--", lw=1.0, label="Equal")
     ax_ratio.set_yscale("log")
     ax_ratio.set_xticks(s2["x"]); ax_ratio.set_xticklabels(s2["snr_bin"].astype(str), rotation=25, ha="right")
-    ax_ratio.set_ylabel("Model / official SNR"); ax_ratio.set_xlabel("Official SPOC SNR bin")
-    ax_ratio.set_title("C. Model / official SNR")
-    ax_ratio.legend(fontsize=13); ax_ratio.grid(axis="y", alpha=0.25)
+    ax_ratio.set_ylabel("Model / TESS"); ax_ratio.set_xlabel("TESS signal-to-noise")
+    ax_ratio.set_title("C. Ratio to TESS")
+    ax_ratio.legend(fontsize=13)
 
     out_path = OUT_DIR / "tess_3in1_calibration.png"
     plt.savefig(out_path, bbox_inches="tight")

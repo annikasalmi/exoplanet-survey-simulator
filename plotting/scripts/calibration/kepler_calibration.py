@@ -23,6 +23,7 @@ except Exception:
 
 from tools.paths import REPO_ROOT, KOI_CUMULATIVE_CSV, PAPER_FIGURES_DIR, CALIBRATION_DIR
 from science.catalogs import nasa_tap_url, read_nasa_csv
+from plotting.figure_style import PAPER_STYLE
 ROOT = Path(REPO_ROOT)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -43,11 +44,7 @@ MES_THRESHOLD = 7.1
 MIN_CELL_N = 20
 DOWNLOAD_NASA_DATA = False  # Set to True to download fresh data, False to use local CSV
 
-plt.rcParams.update({
-    "figure.dpi": 120, "savefig.dpi": 260,
-    "font.size": 13, "axes.titlesize": 14, "axes.labelsize": 13,
-    "legend.fontsize": 10, "xtick.labelsize": 11, "ytick.labelsize": 11,
-})
+plt.rcParams.update(PAPER_STYLE)
 
 CDPP_COLS = [
     "rrmscdpp01p5", "rrmscdpp02p0", "rrmscdpp02p5", "rrmscdpp03p0",
@@ -194,9 +191,9 @@ def run_detector(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def make_3in1(out: pd.DataFrame) -> None:
-    fig = plt.figure(figsize=(14, 8))
+    fig = plt.figure(figsize=(13.0, 7.5), layout="constrained")
     # Layout: scatter spans full height on left; two stacked panels on right.
-    gs = fig.add_gridspec(2, 2, width_ratios=[1.3, 1], hspace=0.40, wspace=0.35)
+    gs = fig.add_gridspec(2, 2, width_ratios=[1, 1])
     ax_scatter = fig.add_subplot(gs[:, 0])
     ax_recov   = fig.add_subplot(gs[0, 1])
     ax_ratio   = fig.add_subplot(gs[1, 1])
@@ -238,9 +235,9 @@ def make_3in1(out: pd.DataFrame) -> None:
     ax_scatter.axvline(MES_THRESHOLD, ls=":", lw=1.1, color="black")
     ax_scatter.axhline(MES_THRESHOLD, ls=":", lw=1.1, color="black")
     ax_scatter.set_xscale("log"); ax_scatter.set_yscale("log")
-    ax_scatter.set_xlabel("Official KOI MES")
-    ax_scatter.set_ylabel("Model MES")
-    ax_scatter.set_title("A. Model MES vs official KOI MES")
+    ax_scatter.set_xlabel("Kepler signal strength")
+    ax_scatter.set_ylabel("Model signal strength")
+    ax_scatter.set_title("A. Model versus Kepler")
     ax_scatter.text(0.02, 0.02, "Dotted lines = 7.1 threshold\nBlack = binned median ± IQR",
                    transform=ax_scatter.transAxes, fontsize=10, va="bottom")
     ax_scatter.legend(loc="upper left", fontsize=13)
@@ -259,9 +256,8 @@ def make_3in1(out: pd.DataFrame) -> None:
                       f"{row['pass_frac']:.0%}\nN={int(row['n'])}", ha="center", va="bottom", fontsize=9)
     ax_recov.set_ylim(0, 1.18)
     ax_recov.set_xticks(s["x"]); ax_recov.set_xticklabels(s["koi_mes_bin"].astype(str), rotation=25, ha="right")
-    ax_recov.set_ylabel("Model pass fraction"); ax_recov.set_xlabel("Official KOI MES bin")
-    ax_recov.set_title("B. Recovery vs signal strength")
-    ax_recov.grid(axis="y", alpha=0.25)
+    ax_recov.set_ylabel("Fraction recovered"); ax_recov.set_xticklabels([])
+    ax_recov.set_title("B. Recovered fraction")
 
     # ── C: MES ratio ─────────────────────────────────────────────────────────
     d_rat = out[np.isfinite(out.get("toy_over_koi_mes", pd.Series(np.nan, index=out.index))) &
@@ -280,13 +276,13 @@ def make_3in1(out: pd.DataFrame) -> None:
     ax_ratio.errorbar(s2["x"], s2["med"],
                       yerr=np.vstack([s2["med"] - s2["q25"], s2["q75"] - s2["med"]]),
                       fmt="o-", capsize=3, linewidth=1.5, color="#2060c0",
-                      label="Model (median, IQR)")
-    ax_ratio.axhline(1.0, color="black", ls="--", lw=1.0, label="Perfect agreement")
+                      label="Model")
+    ax_ratio.axhline(1.0, color="black", ls="--", lw=1.0, label="Equal")
     ax_ratio.set_yscale("log")
     ax_ratio.set_xticks(s2["x"]); ax_ratio.set_xticklabels(s2["koi_mes_bin"].astype(str), rotation=25, ha="right")
-    ax_ratio.set_ylabel("Model / official MES"); ax_ratio.set_xlabel("Official KOI MES bin")
-    ax_ratio.set_title("C. Model / official MES")
-    ax_ratio.legend(fontsize=13); ax_ratio.grid(axis="y", alpha=0.25)
+    ax_ratio.set_ylabel("Model / Kepler"); ax_ratio.set_xlabel("Kepler signal strength")
+    ax_ratio.set_title("C. Ratio to Kepler")
+    ax_ratio.legend(fontsize=13)
 
     # ── Save ─────────────────────────────────────────────────────────────────
     out_path = OUT_DIR / "kepler_3in1_calibration.png"

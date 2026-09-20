@@ -56,8 +56,8 @@ RELATIONS = [
 ]
 
 
-def noised_scatter_AB(population, cut, rng, n_plot=400, window=None):
-    """One detected + noised draw (with the cut applied); split into flat-A-kept vs dropped-by-A.
+def noised_scatter_by_population(population, cut, rng, n_plot=400, window=None):
+    """One detected and noised draw, split by whether rocky super-Earths remain.
     window=(m_hi, r_lo, r_hi) keeps the draw inside the panel, which spans a fraction of the
     universe's radius range, so the points shown are not mostly off-scale."""
     mass = population["mass"].to_numpy()
@@ -71,7 +71,7 @@ def noised_scatter_AB(population, cut, rng, n_plot=400, window=None):
     if cut.get("mass_min"):
         k = mo > cut["mass_min"]
         mo, ro, tmass, trad = mo[k], ro[k], tmass[k], trad[k]
-    dropped = is_super_earth(tmass, trad)          # A drops these (true values)
+    dropped = is_super_earth(tmass, trad)
     if window is not None:
         m_hi, r_lo, r_hi = window
         inside = (mo <= m_hi) & (ro >= r_lo) & (ro <= r_hi)
@@ -84,10 +84,10 @@ def noised_scatter_AB(population, cut, rng, n_plot=400, window=None):
 
 CUTS = [("all (no cut)", {}, "flat_rocky_mr_relations_2x4.png"),
         ("insol<50 I⊕", dict(insol_max=50.0), "flat_rocky_mr_relations_2x4_s50.png"),
-        ("mass>2 M⊕ & insol<50 I⊕ (cold super-Earth cut)",
-         dict(mass_min=2.0, insol_max=50.0), "flat_rocky_mr_relations_2x4_cold_corner.png")]
+        ("mass>2 M⊕ & insol<50 I⊕ (low-insolation super-Earth selection)",
+         dict(mass_min=2.0, insol_max=50.0), "flat_rocky_mr_relations_2x4_low-insolation_corner.png")]
 
-# The 2x2 paper figure shows the default relation (Otegi) alone, before/after the cold cut.
+# The 2x2 paper figure shows the default relation (Otegi) alone, before/after the low-insolation selection.
 OTEGI_2X2_CUTS = [("All detected planets", {}),
                   (r"Insolation < 50 $I_\oplus$, mass > 2 $M_\oplus$",
                    dict(mass_min=2.0, insol_max=50.0))]
@@ -108,9 +108,9 @@ def nasa_cut(nasa, cut):
     )
 
 
-def true_sample(population, cut, n, rng, universe_a=False):
+def true_sample(population, cut, n, rng, only_subneptunes=False):
     """n detected planets at their TRUE masses and radii, with the cut applied to
-    true values. universe_a drops the super-Earths (on/below the silicate line, M > 2)."""
+    true values, optionally excluding rocky super-Earths."""
     mass = population["mass"].to_numpy()
     radius = population["radius"].to_numpy()
     keep = population["joint_detected"].to_numpy().copy()
@@ -118,7 +118,7 @@ def true_sample(population, cut, n, rng, universe_a=False):
         keep &= population["insolation"].to_numpy() < cut["insol_max"]
     if cut.get("mass_min"):
         keep &= mass > cut["mass_min"]
-    if universe_a:
+    if only_subneptunes:
         keep &= ~is_super_earth(mass, radius)
     idx = np.flatnonzero(keep)
     if idx.size > n:
@@ -154,12 +154,11 @@ def _draw_scatter(ax, arr, cut, nasa, m_sil, r_sil, rng, title,
     ax.fill_between(m_c, r_c, 2.6, color="0.965", zorder=0)
     ax.plot(m_c, r_c, "k-", lw=1.2, zorder=6, label="Pure silicate")
     if true_values:
-        # One illustrative survey per universe: blue (A) from the planets that
-        # survive its cut, orange (B) from every planet.
+        # One illustrative survey for each flat_radii_curves variant.
         for above_only, n, colour, lbl, z in [
                 (True, N_SURVEY_BLUE, "tab:blue", labels[0], 4),
                 (False, N_SURVEY_ORANGE, "tab:orange", labels[1], 3)]:
-            mt, rt = true_sample(arr, cut, n, rng, universe_a=above_only)
+            mt, rt = true_sample(arr, cut, n, rng, only_subneptunes=above_only)
             ax.errorbar(mt, rt,
                         xerr=np.array([mt * (1 - np.exp(-SIMULATED_MEASUREMENT_ERROR["mass"])),
                                        mt * (np.exp(SIMULATED_MEASUREMENT_ERROR["mass"]) - 1)]),
@@ -168,7 +167,7 @@ def _draw_scatter(ax, arr, cut, nasa, m_sil, r_sil, rng, title,
                         fmt="o", ms=4, color=colour, alpha=0.6, elinewidth=0.6,
                         capsize=0, zorder=z, label=lbl)
     else:
-        mo, ro, dropped = noised_scatter_AB(arr, cut, rng, window=(MASS_LIMS[1], *RADIUS_LIMS))
+        mo, ro, dropped = noised_scatter_by_population(arr, cut, rng, window=(MASS_LIMS[1], *RADIUS_LIMS))
         ax.scatter(mo[~dropped], ro[~dropped], s=15, color="tab:blue", alpha=0.45, lw=0,
                    zorder=3, label=labels[0])
         ax.scatter(mo[dropped], ro[dropped], s=15, color="tab:orange", alpha=0.5, lw=0,
@@ -199,7 +198,7 @@ def make_figure(cut_label, cut, fname, pools, nasa, m_sil, r_sil, rng):
     fig.tight_layout()
     out_png = os.path.join(OUT_DIR, fname)
     fig.savefig(out_png, dpi=170, bbox_inches="tight")
-    if fname == "flat_rocky_mr_relations_2x4_cold_corner.png":
+    if fname == "flat_rocky_mr_relations_2x4_low-insolation_corner.png":
         PAPER_FIG_DIR.mkdir(parents=True, exist_ok=True)
         fig.savefig(PAPER_FIG_DIR / fname, dpi=170, bbox_inches="tight")
         print(f"--> Saved paper copy: {PAPER_FIG_DIR / fname}")
@@ -255,13 +254,13 @@ def _draw_density_1x2(ax, arr, cut, nasa, m_sil, r_sil, rng, tag=""):
 
 
 def make_otegi_1x2(nasa, m_sil, r_sil, rng, show_full_population=False):
-    """Volatile-fraction density beside the mass-radius draw, for the cool massive cut.
+    """Volatile-fraction density beside the mass-radius draw.
     show_full_population adds the same pair for the uncut population as a row on top.
-    Orange = universe B; blue = universe A (B minus its super-Earths). The mass-radius panel shows
+    Orange = superearths_supneptunes; blue = only_subneptunes. The mass-radius panel shows
     true values with simulated error bars; the densities use noisy values, so some blue can fall
     below the line."""
     cuts = list(OTEGI_2X2_CUTS) if show_full_population else [OTEGI_2X2_CUTS[1]]
-    print(f"\n--> Otegi 1x2 ({len(cuts)} column(s); universes A and B):")
+    print(f"\n--> Otegi 1x2 ({len(cuts)} column(s); flat_radii_curves variants):")
     arr = run_transit_rv_selection(
         flat_radii_curves(
             FLAT_N, seed=SEED, variant="superearths_supneptunes"
@@ -286,9 +285,9 @@ def make_otegi_1x2(nasa, m_sil, r_sil, rng, show_full_population=False):
     if not show_full_population:
         # Figure-wide title over both panels (placed above the axes; the tight
         # bounding box on save keeps it).
-        fig.suptitle("Simulated detections of cool, massive planets", y=1.01, va="bottom")
+        fig.suptitle("Simulated detections of low-insolation massive planets", y=1.01, va="bottom")
     fname = ("flat_otegi_1x2_with_full_population.png" if show_full_population
-             else "flat_otegi_1x2_cold_cut.png")
+             else "flat_otegi_1x2_low-insolation_selection.png")
     out_png = os.path.join(OUT_DIR, fname)
     fig.savefig(out_png, dpi=170, bbox_inches="tight")
     PAPER_FIG_DIR.mkdir(parents=True, exist_ok=True)

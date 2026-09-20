@@ -52,9 +52,9 @@ def main():
         missing_relative_error=NASA_MEASUREMENT_ERROR,
     )
 
-    print("--> building universe B pool (rocky_formation; escape_only is universe A)")
+    print("--> building superearths_supneptunes pool (rocky_formation; escape_only is only_subneptunes)")
     univ = split_universes(make_detected_pool(
-        "universe_B", pool_size=MC_POOL_SIZE, chunk_size=MC_CHUNK_SIZE,
+        "superearths_supneptunes", pool_size=MC_POOL_SIZE, chunk_size=MC_CHUNK_SIZE,
         cache_dir=OUT_DIR, box=COMPARISON_PARAMETER_BOX))
 
     plt.rcParams.update(PAPER_STYLE)

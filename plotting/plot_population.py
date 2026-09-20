@@ -42,11 +42,22 @@ def plot_population(df, *, name):
     fig.savefig(os.path.join(out_dir, "population.png"), dpi=300, bbox_inches="tight")
     plt.close(fig)
 
-    detector_cols = ["kepler_detected", "tess_detected", "rv_detected"]
-    labels = ["Kepler", "TESS", "RV"]
-    counts = [int(df[col].astype(bool).sum()) for col in detector_cols]
+    detector_options = [
+        ("kepler_detected", "Kepler", "#4c78a8"),
+        ("tess_detected", "TESS", "#e45756"),
+        ("rv_detected", "RV", "#72b7b2"),
+        ("hwo_detected", "HWO", "#b279a2"),
+    ]
+    detector_cols = [item for item in detector_options if item[0] in df]
+    if not detector_cols:
+        print(f"Saved plots: {out_dir}")
+        return
+
+    labels = [item[1] for item in detector_cols]
+    colors = [item[2] for item in detector_cols]
+    counts = [int(df[col].astype(bool).sum()) for col, _, _ in detector_cols]
     fig, ax = plt.subplots(figsize=(7, 4))
-    bars = ax.bar(labels, counts, color=["#4c78a8", "#e45756", "#72b7b2"], edgecolor="black")
+    bars = ax.bar(labels, counts, color=colors, edgecolor="black")
     ax.set_ylabel("Detected planets")
     ax.set_title("Detections")
     for bar, count in zip(bars, counts):

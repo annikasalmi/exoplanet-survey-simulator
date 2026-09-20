@@ -1,4 +1,4 @@
-"""Sub-Neptune fraction of flat and P-Pop universes (A/B each) vs NASA under four cuts: all, M > 2,
+"""Sub-Neptune fraction of flat and P-Pop universes (comparison each) vs NASA under four cuts: all, M > 2,
 I < 50, both. Detection is transit+RV with NASA-like measurement error. Also loaded by
 flat_rocky_mr_vs_nasa.py.
 Run: python plotting/scripts/analysis/puffy_cuts_flat.py
@@ -46,8 +46,8 @@ RNG_SEED = 0
 RV_MAG_TARGET = 12.0
 BOX = dict(r_lo=0.5, r_hi=2.2, m_lo=0.1, m_hi=12.0, f_lo=1e-2, f_hi=1e4)
 
-ROWS = [("flat", "FLAT universe", [(True, "flat A", "tab:orange"), (False, "flat B", "tab:blue")]),
-        ("ppop", "P-Pop universe", [(True, "P-Pop A", "tab:red"), (False, "P-Pop B", "tab:purple")])]
+ROWS = [("flat", "FLAT universe", [(True, "flat only_subneptunes", "tab:orange"), (False, "flat superearths_supneptunes", "tab:blue")]),
+        ("ppop", "P-Pop universe", [(True, "P-Pop only_subneptunes", "tab:red"), (False, "P-Pop superearths_supneptunes", "tab:purple")])]
 CUTS = [("all (no cut)", {}),
         ("mass > 2 M⊕", dict(mass_min=2.0)),
         ("insolation < 50 I⊕", dict(insol_max=50.0)),

@@ -48,7 +48,7 @@ MIN_BIN_COUNT = 2
 # unpopulatable at any sample size. 3 bins per decade in every column.
 COLUMNS = {
     # G also gets a map-only supplementary draw: transits are rare at low
-    # insolation around G stars, and the cold large-radius corner came out empty.
+    # insolation around G stars, and the low-insolation large-radius region came out empty.
     "G": dict(teff=(5200.0, 6000.0), insol=(0.1, 1e4), n=3_000_000, seed=75,
               map_extra_n=6_000_000, map_extra_seed=175),
     "K": dict(teff=(3700.0, 5200.0), insol=(0.1, 1e4), n=2_500_000, seed=76),
@@ -133,7 +133,7 @@ def main(paper_copy: bool = True):
     fig, axes = plt.subplots(3, 3, figsize=(17, 15), sharex="col", sharey=True,
                              constrained_layout=True)
     mesh = None
-    print("\nCold Super-Earth Desert detected fraction (S<50, R>1.4, among transiting):")
+    print("\nLow-insolation Super-Earth Desert detected fraction (S<50, R>1.4, among transiting):")
     for j, stype in enumerate(COLUMNS):
         panel = panels[stype]
         r = rocky_win[rocky_win["stype_clean"] == stype]
@@ -174,16 +174,16 @@ def main(paper_copy: bool = True):
                                 fontsize=20, color="white", zorder=8)
 
             xlo = xbins[0]
-            ax.fill_between([xlo, rocky_scatter.COLD_CORNER_INSOL], rocky_scatter.COLD_CORNER_RADIUS,
+            ax.fill_between([xlo, rocky_scatter.LOW_INSOLATION_REGION_INSOL], rocky_scatter.LOW_INSOLATION_REGION_RADIUS,
                             Y_LIMS[1], color="red", alpha=0.15, zorder=1.5, lw=0)
-            # Bold Cold Super-Earth Desert outline: bottom edge (R=1.4) + right edge (S=50).
-            ax.plot([xlo, rocky_scatter.COLD_CORNER_INSOL], [rocky_scatter.COLD_CORNER_RADIUS] * 2,
+            # Bold Low-insolation Super-Earth Desert outline: bottom edge (R=1.4) + right edge (S=50).
+            ax.plot([xlo, rocky_scatter.LOW_INSOLATION_REGION_INSOL], [rocky_scatter.LOW_INSOLATION_REGION_RADIUS] * 2,
                     color="red", lw=2.6, zorder=6)
-            ax.plot([rocky_scatter.COLD_CORNER_INSOL, rocky_scatter.COLD_CORNER_INSOL],
-                    [rocky_scatter.COLD_CORNER_RADIUS, Y_LIMS[1]], color="red", lw=2.6, zorder=6)
+            ax.plot([rocky_scatter.LOW_INSOLATION_REGION_INSOL, rocky_scatter.LOW_INSOLATION_REGION_INSOL],
+                    [rocky_scatter.LOW_INSOLATION_REGION_RADIUS, Y_LIMS[1]], color="red", lw=2.6, zorder=6)
             fn, n_denom, n_missed = missed_fraction_in_window(
-                panel, test, max_insolation=rocky_scatter.COLD_CORNER_INSOL,
-                min_radius=rocky_scatter.COLD_CORNER_RADIUS,
+                panel, test, max_insolation=rocky_scatter.LOW_INSOLATION_REGION_INSOL,
+                min_radius=rocky_scatter.LOW_INSOLATION_REGION_RADIUS,
             )
             if fn is not None:
                 n_pass = n_denom - n_missed
@@ -231,7 +231,7 @@ def main(paper_copy: bool = True):
     handles += [
         Patch(facecolor="red", alpha=0.15, edgecolor="red", lw=2.0,
               label=(r"$R>%.1f\,R_\oplus$, $I<%g\,I_\oplus$"
-                     % (rocky_scatter.COLD_CORNER_RADIUS, rocky_scatter.COLD_CORNER_INSOL))),
+                     % (rocky_scatter.LOW_INSOLATION_REGION_RADIUS, rocky_scatter.LOW_INSOLATION_REGION_INSOL))),
     ]
     # Anchored just below the figure (bbox_inches="tight" keeps it): with zero
     # layout padding, an "outside" legend would overlap the bottom x-labels.

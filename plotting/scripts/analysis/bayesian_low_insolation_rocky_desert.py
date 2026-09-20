@@ -1,5 +1,5 @@
-"""Bayesian comparison in the cold super-Earth desert over three insolation panels. Priors:
-rocky_formation (universe B), escape_only (universe A); a uniform pool (M independent of R) only maps
+"""Bayesian comparison in the low-insolation super-Earth desert over three insolation panels. Priors:
+rocky_formation (superearths_supneptunes), escape_only (only_subneptunes); flat_nonphysical only maps
 detectability. Likelihood = transit+RV detection fraction. Scores NASA's volatile fraction per bin (binomial).
 """
 
@@ -43,20 +43,20 @@ from science.statistics import (
 # Transit leg of the joint detector; main("tess") switches it to TESS.
 MISSION = "kepler"
 _MISSION_LABEL = {"kepler": "Kepler", "tess": "TESS"}
-_OUT_NAME = {"kepler": "bayesian_cold_rocky_desert",
-             "tess": "bayesian_cold_rocky_desert_tess"}
+_OUT_NAME = {"kepler": "bayesian_low-insolation_rocky_desert",
+             "tess": "bayesian_low-insolation_rocky_desert_tess"}
 
 
 NASA_FILE = Path(PSCOMPPARS_CSV)
 
 BOX = COMPARISON_PARAMETER_BOX
-FLAT_N_POOL = 10_000_000       # 10x: the cold among-transiting denominator is thin (~2% transit);
+FLAT_N_POOL = 10_000_000       # 10x: the low-insolation among-transiting denominator is thin (~2% transit);
                                # this fills every MR cell in the I<10 panel above MIN_CELL.
 CHUNK = 2_000_000              # generate+detect in chunks to bound peak memory (~1.5 GB/chunk)
 RNG_SEED = 0
 RV_MAG_TARGET = 12.0
-MASS_MIN = SUPER_EARTH_MIN_MASS  # cold super-Earth desert cut
-COLD_MAX = COLD_DESERT_MAX_INSOLATION
+MASS_MIN = SUPER_EARTH_MIN_MASS  # low-insolation super-Earth desert cut
+LOW_INSOLATION_MAX = COLD_DESERT_MAX_INSOLATION
 MASS_FRAC_ERR = SIMULATED_MEASUREMENT_ERROR["mass"]
 RAD_FRAC_ERR = SIMULATED_MEASUREMENT_ERROR["radius"]
 NASA_MASS_PREC = NASA_MEASUREMENT_ERROR["mass"]
@@ -75,20 +75,20 @@ M_EDGES = np.linspace(BOX["m_lo"], BOX["m_hi"], 17)
 R_EDGES = np.linspace(BOX["r_lo"], BOX["r_hi"], 15)
 M_CENT = 0.5 * (M_EDGES[:-1] + M_EDGES[1:])
 R_CENT = 0.5 * (R_EDGES[:-1] + R_EDGES[1:])
-MIN_CELL = 5                   # display gate; at 10M even the sparsest cold cell has >=~10 samples
+MIN_CELL = 5                   # display gate; at 10M even the sparsest low-insolation cell has >=~10 samples
 
 
 def build_universes():
-    print(f"--> building universe B pool N={FLAT_N_POOL} ...")
+    print(f"--> building superearths_supneptunes pool N={FLAT_N_POOL} ...")
     cache_dir = os.path.join(ANALYSIS_DIR, _OUT_NAME[MISSION])
     univ = split_universes(make_detected_pool(
-        "universe_B", pool_size=FLAT_N_POOL, chunk_size=CHUNK,
+        "superearths_supneptunes", pool_size=FLAT_N_POOL, chunk_size=CHUNK,
         cache_dir=cache_dir, mission=MISSION, seed=RNG_SEED,
         box=BOX, rv_mag_target=RV_MAG_TARGET,
     ))
-    print(f"--> building independent (uniform) pool N={FLAT_N_POOL} ...")
-    univ["uniform"] = make_detected_pool(
-        "uniform", pool_size=FLAT_N_POOL, chunk_size=CHUNK,
+    print(f"--> building flat_nonphysical pool N={FLAT_N_POOL} ...")
+    univ["flat_nonphysical"] = make_detected_pool(
+        "flat_nonphysical", pool_size=FLAT_N_POOL, chunk_size=CHUNK,
         cache_dir=cache_dir, mission=MISSION, seed=RNG_SEED,
         box=BOX, rv_mag_target=RV_MAG_TARGET,
     )
@@ -161,7 +161,7 @@ def save_stats_table(rows, tag):
 
 
 def print_bayes_factors(rows):
-    print("\n  ---- pairwise Bayes factors (headline: I<50 cold super-Earth desert, M>2) ----")
+    print("\n  ---- pairwise Bayes factors (headline: I<50 low-insolation super-Earth desert, M>2) ----")
     desert = next((r for r in rows if r["label"].startswith("I < 50")), None)
     if desert is None:
         return
@@ -206,10 +206,10 @@ def _field_image(ax, field, vmax, levels):
 
 def fig_likelihood_maps(univ, nasa):
     """1x3 by insolation: the detectability field l_b(M,R) (detected fraction among transiting,
-    uniform-parameter universe, ALL masses) in Figure-3 format — filled viridis + white contours,
+    flat_nonphysical universe, ALL masses) in Figure-3 format — filled viridis + white contours,
     NASA planets (mass > MASS_MIN only) colored by log insolation with error bars."""
     Ds = [detection_fraction_map(
-        univ["uniform"], lo, hi, M_EDGES, R_EDGES, min_count=MIN_CELL
+        univ["flat_nonphysical"], lo, hi, M_EDGES, R_EDGES, min_count=MIN_CELL
     )[0] for _, lo, hi in INSOLATION_BINS]
     vmax = max((np.nanmax(D) for D in Ds if np.isfinite(D).any()), default=1.0)
     levels = np.round(np.linspace(0.2, vmax, 4), 2)
@@ -232,7 +232,7 @@ def fig_likelihood_maps(univ, nasa):
         cb2.set_label(r"NASA planets: log(Insolation Flux [$I_\oplus$])")
     fig.suptitle(f"Detectability (likelihood) on the MR plane — {_MISSION_LABEL[MISSION]} transit + RV, "
                  "transiting only\n"
-                 "viridis = detected fraction among transiting (uniform-parameter universe); "
+                 "viridis = detected fraction among transiting (flat_nonphysical); "
                  "white contours",
                  fontsize=13)
     out = os.path.join(ANALYSIS_DIR, _OUT_NAME[MISSION], "likelihood_detection_maps.png")
@@ -261,7 +261,7 @@ def fig_posterior_predictive(univ, nasa, m_sil, r_sil):
                    & u["insolation"].between(lo, hi, inclusive="left")
                    & (u["mass"] > MASS_MIN))
             H, _, _ = np.histogram2d(u["mass"][sel], u["radius"][sel], bins=[M_EDGES, R_EDGES])
-            # log stretch: the uniform-in-R track dams a density spike at the M=12 box wall that a
+            # log stretch: the flat_nonphysical track dams a density spike at the M=12 box wall that a
             # linear+clip scale saturates into a flat slab; log1p renders it as a smooth gradient.
             Hs = gaussian_filter(H, 1.0)
             L = np.log1p(Hs)
@@ -315,7 +315,7 @@ def fig_model_odds(rows):
                label=f"even split (1/{len(UNIVERSES)})")
     ax.set_title(f"Which universe does NASA prefer? ({_MISSION_LABEL[MISSION]} transit + RV; normalized "
                  "binomial composition likelihood)\n"
-                 "headline = I<50 cold super-Earth desert (M>2); transiting planets only", fontsize=11)
+                 "headline = I<50 low-insolation super-Earth desert (M>2); transiting planets only", fontsize=11)
     ax.grid(alpha=0.2, axis="y"); ax.legend(fontsize=9)
     fig.tight_layout()
     out = os.path.join(ANALYSIS_DIR, _OUT_NAME[MISSION], "model_odds.png")
@@ -384,7 +384,7 @@ def main(mission="kepler"):
     m_sil, r_sil = load_mass_radius_curve()
     rng = np.random.default_rng(RNG_SEED)
 
-    print(f"=== Cold super-Earth desert Bayesian comparison — transit mission: {_MISSION_LABEL[MISSION]} ===")
+    print(f"=== Low-insolation super-Earth desert Bayesian comparison — transit mission: {_MISSION_LABEL[MISSION]} ===")
     univ = build_universes()
 
     # Table-6 reconciliation targets are Kepler-derived; only meaningful for the Kepler run.
@@ -392,7 +392,7 @@ def main(mission="kepler"):
         print("\n--> reconciliation vs paper Table 6 (Flat All / Flat Vol detected f_vol):")
         for lbl, lo, hi, mcut, ref in [("all bins, no cut", BOX["f_lo"], BOX["f_hi"], None,
                                         "All 0.43 / Vol 0.70"),
-                                       ("cold I<50, M>2", BOX["f_lo"], COLD_MAX, MASS_MIN,
+                                       ("low-insolation I<50, M>2", BOX["f_lo"], LOW_INSOLATION_MAX, MASS_MIN,
                                         "All 0.44 / Vol 0.74")]:
             pa = predicted_volatile_fraction(
                 univ["rocky_formation"], lo, hi, m_sil, r_sil, rng,
@@ -433,16 +433,16 @@ def main(mission="kepler"):
     print("\n  CAVEATS:")
     print("  - Figures consider TRANSITING planets only (detector geometric transit flag); the")
     print("    likelihood map is the detected fraction among transiting (paper fig:flat).")
-    print("  - Blanks were the MIN_CELL quality mask, not empty cells: cold planets transit ~2%,")
+    print("  - Blanks were the MIN_CELL quality mask, not empty cells: low-insolation planets transit ~2%,")
     print(f"    so the I<10 transiting subsample was thin. N={FLAT_N_POOL:,} fills every MR cell.")
     print("    Posterior-predictive dark regions for the two track universes are PHYSICAL (the MR")
-    print("    relation is a curve); only the uniform universe's fill needed more simulations.")
+    print("    relation is a curve); only flat_nonphysical's fill needed more simulations.")
     print("  - Normalization-free: the binomial conditions on n_b, so absolute occurrence and")
     print("    survey effort cancel. No absolute-rate prior is used.")
     print("  - Point-estimate binomial => overconfident; beta-binomial + NASA error propagation")
     print("    is the honest next step (I<10 especially is data-poor).")
     print("  - escape_only removes TRUE rocky M>2; measurement noise keeps p<1 so one confirmed")
-    print("    cold rocky planet (LHS 1140 b) does not send its likelihood to 0.")
+    print("    low-insolation rocky planet (LHS 1140 b) does not send its likelihood to 0.")
 
 
 if __name__ == "__main__":

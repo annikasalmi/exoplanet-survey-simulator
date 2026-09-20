@@ -44,26 +44,27 @@ Data files in the repo are recorded in [`data/manifest.json`](data/manifest.json
 python sim.py
 ```
 
-This generates 20,000 planets in the default `flat_nonphysical` universe, applies
-the Kepler, TESS, and RV detectors, and writes a CSV to
-`results/catalogs/flat_nonphysical/` plus plots to `results/figures/simulation/`.
+Edit the options at the top of `sim.py`, then run it. This generates the selected
+universe, applies the selected telescope models, handles single or parallel multi-run
+caches, and writes catalogs plus plots under `results/`.
 
-Select a universe or change the draw settings with:
+Set `UNIVERSE` to one of:
+- `flat_nonphysical`
+- `flat_radii_curves`
+- `nasa_exoplanets`
+- `ppop`
 
-```bash
-python sim.py --universe flat_nonphysical --n-planets 20000 --seed 0
-python sim.py --universe flat_radii_curves --variant superearths_supneptunes
-python sim.py --universe flat_radii_curves --variant only_subneptunes
-```
+For `flat_radii_curves`, set `FLAT_RADII_VARIANT` to either
+`superearths_supneptunes` or `only_subneptunes`, or set
+`RUN_BOTH_FLAT_RADII_VARIANTS = True` to run both. Set `TELESCOPES` to any of
+`kepler`, `tess`, `rv`, or `hwo`. Use `TELESCOPES = ("lifesim",)` by itself for
+LIFE. Set `NRUNS > 1` and `PARALLEL = True` for parallel batches.
 
-The valid universes are `flat_nonphysical`, `flat_radii_curves`, and `ppop`.
-The curve-based variants are `superearths_supneptunes` and `only_subneptunes`.
+Simulation runs should go through `sim.py`.
 
 ## Reproducing the paper's analysis figures
 
-```bash
-python run/make_paper_figures.py
-```
+Run the individual scripts under `plotting/scripts/`.
 This table summarizes the detectors:
 ## Instrument model fidelity
 

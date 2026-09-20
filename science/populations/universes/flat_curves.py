@@ -1,4 +1,4 @@
-"""Curve-based flat universe: silicate/volatile planets (B), or no super-Earths (A)."""
+"""Curve-based flat universe with explicit radius-curve variants."""
 
 from __future__ import annotations
 

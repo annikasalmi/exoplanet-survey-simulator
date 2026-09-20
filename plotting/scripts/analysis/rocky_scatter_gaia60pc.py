@@ -259,7 +259,7 @@ def draw_90pct_line(ax, flux, radius, color="black", lw=2.0, label=None,
     return slope, intercept
 
 
-COLD_INSOLATION = 10.0  # "I < 10" cold boundary
+COLD_INSOLATION = 10.0  # "I < 10" low-insolation boundary
 
 
 def false_negative_prob(ppop_panel: pd.DataFrame, slope: float, intercept: float):
@@ -310,7 +310,7 @@ def build_facility_styles(rocky_win: pd.DataFrame, contrast_overrides: bool = Fa
 
 OTHER_COLOR = "0.55"
 
-# The cold super-Earth desert candidates (relaxed cuts; paper_v2 Table 1), all starred
+# The low-insolation super-Earth desert candidates (relaxed cuts; paper_v2 Table 1), all starred
 # equally in overlay panels — LHS 1140 b is not singled out.
 DESERT_CANDIDATE_PATTERNS = [
     r"LHS\s*1140\s*b", r"TOI-?1452\s*b", r"LHS\s*1903\s*e",
@@ -386,7 +386,7 @@ def plot_combined(kepler: pd.DataFrame, tess: pd.DataFrame,
     )
     mesh = None
 
-    print("\nCold-region false-negative probabilities (I<10, radius above 90% fit):")
+    print("\nLow-insolation-region false-negative probabilities (I<10, radius above 90% fit):")
     for i, (mission, ppop) in enumerate(rows):
         for j, stype in enumerate(STAR_ORDER):
             ax = axes[i, j]
@@ -416,7 +416,7 @@ def plot_combined(kepler: pd.DataFrame, tess: pd.DataFrame,
 
             _overlay_rocky_by_facility(ax, r, color_map, major)
 
-            # 90% upper-bound fit + cold false-negative region (G/K/M panels).
+            # 90% upper-bound fit + low-insolation false-negative region (G/K/M panels).
             fn_note = ""
             if stype in ("G", "K", "M"):
                 fit = draw_90pct_line(
@@ -425,7 +425,7 @@ def plot_combined(kepler: pd.DataFrame, tess: pd.DataFrame,
                 )
                 if fit is not None:
                     slope, intercept = fit
-                    # Shade the cold (I<10), above-the-line region.
+                    # Shade the low-insolation (I<10), above-the-line region.
                     xreg = np.logspace(np.log10(INSOLATION_LIMITS[0]),
                                        np.log10(COLD_INSOLATION), 100)
                     ax.fill_between(xreg, 10 ** (slope * np.log10(xreg) + intercept),
@@ -464,7 +464,7 @@ def plot_combined(kepler: pd.DataFrame, tess: pd.DataFrame,
         )
     handles.append(
         Line2D([0], [0], marker="*", linestyle="", color="gold",
-               markeredgecolor="darkred", markersize=12, label="Cold super-Earth desert candidates")
+               markeredgecolor="darkred", markersize=12, label="Low-insolation super-Earth desert candidates")
     )
     handles.append(
         Line2D([0], [0], color="black", lw=2.0, ls="--",
@@ -472,7 +472,7 @@ def plot_combined(kepler: pd.DataFrame, tess: pd.DataFrame,
     )
     handles.append(
         Patch(facecolor="red", alpha=0.12,
-              label="Cold false-negative region (I<10, R>fit)")
+              label="Low-insolation false-negative region (I<10, R>fit)")
     )
     # "outside" reserves space below the axes so the legend never overlaps the
     # bottom-row x-axis labels.
@@ -653,16 +653,16 @@ def plot_threshold_curve_comparison(m_ref, r_ref, nasa_win: pd.DataFrame) -> Pat
     return out
 
 
-# ── Cold Corner definition (I < 50) ───────────────────────────────────────────
+# ── Low-insolation large-radius region definition (I < 50) ───────────────────────────────────────────
 
-# The Cold Corner highlighted in Figure 1 and the mass-radius panels: large
-# (radius > COLD_CORNER_RADIUS) planets receiving little insolation (I < 50).
-COLD_CORNER_INSOL  = 50.0   # I_earth  — "cold" boundary
-COLD_CORNER_RADIUS = 1.4    # R_earth  — "large rocky" lower bound of the corner
-COLD_CORNER_COLOR  = "#ff9ec4"  # light pink band under the silicate curve
+# The Low-insolation large-radius region highlighted in Figure 1 and the mass-radius panels: large
+# (radius > LOW_INSOLATION_REGION_RADIUS) planets receiving little insolation (I < 50).
+LOW_INSOLATION_REGION_INSOL  = 50.0   # I_earth  — "low-insolation" boundary
+LOW_INSOLATION_REGION_RADIUS = 1.4    # R_earth  — "large rocky" lower bound of the corner
+LOW_INSOLATION_REGION_COLOR  = "#ff9ec4"  # light pink band under the silicate curve
 
 # Insolation slices for the 1x3 mass-radius figure (title, mask, draw-corner).
-# Cold panels (I<10, I<50) get the pink Cold-Corner band; the hot panel does not.
+# Low-insolation panels (I<10, I<50) get the pink Low-insolation-Corner band; the hot panel does not.
 MR_INSOL_PANELS = [
     (r"$I < 10\,I_\oplus$",  lambda f: f < 10.0, True),
     (r"$I < 50\,I_\oplus$",  lambda f: f < 50.0, True),
@@ -673,7 +673,7 @@ MR_INSOL_PANELS = [
 def plot_mr_insolation_panels(m_ref, r_ref, nasa_win: pd.DataFrame,
                               color_map: dict, major: list[str], counts) -> Path:
     """1x3 mass-radius panels by insolation (I<10, I<50, I>50) for the PSCompPars sample, colored by
-    discovery facility, with the silicate curve and the cold corner (R > 1.4, I < 50) shaded.
+    discovery facility, with the silicate curve and the low-insolation large-radius region (R > 1.4, I < 50) shaded.
     """
     XLIM = (0.0, 12.0)
     YLIM = (RADIUS_LIMITS[0], RADIUS_LIMITS[1])
@@ -751,10 +751,10 @@ def plot_mr_insolation_panels(m_ref, r_ref, nasa_win: pd.DataFrame,
         if draw_corner:
             ax.fill_between(
                 m_line,
-                COLD_CORNER_RADIUS,
+                LOW_INSOLATION_REGION_RADIUS,
                 r_curve,
-                where=np.isfinite(r_curve) & (r_curve >= COLD_CORNER_RADIUS),
-                color=COLD_CORNER_COLOR,
+                where=np.isfinite(r_curve) & (r_curve >= LOW_INSOLATION_REGION_RADIUS),
+                color=LOW_INSOLATION_REGION_COLOR,
                 alpha=0.35,
                 lw=0,
                 zorder=1,
@@ -783,7 +783,7 @@ def plot_mr_insolation_panels(m_ref, r_ref, nasa_win: pd.DataFrame,
                           label=r"MgSiO$_3$ rocky curve"))
     handles.append(Line2D([0], [0], color="0.5", lw=2.0,
                           label="Earth-like rocky curve"))
-    handles.append(Patch(facecolor=COLD_CORNER_COLOR, alpha=0.35,
+    handles.append(Patch(facecolor=LOW_INSOLATION_REGION_COLOR, alpha=0.35,
                          label=r"$R>1.4\,R_\oplus$, $I<50\,I_\oplus$"))
 
     fig.legend(handles=handles, loc="outside right center",
@@ -810,13 +810,13 @@ def plot_rocky_scatter_standalone(rocky_win: pd.DataFrame, shift: float) -> Path
     ylim = (0.6, RADIUS_LIMITS[1])
 
     # Insolation-bin shading (matches the survival-analysis bins).
-    ax.axvspan(xlim[0], COLD_CORNER_INSOL, color="#74add1", alpha=0.06, zorder=0)
-    ax.axvspan(COLD_CORNER_INSOL, xlim[1], color="#fdae61", alpha=0.06, zorder=0)
+    ax.axvspan(xlim[0], LOW_INSOLATION_REGION_INSOL, color="#74add1", alpha=0.06, zorder=0)
+    ax.axvspan(LOW_INSOLATION_REGION_INSOL, xlim[1], color="#fdae61", alpha=0.06, zorder=0)
 
-    # Cold Corner: large (R > 1.4 R_earth), low-insolation (I < 50) box.
+    # Low-insolation large-radius region: large (R > 1.4 R_earth), low-insolation (I < 50) box.
     ax.add_patch(Rectangle(
-        (INSOLATION_LIMITS[0], COLD_CORNER_RADIUS),
-        COLD_CORNER_INSOL - INSOLATION_LIMITS[0], RADIUS_LIMITS[1] - COLD_CORNER_RADIUS,
+        (INSOLATION_LIMITS[0], LOW_INSOLATION_REGION_RADIUS),
+        LOW_INSOLATION_REGION_INSOL - INSOLATION_LIMITS[0], RADIUS_LIMITS[1] - LOW_INSOLATION_REGION_RADIUS,
         fill=False, edgecolor="red", lw=2.2, zorder=6,
         label=r"$R>1.4\,R_\oplus$, $I<50\,I_\oplus$",
     ))
@@ -842,7 +842,7 @@ def plot_rocky_scatter_standalone(rocky_win: pd.DataFrame, shift: float) -> Path
             continue
         draw_group(sub, STYPE_COLORS.get(stype, "gray"), 5, label=f"{stype} stars")
 
-    # Cold window is the square (S<50, R>1.4) only; the 90% upper-bound line
+    # Low-insolation window is the square (S<50, R>1.4) only; the 90% upper-bound line
     # (competing definition) is intentionally omitted.
     for idx, row in rocky_win[lhs_mask].iterrows():
         draw_group(rocky_win.loc[[idx]], STYPE_COLORS.get(row["stype_clean"], "gray"), labelled_ms)

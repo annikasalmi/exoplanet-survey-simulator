@@ -20,20 +20,20 @@ from science.telescopes.tess.detection_model import TESSData
 
 DEFAULT_RV_MAG_TARGET = 12.0
 POPULATION_GENERATORS = {
-    "universe_B": partial(
+    "superearths_supneptunes": partial(
         flat_radii_curves, variant="superearths_supneptunes"
     ),
-    "uniform": flat_nonphysical,
+    "flat_nonphysical": flat_nonphysical,
 }
 
 
-def run_rv_best(catalog: pd.DataFrame, mag_target: float = 12.0) -> pd.DataFrame:
+def run_rv_best(catalog: pd.DataFrame, mag_target: float = 12.0, source: str = "ppop") -> pd.DataFrame:
     """Combine each planet's HARPS and NIRPS detections and target eligibility."""
     harps = RVData(
-        catalog.copy(), source="ppop", instrument="HARPS"
+        catalog.copy(), source=source, instrument="HARPS"
     ).determine_detectable()
     nirps = RVData(
-        catalog.copy(), source="ppop", instrument="NIRPS"
+        catalog.copy(), source=source, instrument="NIRPS"
     ).determine_detectable()
     best = harps.copy()
     best["detected"] = harps["detected"].astype(bool) | nirps["detected"].astype(bool)
@@ -327,12 +327,12 @@ def make_detected_pool(
     return result
 
 
-def split_universes(universe_b):
-    """Return universe B and universe A, which excludes rocky super-Earths."""
-    keep = ~is_super_earth(universe_b["mass"], universe_b["radius"])
+def split_universes(superearths_supneptunes):
+    """Return superearths_supneptunes and only_subneptunes, which excludes rocky super-Earths."""
+    keep = ~is_super_earth(superearths_supneptunes["mass"], superearths_supneptunes["radius"])
     return {
-        "rocky_formation": universe_b,
-        "escape_only": universe_b.loc[keep].reset_index(drop=True),
+        "rocky_formation": superearths_supneptunes,
+        "escape_only": superearths_supneptunes.loc[keep].reset_index(drop=True),
     }
 
 

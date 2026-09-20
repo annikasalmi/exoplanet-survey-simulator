@@ -1,7 +1,4 @@
-"""TEST LR: does NASA's catalog look like flat universe A (cold rocky M>2 corner removed) or B (kept)?
-Both pass the same Kepler+RV detectors and noise; a classifier learns p_B/p_A per planet, and
-NASA's summed log-ratio is compared to resampled A and B catalogs. Run via the flat_ab line in sim.py.
-"""
+"""Compare NASA against the two flat_radii_curves variants after Kepler+RV selection."""
 
 from __future__ import annotations
 
@@ -44,7 +41,7 @@ FLAT_N_POOL = 1_000_000
 RNG_SEED = 0
 RV_MAG_TARGET = 12.0
 MASS_MIN = 2.0
-COLD_MAX = COLD_DESERT_MAX_INSOLATION
+LOW_INSOLATION_MAX = COLD_DESERT_MAX_INSOLATION
 NASA_MASS_PREC = 0.25
 NASA_RAD_PREC = 0.08
 BOX = dict(r_lo=0.5, r_hi=2.2, m_lo=0.1, m_hi=12.0, f_lo=1e-2, f_hi=1e4)
@@ -62,7 +59,7 @@ N_CATALOGS = 10_000
 ALPHA = 0.05
 S_CLIP = 1e-6
 K_NEIGH = 100                     # location-matched null: kNN in (logI, Teff)
-MAP_INSOL = 20.0                  # cold slice shown in panel (a)
+MAP_INSOL = 20.0                  # low-insolation slice shown in panel (a)
 
 CLF_KW = dict(max_iter=200, learning_rate=0.08, min_samples_leaf=60,
               l2_regularization=1.0, early_stopping=False, random_state=42)
@@ -121,9 +118,8 @@ def load_nasa(precision: bool):
 # ---------------------------------------------------------------- STEP 1: forward sim
 def get_detected_pool(df):
     """TRUE parameters of joint (Kepler AND RV) detected planets, from the
-    flat universe produced by run_flat_universe. Universe B is the keep-all
-    population; universe A drops its super-Earths and is not the pool used here."""
-    pool = df[df["universe_type"] == "B"]
+    flat_radii_curves pair produced by sim.py."""
+    pool = df[df["universe_type"] == "superearths_supneptunes"]
     joint = (pool["kepler_detected"].to_numpy(bool)
              & pool["rv_detected"].to_numpy(bool))
     m_sil, r_sil = load_mass_radius_curve()
@@ -135,10 +131,10 @@ def get_detected_pool(df):
     })
     rocky = is_rocky(det["mass"].to_numpy(), det["radius"].to_numpy(), m_sil, r_sil)
     det["corner"] = rocky & (det["mass"].to_numpy() > MASS_MIN) & \
-        (det["flux"].to_numpy() < COLD_MAX)
+        (det["flux"].to_numpy() < LOW_INSOLATION_MAX)
     print(f"    joint-detected {len(det)}/{len(pool)} ({100*len(det)/len(pool):.2f}%)")
     pi = det["corner"].mean()
-    print(f"    TRUE-corner share of detected planets (pi, universe B): {100 * pi:.2f}%  "
+    print(f"    selected-group share of detected planets (pi): {100 * pi:.2f}%  "
           f"({int(det['corner'].sum())} corner planets)")
     return det
 
@@ -166,7 +162,7 @@ def apply_noise(det: pd.DataFrame, nasa: dict, rng) -> dict:
 
 # ------------------------------------------------------- STEP 3: classifier machinery
 def fit_ratio_classifier(XB: np.ndarray, XA: np.ndarray, cols=None):
-    """A-vs-B classifier -> per-planet log density ratio l(x) = log p_B(x)/p_A(x).
+    """Variant classifier -> per-planet log density ratio l(x) = log p_B(x)/p_A(x).
     Off-corner the two classes hold the SAME rows, so s -> N_B/(N_B+N_A) there and the
     log(N_B/N_A) offset makes l(x) -> log(1 - pi) exactly, as it should."""
     if cols is not None:
@@ -253,8 +249,8 @@ def run_config(det, nasa, name, noise_seed):
     cor_tr, cor_ca = corner[tr], corner[ca]
     XA_tr, XA_ca = XB_tr[~cor_tr], XB_ca[~cor_ca]
     n_cor_tr = int(cor_tr.sum())
-    print(f"    train B/A = {len(XB_tr)}/{len(XA_tr)} (corner in train: {n_cor_tr}); "
-          f"calib B/A = {len(XB_ca)}/{len(XA_ca)}")
+    print(f"    train superearths/only-subneptunes = {len(XB_tr)}/{len(XA_tr)} (corner in train: {n_cor_tr}); "
+          f"calib superearths/only-subneptunes = {len(XB_ca)}/{len(XA_ca)}")
     if n_cor_tr < 50:
         print("    [WARN] <50 corner planets in training — raise FLAT_N_POOL")
 
@@ -321,11 +317,11 @@ def run_config(det, nasa, name, noise_seed):
         print(f"    {label}")
         print(f"      T_NASA = {r['T']:+8.2f} | null A: {np.mean(r['TA']):+7.2f} "
               f"± {np.std(r['TA']):.2f} | alt B: {np.mean(r['TB']):+7.2f} ± {np.std(r['TB']):.2f}")
-        print(f"      p(reject B, one-sided) = {r['p_reject_B']:.4f} | "
-              f"p(compat A, two-sided) = {r['p_compat_A']:.4f} | "
-              f"power(A vs B at 5%) = {r['power']:.2f}")
+        print(f"      p(reject superearths_supneptunes, one-sided) = {r['p_reject_B']:.4f} | "
+              f"p(compat only_subneptunes, two-sided) = {r['p_compat_A']:.4f} | "
+              f"power(only_subneptunes vs superearths_supneptunes at 5%) = {r['power']:.2f}")
     print(f"    location matching: K={K_NEIGH} neighbors in standardized (logI, Teff); "
-          f"median K-th neighbor distance A/B = {dA:.3f}/{dB:.3f} (scaled units; <~0.3 = "
+          f"median K-th neighbor distance comparison = {dA:.3f}/{dB:.3f} (scaled units; <~0.3 = "
           "matching is tight)")
 
     order = np.argsort(ell_cond_n)[::-1]
@@ -372,9 +368,9 @@ def panel_map(ax, fig, cfg, m_sil, r_sil):
             color="k", lw=1.5, label="silicate line")
     ax.axvline(MASS_MIN, color="red", ls="--", lw=1.2, label=f"M = {MASS_MIN:g} M⊕")
     nasa = cfg["nasa"]
-    cold = nasa["ins"] < COLD_MAX
-    ax.scatter(nasa["m"][cold], nasa["r"][cold], s=28, facecolor="tab:green",
-               edgecolor="k", lw=0.4, zorder=5, label=f"NASA cold (I<{COLD_MAX:g})")
+    low_insolation = nasa["ins"] < LOW_INSOLATION_MAX
+    ax.scatter(nasa["m"][low_insolation], nasa["r"][low_insolation], s=28, facecolor="tab:green",
+               edgecolor="k", lw=0.4, zorder=5, label=f"NASA low-insolation (I<{LOW_INSOLATION_MAX:g})")
     ax.set_xscale("log")
     ax.set_xlim(BOX["m_lo"], BOX["m_hi"]); ax.set_ylim(BOX["r_lo"], BOX["r_hi"])
     ax.set_xlabel(r"planet mass [$M_\oplus$]"); ax.set_ylabel(r"planet radius [$R_\oplus$]")
@@ -388,13 +384,13 @@ def panel_calibration(ax, r, stat_label, n_nasa, extra=None):
     bins = np.linspace(min(r["TA"].min(), r["TB"].min(), r["T"]) - 1,
                        max(r["TA"].max(), r["TB"].max(), r["T"]) + 1, 60)
     ax.hist(r["TA"], bins=bins, density=True, color="tab:blue", alpha=0.55,
-            label="universe A catalogs (corner empty)")
+            label="only_subneptunes catalogs (only_subneptunes)")
     ax.hist(r["TB"], bins=bins, density=True, color="tab:orange", alpha=0.55,
-            label="universe B catalogs (flat corner)")
+            label="superearths_supneptunes catalogs (superearths_supneptunes)")
     ax.axvline(r["T"], color="tab:green", lw=2.5, label=f"NASA (N={n_nasa})")
     ax.axvline(r["crit"], color="0.4", ls=":", lw=1.2, label=f"5% critical value of B")
-    txt = (f"p(reject B) = {r['p_reject_B']:.4f}\n"
-           f"p(compat A) = {r['p_compat_A']:.4f}\npower = {r['power']:.2f}")
+    txt = (f"p(reject superearths_supneptunes) = {r['p_reject_B']:.4f}\n"
+           f"p(compat only_subneptunes) = {r['p_compat_A']:.4f}\npower = {r['power']:.2f}")
     if extra:
         txt += "\n" + extra
     ax.text(0.02, 0.975, txt, transform=ax.transAxes, ha="left", va="top", fontsize=8.5,
@@ -421,11 +417,11 @@ def panel_reliability(ax, cfg):
 def make_figure(cfg_prec, cfg_full, m_sil, r_sil):
     fig, axes = plt.subplots(2, 2, figsize=(17, 11.5))
     panel_map(axes[0, 0], fig, cfg_prec, m_sil, r_sil)
-    extra = (f"pool-mix-null T_cond: p(reject B) = "
+    extra = (f"pool-mix-null T_cond: p(reject superearths_supneptunes) = "
              f"{cfg_prec['res']['cond']['p_reject_B']:.4f}\n"
-             f"full sample (N={cfg_full['n_nasa']}): p(reject B) = "
+             f"full sample (N={cfg_full['n_nasa']}): p(reject superearths_supneptunes) = "
              f"{cfg_full['res']['cond_loc']['p_reject_B']:.4f}, "
-             f"p(compat A) = {cfg_full['res']['cond_loc']['p_compat_A']:.4f}")
+             f"p(compat only_subneptunes) = {cfg_full['res']['cond_loc']['p_compat_A']:.4f}")
     panel_calibration(axes[0, 1], cfg_prec["res"]["cond_loc"],
                       "(b) HEADLINE  T_cond | locations — composition at NASA's own "
                       "(I, Teff) locations; null location-matched — precision NASA",
@@ -437,7 +433,7 @@ def make_figure(cfg_prec, cfg_full, m_sil, r_sil):
     panel_reliability(axes[1, 1], cfg_prec)
     fig.suptitle("TEST LR — full-catalog likelihood ratio via classifier density ratio "
                  "(SBI likelihood-ratio trick)\n"
-                 "A = flat universe MINUS cold rocky M>2 corner, B = flat universe; both through "
+                 "A = only_subneptunes variant, B = flat universe; both through "
                  "the repo Kepler+RV joint detectors + NASA-resampled noise; "
                  r"$T=\sum_i \ell(x_i)$ conditional on N + observed locations (count term "
                  "dropped — TEST A showed absolute corner counts are follow-up-confounded)",
@@ -479,28 +475,28 @@ def _mr_axis(ax, m_sil, r_sil, shade_corner=True):
 
 
 def explainer_universes(cfg, m_sil, r_sil):
-    """E1 — the whole test as three M-R scatter panels (cold slice, observed values)."""
+    """E1 — the whole test as three M-R scatter panels (low-insolation slice, observed values)."""
     X, corner, nasa = cfg["X_obs"], cfg["corner_obs"], cfg["nasa"]
     m, r, i = 10.0 ** X[:, 0], 10.0 ** X[:, 1], 10.0 ** X[:, 2]
-    cold = i < COLD_MAX
+    low_insolation = i < LOW_INSOLATION_MAX
     rng = np.random.default_rng(5)
-    pick = rng.permutation(np.where(cold)[0])[:EXPL_SUB]
+    pick = rng.permutation(np.where(low_insolation)[0])[:EXPL_SUB]
     pc, pn = pick[corner[pick]], pick[~corner[pick]]
 
     fig, axes = plt.subplots(1, 3, figsize=(17, 5.8), sharey=True)
     for ax in axes:
         _mr_axis(ax, m_sil, r_sil)
-    axes[0].scatter(m[pn], r[pn], s=8, color="0.65", alpha=0.55, label="other cold planets")
+    axes[0].scatter(m[pn], r[pn], s=8, color="0.65", alpha=0.55, label="other low-insolation planets")
     axes[0].scatter(m[pc], r[pc], s=16, color="tab:red", alpha=0.8,
-                    label="corner planets (cold rocky M>2)")
-    axes[0].set_title("(a) universe B — flat occurrence:\ncorner planets EXIST (red)",
+                    label="corner planets (low-insolation rocky M>2)")
+    axes[0].set_title("(a) superearths_supneptunes — flat occurrence:\ncorner planets EXIST (red)",
                       fontsize=10)
     axes[1].scatter(m[pn], r[pn], s=8, color="0.65", alpha=0.55)
-    axes[1].set_title("(b) universe A — same universe,\ncorner planets REMOVED at birth",
+    axes[1].set_title("(b) only_subneptunes — same universe,\ncorner planets REMOVED at birth",
                       fontsize=10)
-    ncold = nasa["ins"] < COLD_MAX
-    axes[2].scatter(nasa["m"][ncold], nasa["r"][ncold], s=42, facecolor="tab:green",
-                    edgecolor="k", lw=0.5, label=f"NASA cold planets (N={int(ncold.sum())})")
+    nasa_low_insolation = nasa["ins"] < LOW_INSOLATION_MAX
+    axes[2].scatter(nasa["m"][nasa_low_insolation], nasa["r"][nasa_low_insolation], s=42, facecolor="tab:green",
+                    edgecolor="k", lw=0.5, label=f"NASA low-insolation planets (N={int(nasa_low_insolation.sum())})")
     axes[2].set_title("(c) NASA — which universe\ndoes it look like?", fontsize=10)
     axes[0].set_ylabel(r"planet radius [$R_\oplus$]")
     for ax in axes:
@@ -527,7 +523,7 @@ def _ell_grid(cfg, insol, teff0):
 
 
 def explainer_scores(cfg, m_sil, r_sil):
-    """E2 — the classifier score in the audience's own planes: M-R at a cold and a hot
+    """E2 — the classifier score in the audience's own planes: M-R at a low-insolation and a hot
     slice, then NASA planets colored by score in the (insolation, radius) plane."""
     nasa = cfg["nasa"]
     teff0 = float(np.median(nasa["teff"]))
@@ -552,8 +548,8 @@ def explainer_scores(cfg, m_sil, r_sil):
                     norm=TwoSlopeNorm(0.0, vmin=-max(np.abs(ell).max(), 0.1),
                                       vmax=max(np.abs(ell).max(), 0.1)),
                     s=24 + 40 * np.abs(ell), edgecolor="k", lw=0.4)
-    ax.axvline(COLD_MAX, color="red", ls="--", lw=1.3)
-    ax.text(COLD_MAX * 0.75, BOX["r_hi"] - 0.05, "← cold", color="red", ha="right",
+    ax.axvline(LOW_INSOLATION_MAX, color="red", ls="--", lw=1.3)
+    ax.text(LOW_INSOLATION_MAX * 0.75, BOX["r_hi"] - 0.05, "← low-insolation", color="red", ha="right",
             va="top", fontsize=9)
     ax.set_xscale("log"); ax.set_xlim(BOX["f_lo"], BOX["f_hi"])
     ax.set_ylim(BOX["r_lo"], BOX["r_hi"])
@@ -575,17 +571,17 @@ def explainer_verdict(cfg, m_sil, r_sil):
     XB_ca, cor_ca, nasa = cfg["XB_ca"], cfg["cor_ca"], cfg["nasa"]
     n = cfg["n_nasa"]
     m, r, i = 10.0 ** XB_ca[:, 0], 10.0 ** XB_ca[:, 1], 10.0 ** XB_ca[:, 2]
-    obs_corner = is_rocky(m, r, m_sil, r_sil) & (m > MASS_MIN) & (i < COLD_MAX)
+    obs_corner = is_rocky(m, r, m_sil, r_sil) & (m > MASS_MIN) & (i < LOW_INSOLATION_MAX)
     nasa_corner = int((is_rocky(nasa["m"], nasa["r"], m_sil, r_sil)
-                       & (nasa["m"] > MASS_MIN) & (nasa["ins"] < COLD_MAX)).sum())
+                       & (nasa["m"] > MASS_MIN) & (nasa["ins"] < LOW_INSOLATION_MAX)).sum())
 
     Xn = np.column_stack([np.log10(nasa["m"]), np.log10(nasa["r"]),
                           np.log10(nasa["ins"]), nasa["teff"]])
     scale = XB_ca[:, LOC_COLS].std(axis=0)
     rng = np.random.default_rng(6)
     counts = {}
-    for lbl, pool_mask in [("universe A\n(corner empty)", ~cor_ca),
-                           ("universe B\n(flat corner)", np.ones(len(cor_ca), bool))]:
+    for lbl, pool_mask in [("only_subneptunes\n(only_subneptunes)", ~cor_ca),
+                           ("superearths_supneptunes\n(superearths_supneptunes)", np.ones(len(cor_ca), bool))]:
         nn = NearestNeighbors(n_neighbors=K_NEIGH).fit(XB_ca[pool_mask][:, LOC_COLS] / scale)
         idx = nn.kneighbors(Xn[:, LOC_COLS] / scale, return_distance=False)
         flags = obs_corner[pool_mask][idx]                       # (N, K)
@@ -604,14 +600,14 @@ def explainer_verdict(cfg, m_sil, r_sil):
     for x, v in enumerate(med):
         ax.text(x, v + 0.4, f"{v:.0f}", ha="center", fontsize=10)
     ax.set_ylabel(f"corner-looking planets per {n}-planet catalog")
-    ax.set_title("(a) plain counts: cold rocky M>2 planets (observed values)\n"
+    ax.set_title("(a) plain counts: low-insolation rocky super-Earth planets (observed values)\n"
                  "fake catalogs built AT NASA's own planet locations", fontsize=10)
     ax.grid(alpha=0.2, axis="y")
 
     ax = axes[1]
     r_loc = cfg["res"]["cond_loc"]
-    for y, (T, color, lbl) in enumerate([(r_loc["TA"], "tab:blue", "universe A catalogs"),
-                                         (r_loc["TB"], "tab:orange", "universe B catalogs")]):
+    for y, (T, color, lbl) in enumerate([(r_loc["TA"], "tab:blue", "only_subneptunes catalogs"),
+                                         (r_loc["TB"], "tab:orange", "superearths_supneptunes catalogs")]):
         sub = T[rng.permutation(len(T))[:400]]
         ax.scatter(sub, np.full(len(sub), y) + rng.uniform(-0.18, 0.18, len(sub)),
                    s=6, color=color, alpha=0.4, label=lbl)
@@ -619,7 +615,7 @@ def explainer_verdict(cfg, m_sil, r_sil):
     ax.annotate("NASA lands here", xy=(r_loc["T"], 0.5), xytext=(r_loc["T"] + 25, 0.5),
                 arrowprops=dict(arrowstyle="->", color="tab:green"), color="tab:green",
                 fontsize=10)
-    ax.set_yticks([0, 1]); ax.set_yticklabels(["universe A\ncatalogs", "universe B\ncatalogs"])
+    ax.set_yticks([0, 1]); ax.set_yticklabels(["only_subneptunes\ncatalogs", "superearths_supneptunes\ncatalogs"])
     ax.set_xlabel("total catalog score  T  (sum of the per-planet scores)")
     ax.set_title(f"(b) the number line: each dot = one fake catalog\n"
                  f"p(NASA is a B catalog) = {r_loc['p_reject_B']:.4f}", fontsize=10)
@@ -658,11 +654,11 @@ def main(df):
     rf = cfgs["full"]["res"]["cond_loc"]
     rsf = cfgs["full"]["res"]["shape"]
     print("\n================ SUMMARY ================")
-    print("  We made two fake universes. Same everything, except one has cold big rocky")
+    print("  We made two fake universes. Same everything, except one has low-insolation big rocky")
     print("  planets (B) and one does not (A). Both go through our detectors + NASA-size")
     print("  noise. A classifier learns the ONLY difference: the corner. Each NASA planet")
     print("  then gets a score: 'do you look like a corner planet?'. Sum of scores = T.")
-    print("  Null catalogs are built AT NASA's own planet locations, so 'NASA hunts cold")
+    print("  Null catalogs are built AT NASA's own planet locations, so 'NASA hunts low-insolation")
     print("  planets harder' cannot fake the answer in either direction.")
     print(f"  NASA (precision, N={cfgs['precision']['n_nasa']}): "
           f"p={rp['p_reject_B']:.4f} under B -> "
@@ -672,8 +668,8 @@ def main(df):
     print(f"  The un-shielded statistic flips with sample choice (T_shape: precision "
           f"p={rs['p_reject_B']:.4f}, full p={rsf['p_reject_B']:.4f}) —")
     print("  that flip IS the follow-up confound; the conditional statistic does not flip.")
-    print(f"  Full sample (N={cfgs['full']['n_nasa']}): p(reject B)={rf['p_reject_B']:.4f}, "
-          f"p(compat A)={rf['p_compat_A']:.4f}.")
+    print(f"  Full sample (N={cfgs['full']['n_nasa']}): p(reject superearths_supneptunes)={rf['p_reject_B']:.4f}, "
+          f"p(compat only_subneptunes)={rf['p_compat_A']:.4f}.")
     print("\nCAVEATS")
     print("  1. p-value is exact-frequentist w.r.t. OUR simulator; toy detectors stand in for")
     print("     NASA's messy selection. T_cond cancels location-targeting effort (the TEST A")
@@ -684,5 +680,10 @@ def main(df):
 
 
 if __name__ == "__main__":
-    from run.flat_universe.run_flat_universe import main as run_flat
-    main(run_flat(seed=RNG_SEED, n_planets=FLAT_N_POOL, run_anew=False))
+    import sim
+    sim.UNIVERSE = "flat_radii_curves"
+    sim.RUN_BOTH_FLAT_RADII_VARIANTS = True
+    sim.TELESCOPES = ("kepler", "rv")
+    sim.SEED = RNG_SEED
+    sim.N_PLANETS = FLAT_N_POOL
+    main(sim.run_both_flat_radii_variants(run_id=0, run_anew=False))

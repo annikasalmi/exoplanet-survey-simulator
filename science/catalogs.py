@@ -32,6 +32,7 @@ FACILITY_BY_INSTRUMENT = {
     "TESS": "Transiting Exoplanet Survey Satellite (TESS)",
 }
 DIRECT_IMAGING_WAVELENGTH_M = {"LIFE": 18.5e-6, "HWO": 2.5e-6}
+NASA_TAP_SYNC_URL = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"
 NASA_ROCKY_QUERY = """
 SELECT pl_name, hostname, discoverymethod, disc_facility, tran_flag,
        pl_insol, pl_insolerr1, pl_insolerr2, pl_insollim,
@@ -78,6 +79,13 @@ def read_nasa_csv(path, **kwargs) -> pd.DataFrame:
         )
     kwargs.setdefault("low_memory", False)
     return pd.read_csv(path, skiprows=header_rows, **kwargs)
+
+
+def nasa_tap_url(query: str) -> str:
+    """NASA Exoplanet Archive TAP CSV URL for a SQL query."""
+    encoded_query = quote(query)
+    url = f"{NASA_TAP_SYNC_URL}?query={encoded_query}&format=csv"
+    return url
 
 
 def parameter_box_mask(box, mass, radius, insolation=None):
@@ -164,12 +172,7 @@ def load_nasa_rocky_source(cache_path, *, redownload=False, download_if_missing=
     if redownload or not cache_path.exists():
         if not download_if_missing:
             raise FileNotFoundError(f"NASA cache missing: {cache_path}")
-        url = (
-            "https://exoplanetarchive.ipac.caltech.edu/TAP/sync?query="
-            + quote(NASA_ROCKY_QUERY)
-            + "&format=csv"
-        )
-        frame = pd.read_csv(url)
+        frame = pd.read_csv(nasa_tap_url(NASA_ROCKY_QUERY))
         cache_path.parent.mkdir(parents=True, exist_ok=True)
         frame.to_csv(cache_path, index=False)
     return load_measured_planets(
@@ -355,5 +358,5 @@ __all__ = [
     "FGKM_TEMPERATURE_BOUNDS", "filter_rocky_catalog",
     "load_and_filter_exoplanets", "load_measured_planets",
     "load_nasa_rocky_source", "parameter_box_mask", "read_nasa_csv",
-    "restrict_science_window",
+    "nasa_tap_url", "restrict_science_window",
 ]

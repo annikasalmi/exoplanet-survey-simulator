@@ -9,7 +9,6 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-from urllib.parse import quote
 
 import numpy as np
 import pandas as pd
@@ -24,6 +23,7 @@ except Exception:
     pass
 
 from tools.paths import TESS_DATA_DIR, PAPER_FIGURES_DIR, CALIBRATION_DIR, KEPLER_DATA_DIR
+from science.catalogs import nasa_tap_url
 from science.physics import infer_stellar_type
 from science.telescopes.rv.detection_model import RVData
 
@@ -66,10 +66,8 @@ def load_rvamp_sample() -> pd.DataFrame:
         print(f"Loading published-K sample from cache: {RVAMP_CACHE.name}")
         df = pd.read_csv(RVAMP_CACHE)
     else:
-        url = ("https://exoplanetarchive.ipac.caltech.edu/TAP/sync?query="
-               + quote(RVAMP_QUERY) + "&format=csv")
         print("Downloading PSCompPars planets with published pl_rvamp ...")
-        df = pd.read_csv(url)
+        df = pd.read_csv(nasa_tap_url(RVAMP_QUERY))
         RVAMP_CACHE.parent.mkdir(parents=True, exist_ok=True)
         df.to_csv(RVAMP_CACHE, index=False)
         print(f"Saved cache: {RVAMP_CACHE}")

@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from science.physics import infer_stellar_type
 from tools.paths import PPOP_DIR
 
 OTEGI_ROCKY = dict(mr_C=1.03, mr_beta=0.29)      # R = 1.03 M^0.29 (Otegi et al. 2020)
@@ -36,16 +37,6 @@ _MS_MASS = np.array([0.08, 0.085, 0.10, 0.15, 0.21, 0.35, 0.44, 0.57,
                      0.68, 0.88, 0.92, 1.05, 1.30, 1.60, 2.10])
 
 _YEAR_D = 365.25
-
-
-def _stype_from_teff(teff):
-    t = np.asarray(teff, dtype=float)
-    out = np.full(t.shape, "M", dtype=object)
-    out[t >= 3700] = "K"
-    out[t >= 5200] = "G"
-    out[t >= 6000] = "F"
-    out[t >= 7500] = "A"
-    return out
 
 
 _MEAN_MR_CURVE = None       # cached (R_grid, M_grid) for the mean-relation inverse R->M
@@ -182,7 +173,7 @@ def flat_nonphysical(
     # Sky position (flat) for any visibility model; detectors here use it loosely.
     df["ra"] = rng.uniform(0.0, 360.0, len(df))
     df["dec"] = np.degrees(np.arcsin(rng.uniform(-1.0, 1.0, len(df))))  # isotropic sky
-    df["stype"] = _stype_from_teff(teff)
+    df["stype"] = infer_stellar_type(teff)
     df["nstar"] = np.arange(len(df))   # one synthetic star per planet (independent draws)
     df["id"] = np.arange(len(df))
     # Swap the log-uniform mass for an M-R relation; nothing else depends on mass.

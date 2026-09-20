@@ -121,6 +121,7 @@ class KeplerData:
 
         # Make outside datasets speak the local project language.
         self.catalog = self.standardize_catalog_columns(self.catalog, self.source)
+        self.nasa_like_source = self.source in {"pscomppars", "ps", "nasa", "koi"}
         self._add_basic_helper_columns()
 
         if self.estimate_missing_semimajor_axis:
@@ -337,11 +338,6 @@ class KeplerData:
         if bad:
             raise ValueError(f"Detection columns exist but are entirely NaN: {bad}")
 
-    def _is_nasa_like(self) -> bool:
-        return self.source in {"pscomppars", "ps", "nasa", "koi"} or str(
-            self.catalog.get("dataset_source", pd.Series([""])).iloc[0]
-        ).startswith("NASA")
-
     # ============================================================
     # Transit / depth / brightness calculations
     # ============================================================
@@ -353,7 +349,7 @@ class KeplerData:
 
     # Observed depth for NASA rows that have one, else the (Rp/R*)^2 model depth.
     def calc_transit_depth_ppm(self):
-        if self._is_nasa_like() and self.use_observed_transit_depth_for_nasa:
+        if self.nasa_like_source and self.use_observed_transit_depth_for_nasa:
             if "observed_transit_depth_ppm" in self.catalog.columns:
                 observed = pd.to_numeric(self.catalog["observed_transit_depth_ppm"], errors="coerce")
                 model = self.calc_transit_depth_fraction() * 1e6
@@ -369,7 +365,7 @@ class KeplerData:
         """
         b = self._impact_from_inclination()
         self.catalog["impact_parameter"] = b
-        if self._is_nasa_like() and self.use_observed_transit_flag_for_nasa and "tran_flag" in self.catalog.columns:
+        if self.nasa_like_source and self.use_observed_transit_flag_for_nasa and "tran_flag" in self.catalog.columns:
             tran_flag = pd.to_numeric(self.catalog["tran_flag"], errors="coerce").fillna(0)
             self.catalog["transiting_source"] = "tran_flag"
             return (tran_flag.astype(int) == 1).fillna(False)
@@ -420,7 +416,7 @@ class KeplerData:
     def signal_rms_ppm(self) -> pd.Series:
         """rms of the limb-darkened transit dip over T14 (see transit_shape); what the MES uses."""
         observed = None
-        if self._is_nasa_like() and self.use_observed_transit_depth_for_nasa and "observed_transit_depth_ppm" in self.catalog.columns:
+        if self.nasa_like_source and self.use_observed_transit_depth_for_nasa and "observed_transit_depth_ppm" in self.catalog.columns:
             observed = pd.to_numeric(self.catalog["observed_transit_depth_ppm"], errors="coerce")
         rms = transit_shape.signal_rms_ppm(self._radius_ratio(), self.catalog["impact_parameter"], "Kepler", observed)
         return pd.Series(rms, index=self.catalog.index)
@@ -449,7 +445,7 @@ class KeplerData:
             mag = pd.to_numeric(self.catalog["kepmag"], errors="coerce")
             bright = mag <= self.kepler_mag_limit
 
-            if self._is_nasa_like() and self.assume_bright_if_kepmag_missing_for_nasa:
+            if self.nasa_like_source and self.assume_bright_if_kepmag_missing_for_nasa:
                 bright = bright | mag.isna()
                 source = np.where(mag.notna(), "kepmag", "missing_kepmag_assumed_bright_for_nasa")
             else:
@@ -483,7 +479,7 @@ class KeplerData:
     # ============================================================
 
     def _observed_duration(self) -> pd.Series:
-        if self._is_nasa_like() and "observed_transit_duration_hr" in self.catalog.columns:
+        if self.nasa_like_source and "observed_transit_duration_hr" in self.catalog.columns:
             return pd.to_numeric(self.catalog["observed_transit_duration_hr"], errors="coerce")
         return pd.Series(np.nan, index=self.catalog.index)
 

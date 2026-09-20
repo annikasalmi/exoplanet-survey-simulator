@@ -127,7 +127,3 @@ class BasePlotter:
             return detected_heights, detected_errors
         else:
             return detected_heights, np.zeros_like(detected_heights)
-
-    def plot_all(self) -> None:
-        """Base plot_all method - should be overridden by subclasses."""
-        raise NotImplementedError("Subclasses must implement plot_all()")

@@ -12,7 +12,8 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in os.sys.path:
     os.sys.path.insert(0, str(ROOT))
 
-from science.populations.universes.flat_curves import flat_radii_curves, is_super_earth
+from science.physics import is_super_earth
+from science.populations.universes.flat_curves import flat_radii_curves
 from science.telescopes.detection import run_rv_best
 from science.telescopes.kepler.detection_model import KeplerData
 from science.telescopes.tess.detection_model import TESSData

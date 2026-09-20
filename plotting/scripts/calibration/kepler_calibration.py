@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from urllib.parse import quote
 
 import numpy as np
 import pandas as pd
@@ -23,7 +22,7 @@ except Exception:
     pass
 
 from tools.paths import REPO_ROOT, KOI_CUMULATIVE_CSV, PAPER_FIGURES_DIR, CALIBRATION_DIR
-from science.catalogs import read_nasa_csv
+from science.catalogs import nasa_tap_url, read_nasa_csv
 ROOT = Path(REPO_ROOT)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -65,16 +64,6 @@ DISP_COLORS = {
     "CANDIDATE":   "#2060c0",
     "FALSE POSITIVE": "#909090",
 }
-
-
-# ── Download ──────────────────────────────────────────────────────────────────
-
-
-def nasa_tap_url(query: str) -> str:
-    return (
-        "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"
-        f"?query={quote(query)}&format=csv"
-    )
 
 
 def load_or_download(redownload: bool = False) -> pd.DataFrame:

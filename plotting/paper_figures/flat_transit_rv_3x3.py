@@ -25,7 +25,7 @@ from science.telescopes.detection import (
 from science.catalogs import restrict_science_window, load_and_filter_nasa
 from science.statistics import binned_fraction_2d, fit_quantile_power_law
 from science.physics import load_rocky_reference_curve, compute_rocky_threshold_shift
-from plotting.scripts.analysis import rocky_scatter_gaia60pc as rocky_scatter
+from plotting.paper_figures import rocky_scatter_gaia60pc as rocky_scatter
 
 OUT_DIR = Path(ANALYSIS_DIR) / "flat_transit_rv_3x3"
 PAPER_FIG_DIR = Path(PAPER_FIGURES_DIR)

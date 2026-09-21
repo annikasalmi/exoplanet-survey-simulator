@@ -4,6 +4,18 @@ Constants for plotting routines in the project.
 from typing import List, Optional
 import numpy as np
 
+PAPER_STYLE = {
+    "figure.dpi": 120,
+    "savefig.dpi": 260,
+    "font.size": 20,
+    "axes.titlesize": 23,
+    "axes.labelsize": 24,
+    "xtick.labelsize": 20,
+    "ytick.labelsize": 20,
+    "legend.fontsize": 15,
+    "legend.frameon": True,
+}
+
 STAR_ORDER: List[str] = ['F', 'G', 'K', 'M']
 BIN_LABELS: List[str] = ['<1.5', '1.5–3.0', '3.0–6.0', 'Rocky HZ']
 TEMP_ZONES: List[str] = ['hot', 'habitable', 'cold']

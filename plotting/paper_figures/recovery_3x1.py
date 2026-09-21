@@ -28,7 +28,7 @@ from tools.paths import (REPO_ROOT, KOI_CUMULATIVE_CSV, PAPER_FIGURES_DIR,
                          CALIBRATION_DIR, TESS_DATA_DIR, KEPLER_DATA_DIR, _EXOPLANET_CSV_DIR)
 from science.catalogs import nasa_tap_url, read_nasa_csv
 from science.physics import infer_stellar_type
-from plotting.figure_style import PAPER_STYLE
+from tools.plotting_constants import PAPER_STYLE
 
 ROOT = Path(REPO_ROOT)
 if str(ROOT) not in sys.path:

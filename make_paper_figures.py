@@ -18,16 +18,16 @@ PAPER_DIR = PAPER_FIGURES_DIR
 # (script, extra args, figures it writes to results/paper/)
 STEPS = [
     ("science/telescopes/tess/download_cdpp.py", [], []),  # SPOC CDPP tables for the TESS panel
-    ("plotting/scripts/calibration/recovery_3x1.py", [],
+    ("plotting/paper_figures/recovery_3x1.py", [],
      ["recovery_3x1.png"]),
-    ("plotting/scripts/analysis/flat_transit_rv_3x3.py", [],
+    ("plotting/paper_figures/flat_transit_rv_3x3.py", [],
      ["flat_transit_rv_3x3_otegi.png"]),
-    ("plotting/scripts/analysis/rocky_scatter_gaia60pc.py", [],
+    ("plotting/paper_figures/rocky_scatter_gaia60pc.py", [],
      ["rocky_mr_insolation_3panel.png", "rocky_scatter_standalone.png"]),
-    ("plotting/scripts/analysis/flat_rocky_mr_vs_nasa.py", [],
+    ("plotting/paper_figures/flat_rocky_mr_vs_nasa.py", [],
      ["flat_rocky_mr_relations_2x4_low-insolation_corner.png",
       "flat_otegi_1x2_low-insolation_selection.png"]),
-    ("plotting/scripts/analysis/mc_comparison_statistic.py", [],
+    ("plotting/paper_figures/mc_comparison_statistic.py", [],
      ["mc_comparison_statistic_5000.png"]),
 ]
 

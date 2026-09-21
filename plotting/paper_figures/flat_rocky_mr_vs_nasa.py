@@ -34,12 +34,10 @@ from science.statistics import (
     NASA_MEASUREMENT_ERROR, SIMULATED_MEASUREMENT_ERROR, perturb_fractional,
 )
 from tools.paths import PSCOMPPARS_CSV
-from plotting.figure_style import PAPER_STYLE
 
 OUT_DIR = os.path.join(ANALYSIS_DIR, "flat_rocky_mr_vs_nasa")
 PAPER_FIG_DIR = Path(PAPER_FIGURES_DIR)
 
-FIGURE_STYLE = PAPER_STYLE
 MASS_LIMS = (0.0, 12.0)
 RADIUS_LIMS = (0.5, 2.4)
 FLAT_N = 150000

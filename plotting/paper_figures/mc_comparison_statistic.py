@@ -24,7 +24,7 @@ from science.comparison import (
 from science.telescopes.detection import make_detected_pool, split_universes
 from science.statistics import NASA_MEASUREMENT_ERROR
 from tools.paths import ANALYSIS_DIR, PAPER_FIGURES_DIR, PSCOMPPARS_CSV
-from plotting.figure_style import PAPER_STYLE
+from tools.plotting_constants import PAPER_STYLE
 
 OUT_DIR = os.path.join(ANALYSIS_DIR, "mc_comparison_statistic")
 

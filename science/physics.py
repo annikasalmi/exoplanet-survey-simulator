@@ -142,6 +142,34 @@ def compute_rocky_threshold_shift(m_ref: np.ndarray, r_ref: np.ndarray,
     )
     return 0.0
 
+def lambert_phase(alpha_rad):
+    """Lambertian phase function."""
+    alpha = np.clip(alpha_rad, 0, np.pi)
+    direct = np.sin(alpha)
+    projected = (np.pi - alpha) * np.cos(alpha)
+    return (direct + projected) / np.pi
+
+def calculate_system_fluxes(T_star, T_planet, R_star, R_planet, D, wavelength_m, Ag, alpha_rad):
+    """Calculate fluxes for a star-planet system."""
+    # Convert to meters
+    R_star_m = R_star * const.R_sun
+    R_planet_m = R_planet * const.R_earth
+    D_m = D * const.au_to_m
+
+    # Calculate fluxes
+    flux_star = blackbody_spectral_radiance(wavelength_m, T_star) * (R_star_m / D_m)**2
+    flux_planet = blackbody_spectral_radiance(wavelength_m, T_planet) * (R_planet_m / D_m)**2
+    
+    # Reflected light
+    phase = lambert_phase(alpha_rad)
+    reflected_flux = flux_star * Ag * (R_planet_m / D_m)**2 * phase
+    
+    # Total planet flux and contrast
+    total_planet_flux = flux_planet + reflected_flux
+    # Avoid division by zero or very small values
+    contrast = np.where(flux_star > 1e-50, total_planet_flux / flux_star, 0)
+    
+    return flux_star, flux_planet, reflected_flux, contrast
 
 __all__ = [
     "SUPER_EARTH_MIN_MASS", "add_stellar_type", "blackbody_spectral_radiance",

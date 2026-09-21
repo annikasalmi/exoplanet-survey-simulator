@@ -6,6 +6,10 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -13,7 +17,7 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 from matplotlib.ticker import FuncFormatter
 
-from tools.paths import REPO_ROOT, ANALYSIS_DIR, PAPER_FIGURES_DIR
+from tools.paths import REPO_ROOT, ANALYSIS_DIR, PAPER_FIGURES_DIR, _EXOPLANET_CSV_DIR
 ROOT = Path(REPO_ROOT)
 
 from science.telescopes.detection import (
@@ -27,6 +31,7 @@ from plotting.paper_figures import rocky_scatter_gaia60pc as rocky_scatter
 
 OUT_DIR = Path(ANALYSIS_DIR) / "flat_transit_rv_3x3"
 PAPER_FIG_DIR = Path(PAPER_FIGURES_DIR)
+NASA_FLAGS_CACHE = _EXOPLANET_CSV_DIR / "pscomppars_transiting_mass_insol.csv"
 
 FIGURE_STYLE = {
     "font.size": 21, "axes.titlesize": 26, "axes.labelsize": 23,
@@ -74,6 +79,7 @@ ROWS = [
 
 def build_column(stype: str, m_ref, r_ref) -> pd.DataFrame:
     cfg = COLUMNS[stype]
+    print(f"  {stype}: drawing {cfg['n']:,} planets...", flush=True)
     panel, catalog, extra = build_stellar_selection_panel(
         cfg, m_ref, r_ref, radius_limits=RADIUS_LIMS, period_limits=PERIOD_LIMS,
         minimum_radius=rocky_scatter.RADIUS_LIMITS[0],
@@ -84,9 +90,9 @@ def build_column(stype: str, m_ref, r_ref) -> pd.DataFrame:
           f"candidates -> {int(main['transit_eligible'].sum()):,} transiting; "
           f"pass transit {int(main['transit_detected'].sum()):,}, "
           f"rv {int(main['rv_detected'].sum()):,}, "
-          f"joint {int(main['joint_detected'].sum()):,}")
+          f"joint {int(main['joint_detected'].sum()):,}", flush=True)
     if extra is not None:
-        print(f"     + {cfg['map_extra_n']:,} map-only draws -> {len(extra):,} candidates")
+        print(f"     + {cfg['map_extra_n']:,} map-only draws -> {len(extra):,} candidates", flush=True)
     return panel
 
 
@@ -103,7 +109,7 @@ def main(paper_copy: bool = True):
         rows[2] = (f"Transit ({TRANSIT_MISSION}) + RV", "joint_detected")
     m_ref, r_ref = load_rocky_reference_curve()
     shift = compute_rocky_threshold_shift(m_ref, r_ref)
-    _, rocky = load_and_filter_nasa(m_ref, r_ref, shift)
+    _, rocky = load_and_filter_nasa(NASA_FLAGS_CACHE, m_ref, r_ref, shift)
     rocky_win = restrict_science_window(
         rocky,
         insolation=rocky_scatter.INSOLATION_LIMITS,

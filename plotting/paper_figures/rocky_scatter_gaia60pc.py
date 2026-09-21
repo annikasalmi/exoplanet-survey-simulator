@@ -7,6 +7,10 @@ from pathlib import Path
 import re
 import sys
 
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 import numpy as np
 import pandas as pd
 
@@ -817,7 +821,20 @@ def main():
     shift = compute_rocky_threshold_shift(m_ref, r_ref)
     print()
 
-    nasa_all, rocky = load_and_filter_nasa(m_ref, r_ref, shift)
+    nasa_all, rocky = load_and_filter_nasa(
+        NASA_FLAGS_CACHE,
+        m_ref,
+        r_ref,
+        shift,
+        redownload=FORCE_REDOWNLOAD_NASA,
+        download_if_missing=DOWNLOAD_NASA_IF_MISSING,
+        exclude_mass_limits=EXCLUDE_MASS_LIMITS,
+        exclude_radius_limits=EXCLUDE_RADIUS_LIMITS,
+        require_two_sided_mass=REQUIRE_TWO_SIDED_MASS,
+        require_two_sided_radius=REQUIRE_TWO_SIDED_RADIUS,
+        max_mass_rel_uncertainty=MAX_MASS_REL_UNCERTAINTY,
+        max_radius_rel_uncertainty=MAX_RADIUS_REL_UNCERTAINTY,
+    )
 
     # Limit the planets used in ALL figures to the context window.
     rocky_win = restrict_science_window(

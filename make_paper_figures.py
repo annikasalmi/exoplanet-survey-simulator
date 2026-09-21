@@ -14,9 +14,8 @@ from tools.paths import PAPER_FIGURES_DIR
 
 def main():
     t_all = time.time()
-
-
-    download_tess_cdpp()
+    
+    # download_tess_cdpp()
     recovery_3x1()
     flat_transit_rv_3x3()
     rocky_scatter_gaia60pc()

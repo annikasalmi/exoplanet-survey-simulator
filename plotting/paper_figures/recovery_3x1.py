@@ -15,11 +15,11 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from tools.paths import ( KOI_CUMULATIVE_CSV, EXOFOP_TOI_CSV, PAPER_FIGURES_DIR,
+from tools.paths import ( KOI_CUMULATIVE_CSV, PAPER_FIGURES_DIR, DATA_DIR,
                          CALIBRATION_DIR, TESS_DATA_DIR, KEPLER_DATA_DIR)
 from science.catalogs import nasa_tap_url, read_nasa_csv
 from science.physics import infer_stellar_type
-from plotting.figure_style import PAPER_STYLE
+from tools.plotting_constants import PAPER_STYLE
 
 from science.telescopes.kepler.detection_model import KeplerData
 from science.telescopes.tess.detection_model import TESSData
@@ -33,6 +33,7 @@ KEPLER_DIR = TESS_DIR = RV_DIR = OUT_DIR
 KEPLER_CACHE = OUT_DIR / "koi_stellar_cached.csv"
 TESS_CACHE = OUT_DIR / "toi_cached.csv"
 DEPTH_ERR_CACHE = OUT_DIR / "koi_depth_errors.csv"
+EXOFOP_TOI_CSV = DATA_DIR / "exoplanet_csv" / "exofop_toi.csv"
 PAPER_FIG_DIR = Path(PAPER_FIGURES_DIR)
 PAPER_FIG_DIR.mkdir(parents=True, exist_ok=True)
 

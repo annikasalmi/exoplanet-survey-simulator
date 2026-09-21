@@ -22,8 +22,9 @@ from science.telescopes.detection import (
     build_stellar_selection_panel,
     missed_fraction_in_window,
 )
-from science.catalogs import restrict_science_window
+from science.catalogs import restrict_science_window, load_and_filter_nasa
 from science.statistics import binned_fraction_2d, fit_quantile_power_law
+from science.physics import load_rocky_reference_curve, compute_rocky_threshold_shift
 from plotting.scripts.analysis import rocky_scatter_gaia60pc as rocky_scatter
 
 OUT_DIR = Path(ANALYSIS_DIR) / "flat_transit_rv_3x3"
@@ -102,9 +103,9 @@ def main(paper_copy: bool = True):
     if TRANSIT_MISSION != "TESS":
         rows[0] = (f"Transit test ({TRANSIT_MISSION})", "transit_detected")
         rows[2] = (f"Transit ({TRANSIT_MISSION}) + RV", "joint_detected")
-    m_ref, r_ref = rocky_scatter.load_rocky_reference_curve()
-    shift = rocky_scatter.compute_rocky_threshold_shift(m_ref, r_ref)
-    _, rocky = rocky_scatter.load_and_filter_nasa(m_ref, r_ref, shift)
+    m_ref, r_ref = load_rocky_reference_curve()
+    shift = compute_rocky_threshold_shift(m_ref, r_ref)
+    _, rocky = load_and_filter_nasa(m_ref, r_ref, shift)
     rocky_win = restrict_science_window(
         rocky,
         insolation=rocky_scatter.INSOLATION_LIMITS,

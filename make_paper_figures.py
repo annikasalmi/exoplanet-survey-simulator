@@ -10,8 +10,10 @@ import sys
 import time
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
-PAPER_DIR = ROOT / "results" / "paper"
+from tools.paths import REPO_ROOT, PAPER_FIGURES_DIR
+
+ROOT = REPO_ROOT
+PAPER_DIR = PAPER_FIGURES_DIR
 
 # (script, extra args, figures it writes to results/paper/)
 STEPS = [

@@ -1,7 +1,7 @@
 """Where HWO can see habitable-zone planets in stellar luminosity vs distance.
 Run: python plotting/scripts/plot_hz_limits_simple.py  -> results/figures/other/distance_luminosity_simple.png
 """
-import os
+from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -11,7 +11,7 @@ from tools import physics_constants as const
 from tools.paths import OTHER_FIGURES_DIR
 from tools.plotting_constants import DETECTION_COLORS
 
-OUT_PATH = os.path.join(OTHER_FIGURES_DIR, 'distance_luminosity_simple.png')
+OUT_PATH = OTHER_FIGURES_DIR / 'distance_luminosity_simple.png'
 
 class SimpleHZPlotter:
     """Simplified habitable zone limits plotter."""
@@ -119,7 +119,7 @@ class SimpleHZPlotter:
         
         ax.legend(handles=legend_elements, loc='lower right', fontsize=12)
         plt.tight_layout()
-        os.makedirs(OTHER_FIGURES_DIR, exist_ok=True)
+        OTHER_FIGURES_DIR.mkdir(parents=True, exist_ok=True)
         plt.savefig(OUT_PATH, dpi=300, bbox_inches='tight')
         plt.close(fig)
 

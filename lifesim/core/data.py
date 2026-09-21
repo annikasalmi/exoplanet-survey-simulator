@@ -9,7 +9,7 @@ from astropy.coordinates import SkyCoord, BarycentricMeanEcliptic
 
 from lifesim.util.options import Options
 from lifesim.util.habitable import single_habitable_zone
-from tools.paths import PPOP_DATA_DIR
+from tools.paths import PPOP_TEST_PLANET_POP
 
 
 # TODO: automatically add data storage for all
@@ -45,9 +45,9 @@ class Data(object):
         self.catalog = None
 
     def catalog_from_ppop(self,
-                          format_df = True, 
+                          format_df = True,
                           df = None,
-                          data_path=os.path.join(PPOP_DATA_DIR, 'test_planet_pop.txt'),
+                          data_path=PPOP_TEST_PLANET_POP,
                           input_path: str = '',
                           overwrite: bool = False):
         """

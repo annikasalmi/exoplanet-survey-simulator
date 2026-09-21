@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -22,10 +22,10 @@ class BasePlotter:
         self.nruns = nruns
         self.star_catalog = star_catalog
         self.name = self.DEFAULT_NAME if name is None else name
-        self.data_dir = os.path.join(PLOTS_DIR, str(self.name)+'_'+str(self.nruns)+'_'+str(self.star_catalog))
-        
+        self.data_dir = PLOTS_DIR / f"{self.name}_{self.nruns}_{self.star_catalog}"
+
         # Create plots directory if it doesn't exist
-        os.makedirs(self.data_dir, exist_ok=True)
+        self.data_dir.mkdir(parents=True, exist_ok=True)
         
         # Cache for computed values to avoid recalculation
         self._cache = {}
@@ -58,7 +58,7 @@ class BasePlotter:
         """Save plot with consistent settings."""
         plt.tight_layout()
         outfile = self._output_filename(filename, suffix)
-        plt.savefig(os.path.join(self.data_dir, outfile), dpi=300, bbox_inches='tight')
+        plt.savefig(self.data_dir / outfile, dpi=300, bbox_inches='tight')
         plt.close(fig)
 
     def _validate_data(self) -> bool:

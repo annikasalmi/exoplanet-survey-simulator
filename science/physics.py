@@ -116,8 +116,36 @@ def add_stellar_type(
     return result
 
 
+def load_rocky_reference_curve(path=SILICON_CURVE) -> tuple[np.ndarray, np.ndarray]:
+    """Load silicate curve as (mass, radius) sorted by mass; rocky threshold.
+    Falls back to toy power-law if file is not found.
+    """
+    if not Path(path).exists():
+        print(f"WARNING: {path} not found — using toy power-law rocky curve.")
+        m = np.linspace(0.05, 30.0, 600)
+        return m, m ** 0.27
+    return load_mass_radius_curve(path)
+
+
+def compute_rocky_threshold_shift(m_ref: np.ndarray, r_ref: np.ndarray,
+                                  anchor_mass: float = 5.60,
+                                  anchor_radius: float = 1.730) -> float:
+    """Compute rocky/sub-Neptune cutoff shift based on an anchor planet.
+    Returns shift in Earth radii; prints diagnostic info about the anchor.
+    """
+    r_at_anchor = float(radius_on_curve(anchor_mass, m_ref, r_ref))
+    offset = anchor_radius - r_at_anchor
+    print(
+        f"Rocky curve at {anchor_mass:.2f} M_earth: {r_at_anchor:.4f} R_earth\n"
+        f"Using UNSHIFTED silicate curve as rocky cutoff (shift = +0.000 R_earth; "
+        f"anchor offset would be {offset:+.4f} R_earth)"
+    )
+    return 0.0
+
+
 __all__ = [
     "SUPER_EARTH_MIN_MASS", "add_stellar_type", "blackbody_spectral_radiance",
-    "infer_stellar_type", "is_rocky", "is_super_earth", "is_volatile",
-    "load_mass_radius_curve", "radius_on_curve",
+    "compute_rocky_threshold_shift", "infer_stellar_type", "is_rocky", "is_super_earth",
+    "is_volatile", "load_mass_radius_curve", "load_rocky_reference_curve",
+    "radius_on_curve",
 ]

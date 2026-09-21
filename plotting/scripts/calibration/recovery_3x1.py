@@ -24,8 +24,8 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from tools.paths import (REPO_ROOT, KOI_CUMULATIVE_CSV, EXOFOP_TOI_CSV, PAPER_FIGURES_DIR,
-                         CALIBRATION_DIR, TESS_DATA_DIR, KEPLER_DATA_DIR)
+from tools.paths import (REPO_ROOT, KOI_CUMULATIVE_CSV, PAPER_FIGURES_DIR,
+                         CALIBRATION_DIR, TESS_DATA_DIR, KEPLER_DATA_DIR, _EXOPLANET_CSV_DIR)
 from science.catalogs import nasa_tap_url, read_nasa_csv
 from science.physics import infer_stellar_type
 from plotting.figure_style import PAPER_STYLE
@@ -272,7 +272,7 @@ def tess_load(redownload: bool = False) -> pd.DataFrame:
     """ExoFOP TOI table. Reads the copy in data/; downloads only when DOWNLOAD_NASA_DATA
     (or redownload) is set, and saves what it fetches back to data/.
     """
-    local = Path(EXOFOP_TOI_CSV)
+    local = _EXOPLANET_CSV_DIR / "exofop_toi.csv"
     if local.exists() and not (DOWNLOAD_NASA_DATA or redownload):
         print(f"Loading local TOI table: {local}")
         df = read_nasa_csv(local)

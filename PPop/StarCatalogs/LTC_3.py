@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-from tools.paths import PPOP_DIR, PPOP_STAR_DIR
+from tools.paths import LTC_3_CATALOG
 
 
 # =============================================================================
@@ -29,7 +29,7 @@ class StarCatalog():
                  Stypes=['B', 'A', 'F', 'G', 'K', 'M', 'D'],
                  Dist_range=[0, 30], # pc
                  Dec_range=[-90, 90], # deg
-                 Path=os.path.join(PPOP_DIR,'StarCatalogs','LTC_3.csv')):
+                 Path=LTC_3_CATALOG):
         """
         Parameters
         ----------
@@ -54,7 +54,7 @@ class StarCatalog():
              Stypes=['B', 'A', 'F', 'G', 'K', 'M', 'D'],
              Dist_range=[0, 30], # pc
              Dec_range=[-90, 90], # deg
-             Path=os.path.join(PPOP_STAR_DIR, 'LTC_3.csv')):
+             Path=LTC_3_CATALOG):
         """
         Parameters
         ----------

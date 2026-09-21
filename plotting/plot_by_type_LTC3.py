@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -46,7 +46,7 @@ class PlanetDetectionPlotterLTC3(PlanetDetectionPlotter):
         ax2.set_xlim([bins[0], 305])
         
         plt.tight_layout(rect=[0, 0, 1, 0.95])
-        plt.savefig(os.path.join(self.data_dir, self._output_filename('detection_efficiency_by_type_temp')), 
+        plt.savefig(self.data_dir / self._output_filename('detection_efficiency_by_type_temp'),
                    dpi=300, bbox_inches='tight')
         plt.close(fig)
 
@@ -165,7 +165,7 @@ class PlotPlanetTypeLTC3(PlotPlanetType):
         ax.set_ylim(0, y_max * 1.3)
         
         plt.tight_layout(rect=[0, 0, 1, 0.92])
-        plt.savefig(os.path.join(self.data_dir, self._output_filename('stellar_type_overlay')), 
+        plt.savefig(self.data_dir / self._output_filename('stellar_type_overlay'),
                    dpi=300, bbox_inches='tight')
         plt.close(fig)
 
@@ -273,7 +273,7 @@ class PlotPlanetTypeLTC3(PlotPlanetType):
         ax.set_ylim(0, y_max * 1.3)
         
         plt.tight_layout(rect=[0, 0, 1, 0.92])
-        plt.savefig(os.path.join(self.data_dir, self._output_filename('planet_type_subcategory')), 
+        plt.savefig(self.data_dir / self._output_filename('planet_type_subcategory'),
                    dpi=300, bbox_inches='tight')
         plt.close(fig)
 
@@ -325,7 +325,7 @@ class PlotPlanetTypeLTC3(PlotPlanetType):
         ax.set_ylim(bottom=0)
         
         plt.tight_layout()
-        plt.savefig(os.path.join(self.data_dir, self._output_filename('distance_analysis')), 
+        plt.savefig(self.data_dir / self._output_filename('distance_analysis'),
                    dpi=300, bbox_inches='tight')
         plt.close(fig)
 
@@ -387,7 +387,7 @@ class PlotPlanetTypeLTC3(PlotPlanetType):
         ax.set_ylim(0, 1.1)
         
         plt.tight_layout()
-        plt.savefig(os.path.join(self.data_dir, self._output_filename('detection_efficiency_rocky_habitable')), 
+        plt.savefig(self.data_dir / self._output_filename('detection_efficiency_rocky_habitable'),
                    dpi=300, bbox_inches='tight')
         plt.close(fig)
 

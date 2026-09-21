@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import os
-
+from pathlib import Path
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -14,8 +13,8 @@ from tools.paths import PLOTS_DIR
 
 def plot_population(df, *, name):
     """Plot the supplied catalog without generating or modifying its population."""
-    out_dir = os.path.join(PLOTS_DIR, name)
-    os.makedirs(out_dir, exist_ok=True)
+    out_dir = PLOTS_DIR / name
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Plotting {name} ({len(df):,} planets)")
 

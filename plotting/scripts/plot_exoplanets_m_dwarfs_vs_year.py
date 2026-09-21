@@ -4,9 +4,9 @@ Run: python plotting/scripts/plot_exoplanets_m_dwarfs_vs_year.py  -> results/fig
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
-from tools.paths import EXOPLANETS_ALL_2025_CSV, OTHER_FIGURES_DIR
+from tools.paths import EXOPLANETS_2026_CSV, OTHER_FIGURES_DIR
 
-df = pd.read_csv(EXOPLANETS_ALL_2025_CSV)
+df = pd.read_csv(EXOPLANETS_2026_CSV)
 
 # Filter for planets with R < 2.6 R_earth and stellar temperature < 4000K
 filtered = df[(df['pl_rade'] < 2.6) & (df['st_teff'] < 4000)]

@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -268,9 +268,8 @@ class PlotPlanetType(BasePlotter):
             #             )
         
         plt.tight_layout()
-        
-        plt.savefig(os.path.join(self.data_dir, 
-                                self._output_filename('stellar_type_overlay')),
+
+        plt.savefig(self.data_dir / self._output_filename('stellar_type_overlay'),
                    bbox_inches='tight')
         plt.close(fig)
 

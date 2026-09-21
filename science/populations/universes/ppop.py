@@ -7,7 +7,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from tools.paths import PPOP_DATA_DIR
+from tools.paths import PPOP_TEST_PLANET_POP
 
 M_STAR_BOOST = 1  # Gaia-60pc is already M-dwarf-complete; 1 disables duplication.
 
@@ -77,7 +77,7 @@ class PPop:
         # self.options.set_manual(output_path='data')
         # self.options.set_manual(output_filename=self.Name)
 
-    def run_ppop(self, data_path=os.path.join(PPOP_DATA_DIR, 'test_planet_pop.txt')):
+    def run_ppop(self, data_path=PPOP_TEST_PLANET_POP):
         from PPop import SystemGenerator
         from astropy.table import vstack as astropy_vstack
 
@@ -121,7 +121,7 @@ class PPop:
                                 nuniverses)
         return df
 
-    def catalog_from_ppop(self,data_path=os.path.join(PPOP_DATA_DIR, 'test_planet_pop.txt'),
+    def catalog_from_ppop(self,data_path=PPOP_TEST_PLANET_POP,
                             overwrite: bool = False, df=None):
         """
         Read the contents of the P-Pop output file (in .txt or .fits format) to a catalog. Note that reading catalogs

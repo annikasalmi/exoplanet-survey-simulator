@@ -353,10 +353,39 @@ def load_and_filter_exoplanets(csv_path, instrument="LIFE") -> pd.DataFrame:
     return frame
 
 
+def load_and_filter_nasa(csv_path, m_ref, r_ref, shift: float,
+                         redownload: bool = False,
+                         download_if_missing: bool = False,
+                         exclude_mass_limits: bool = True,
+                         exclude_radius_limits: bool = True,
+                         require_two_sided_mass: bool = True,
+                         require_two_sided_radius: bool = True,
+                         max_mass_rel_uncertainty: float = 0.5,
+                         max_radius_rel_uncertainty: float = 0.5) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Load and filter NASA rocky planets catalog with quality cuts and threshold.
+
+    Returns (all_quality_filtered, rocky_filtered) DataFrames filtered against
+    a rocky mass-radius reference curve with optional vertical shift.
+    """
+    raw = load_nasa_rocky_source(
+        csv_path,
+        redownload=redownload,
+        download_if_missing=download_if_missing,
+    )
+    cuts = {**DEFAULT_ROCKY_CATALOG_CUTS,
+            "exclude_mass_limits": exclude_mass_limits,
+            "exclude_radius_limits": exclude_radius_limits,
+            "require_two_sided_mass": require_two_sided_mass,
+            "require_two_sided_radius": require_two_sided_radius,
+            "max_mass_relative_uncertainty": max_mass_rel_uncertainty,
+            "max_radius_relative_uncertainty": max_radius_rel_uncertainty}
+    return filter_rocky_catalog(raw, m_ref, r_ref, shift=shift, cuts=cuts)
+
+
 __all__ = [
     "COMPARISON_PARAMETER_BOX", "DEFAULT_ROCKY_CATALOG_CUTS",
     "FGKM_TEMPERATURE_BOUNDS", "filter_rocky_catalog",
-    "load_and_filter_exoplanets", "load_measured_planets",
+    "load_and_filter_exoplanets", "load_and_filter_nasa", "load_measured_planets",
     "load_nasa_rocky_source", "parameter_box_mask", "read_nasa_csv",
     "nasa_tap_url", "restrict_science_window",
 ]

@@ -16,21 +16,18 @@ import pandas as pd
 
 from tools.paths import (
     SILICON_CURVE, ANALYSIS_DIR, PAPER_FIGURES_DIR, KEPLER_DATA_DIR,
-    TESS_DATA_DIR, KEPLER_REF_CURVE, PSCOMPPARS_TRANSITING_CSV,
+    TESS_DATA_DIR, REPO_ROOT, _EXOPLANET_CSV_DIR,
 )
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch, Rectangle
 from matplotlib.ticker import FuncFormatter, NullFormatter
 
-from science.catalogs import (
-    DEFAULT_ROCKY_CATALOG_CUTS,
-    filter_rocky_catalog,
-    load_nasa_rocky_source,
-    restrict_science_window,
-)
+from science.catalogs import load_and_filter_nasa, restrict_science_window
 from science.physics import (
+    compute_rocky_threshold_shift,
     load_mass_radius_curve,
+    load_rocky_reference_curve,
     radius_on_curve,
 )
 from science.statistics import (
@@ -40,26 +37,17 @@ from science.statistics import (
 from science.telescopes.detection import prepare_kepler_catalog, prepare_tess_catalog
 
 
-# ── Project root ──────────────────────────────────────────────────────────────
-
-def find_project_root(start_path: Path) -> Path:
-    start_path = start_path.resolve()
-    for p in [start_path] + list(start_path.parents):
-        if (p / "run" / "kepler").exists() and (p / "run" / "tess").exists():
-            return p
-    return start_path.parents[2]
-
-
-ROOT = find_project_root(Path(__file__).resolve())
-
-# ── Paths ─────────────────────────────────────────────────────────────────────
-
-# Stack the first N_UNIVERSES seeded Gaia-60pc universes (<stem>_<i>.csv) to smooth the sparse
-# FGK background. Files are listed by index, not globbed, so stale higher-numbered runs are ignored.
+ROOT = REPO_ROOT
 N_UNIVERSES = 10
 
-KEPLER_PPOP_DIR = Path(KEPLER_DATA_DIR) / "Gaia"
-TESS_PPOP_DIR   = Path(TESS_DATA_DIR) / "Gaia"
+KEPLER_PPOP_DIR = KEPLER_DATA_DIR / "Gaia"
+TESS_PPOP_DIR   = TESS_DATA_DIR / "Gaia"
+REF_CURVE_PATH = REPO_ROOT / "science" / "telescopes" / "kepler" / "reference_curves" / "ref.ddat"
+ROCKY_CURVE_PATH = SILICON_CURVE
+ROCKY_CURVE_LABEL = "silicate rocky curve"
+NASA_FLAGS_CACHE = _EXOPLANET_CSV_DIR / "pscomppars_transiting_mass_insol.csv"
+OUT_DIR = ANALYSIS_DIR / "rocky_scatter_gaia60pc"
+PAPER_FIG_DIR = PAPER_FIGURES_DIR
 
 
 def _ppop_files(directory: Path, stem: str) -> list[Path]:
@@ -77,21 +65,6 @@ def _ppop_files(directory: Path, stem: str) -> list[Path]:
         print(f"  [warn] {len(missing)} expected universe(s) missing, "
               f"stacking {len(present)}: missing {missing}")
     return present
-
-# Pure-rock reference curve (kept as the BLACK comparison line in the M-R
-# diagnostic only; it no longer defines the threshold).
-REF_CURVE_PATH = Path(KEPLER_REF_CURVE)
-
-# Silicate mass-radius curve (silicon_curve.ddat; cols 0,1 = mass, radius in Earth units).
-# It is the rocky threshold that separates rocky planets from sub-Neptunes throughout this script.
-ROCKY_CURVE_PATH  = Path(SILICON_CURVE)
-ROCKY_CURVE_LABEL = "silicate rocky curve"
-
-NASA_FLAGS_CACHE = Path(PSCOMPPARS_TRANSITING_CSV)
-
-OUT_DIR = Path(ANALYSIS_DIR) / "rocky_scatter_gaia60pc"
-
-PAPER_FIG_DIR = Path(PAPER_FIGURES_DIR)
 
 # ── LHS 1140 b anchor ────────────────────────────────────────────────────────
 
@@ -141,52 +114,6 @@ FACILITY_RELABEL = {
 }
 
 
-# ── Rocky threshold ───────────────────────────────────────────────────────────
-
-def load_rocky_reference_curve():
-    """Load the silicate curve (silicon_curve.ddat) as (mass, radius) sorted by mass.
-    It is the rocky threshold separating rocky planets from sub-Neptunes.
-    """
-    if not ROCKY_CURVE_PATH.exists():
-        print(f"WARNING: {ROCKY_CURVE_PATH} not found — using toy power-law rocky curve.")
-        m = np.linspace(0.05, 30.0, 600)
-        return m, m ** 0.27
-    return load_mass_radius_curve(ROCKY_CURVE_PATH)
-
-
-def compute_rocky_threshold_shift(m_ref: np.ndarray, r_ref: np.ndarray) -> float:
-    """Rocky/sub-Neptune cutoff shift: 0.0, since the unshifted silicate curve is the cutoff.
-    The LHS 1140 b anchor offset (~0) is only reported; compute_anchor_shift() still draws it.
-    """
-    r_at_lhs = float(radius_on_curve(LHS1140B_MASS_MEARTH, m_ref, r_ref))
-    anchor = LHS1140B_RADIUS_REARTH - r_at_lhs
-    print(
-        f"Rocky curve at LHS 1140 b mass ({LHS1140B_MASS_MEARTH} M⊕): {r_at_lhs:.4f} R⊕\n"
-        f"Using UNSHIFTED silicate curve as rocky cutoff (shift = +0.000 R⊕; "
-        f"LHS 1140 b anchor offset would be {anchor:+.4f} R⊕)"
-    )
-    return 0.0
-
-
-# ── NASA PSCompPars ───────────────────────────────────────────────────────────
-
-
-def load_and_filter_nasa(m_ref, r_ref, shift: float) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Return (all_quality_filtered, rocky_filtered) DataFrames."""
-    raw = load_nasa_rocky_source(
-        NASA_FLAGS_CACHE,
-        redownload=FORCE_REDOWNLOAD_NASA,
-        download_if_missing=DOWNLOAD_NASA_IF_MISSING,
-    )
-
-    cuts = {**DEFAULT_ROCKY_CATALOG_CUTS,
-            "exclude_mass_limits": EXCLUDE_MASS_LIMITS,
-            "exclude_radius_limits": EXCLUDE_RADIUS_LIMITS,
-            "require_two_sided_mass": REQUIRE_TWO_SIDED_MASS,
-            "require_two_sided_radius": REQUIRE_TWO_SIDED_RADIUS,
-            "max_mass_relative_uncertainty": MAX_MASS_REL_UNCERTAINTY,
-            "max_radius_relative_uncertainty": MAX_RADIUS_REL_UNCERTAINTY}
-    return filter_rocky_catalog(raw, m_ref, r_ref, shift=shift, cuts=cuts)
 
 
 

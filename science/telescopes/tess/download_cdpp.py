@@ -1,6 +1,6 @@
 """Download the per-sector SPOC RMS CDPP tables (sectors 1..MAX_SECTOR, ~230 MB) from the MAST TCE
 bulk-download page into results/catalogs/tess/CDPP, skipping files already there. tess_calibration.py
-and build_reference_data.py read them; the TESS P-Pop pipeline does not.
+and data_processing.py read them; the TESS P-Pop pipeline does not.
 Run from repo root:  python science/telescopes/tess/download_cdpp.py
 """
 
@@ -10,7 +10,7 @@ import urllib.request
 from pathlib import Path
 
 from tools.paths import CDPP_DIR
-from science.telescopes.tess.build_reference_data import MAX_SECTOR
+from science.telescopes.tess.data_processing import MAX_SECTOR
 
 PAGE_URL = "https://archive.stsci.edu/tess/bulk_downloads/bulk_downloads_tce.html"
 FILE_URL = "https://archive.stsci.edu/missions/tess/catalogs/cdpp/{}"

@@ -379,8 +379,8 @@
       "source": {
         "landing_url": "https://archive.stsci.edu/tess/bulk_downloads/bulk_downloads_tce.html",
         "upstream_url_template": "https://archive.stsci.edu/missions/tess/catalogs/cdpp/{filename}",
-        "transform": "science/telescopes/tess/build_reference_data.py build_noise: keep sectors <=106, bin Tmag to 0.5 mag, take median CDPP per sector/bin and across all sectors (sector 0), retain bins with at least 10 target-sectors.",
-        "query_provenance": "Exact discovery/download and aggregation code is in science/telescopes/tess/download_cdpp.py and build_reference_data.py."
+        "transform": "science.telescopes.tess.data_processing.build_noise(...): keep sectors <=106, bin Tmag to 0.5 mag, take median CDPP per sector/bin and across all sectors (sector 0), retain bins with at least 10 target-sectors.",
+        "query_provenance": "Exact discovery/download and aggregation code is in science/telescopes/tess/download_cdpp.py and science/telescopes/tess/data_processing.py."
       },
       "snapshot": {
         "downloaded_at": null,
@@ -399,7 +399,7 @@
       },
       "update": {
         "mode": "rebuild",
-        "command": "python science/telescopes/tess/download_cdpp.py && python science/telescopes/tess/build_reference_data.py noise",
+        "command": "download CDPP tables, then call science.telescopes.tess.data_processing.build_noise(TESSData.CDPP_COLS, cdpp_dir)",
         "note": "MAX_SECTOR=106 is part of this snapshot definition; review and rename the dataset if extending it."
       },
       "integrity": {
@@ -416,7 +416,7 @@
       "license_policy_ref": "tess-point",
       "source": {
         "landing_url": "https://github.com/tessgi/tess-point",
-        "generator": "science/telescopes/tess/build_reference_data.py build_grid",
+        "generator": "science.telescopes.tess.data_processing.build_grid()",
         "parameters": {
           "max_sector": 106,
           "n_lon": 360,
@@ -444,7 +444,7 @@
       },
       "update": {
         "mode": "rebuild",
-        "command": "python science/telescopes/tess/build_reference_data.py grid",
+        "command": "call science.telescopes.tess.data_processing.build_grid()",
         "note": "Requires the tess extra: pip install -e \".[tess]\"."
       },
       "integrity": {

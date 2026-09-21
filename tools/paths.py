@@ -18,6 +18,7 @@ RV_DATA_DIR = CATALOGS_DIR / "rv"
 HWO_DATA_DIR = CATALOGS_DIR / "hwo"
 LIFESIM_DATA_DIR = CATALOGS_DIR / "lifesim"
 FLAT_UNIVERSE_DATA_DIR = CATALOGS_DIR / "flat_universe"
+TESS_REFERENCE_DATA_DIR = REPO_ROOT / "science" / "telescopes" / "tess" / "data"
 
 FIGURES_DIR = RESULTS_DIR / "figures"
 PLOTS_DIR = FIGURES_DIR / "simulation"

@@ -47,7 +47,7 @@ setup(
                       'spectres',
                       'tables>=3.8.0',
                       'tqdm>=4.64.1'],
-    # `tess`: only for rebuilding the committed TESS sector grid (build_reference_data.py).
+    # `tess`: only for rebuilding the committed TESS sector grid (tess/data_processing.py).
     extras_require={'test': ['pytest>=6.0.0', 'pytest-cov>=2.10.0'],
                     'tess': ['tess-point']},
     license='GPLv3',

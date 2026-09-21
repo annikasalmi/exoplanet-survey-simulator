@@ -13,6 +13,19 @@ from tools.paths import SILICON_CURVE
 SUPER_EARTH_MIN_MASS = 2.0
 
 
+def apparent_bolometric_mag(l_sun, distance_pc):
+    """Apparent bolometric magnitude from luminosity in Lsun and distance in parsec."""
+    l_sun = np.asarray(l_sun, dtype=float)
+    distance_pc = np.asarray(distance_pc, dtype=float)
+    return 4.74 - 2.5 * np.log10(l_sun) + 5 * np.log10(distance_pc / 10.0)
+
+
+def semimajor_axis_from_period(p_days, mstar_msun=1.0):
+    """Kepler's third law in solar units: a_AU = (M_star * P_year^2)^(1/3)."""
+    p_year = np.asarray(p_days, dtype=float) / 365.25
+    return (np.asarray(mstar_msun, dtype=float) * p_year ** 2) ** (1.0 / 3.0)
+
+
 def blackbody_spectral_radiance(wavelength_m, temperature):
     """Planck spectral radiance in W sr⁻¹ m⁻³ with stable large exponents."""
     wavelength = np.asarray(wavelength_m, dtype=float)

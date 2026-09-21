@@ -35,15 +35,18 @@ import numpy as np
 import pandas as pd
 
 from science import physics_constants as const
-from science.physics import infer_stellar_type
-
-try:
-    from lifesim.core.data import Data
-except Exception:  # lets this file import outside the lifesim environment
-    Data = None
+from science.physics import apparent_bolometric_mag
+from science.telescopes.rv import data_processing
 
 
 class RVData:
+    TEFF_GRID = np.array([2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 7000, 8000], dtype=float)
+    BC_GRIDS = {
+        "V": np.array([-4.0, -2.6, -1.6, -1.0, -0.6, -0.35, -0.2, -0.1, -0.05, -0.1], dtype=float),
+        "J": np.array([2.30, 2.10, 1.90, 1.70, 1.55, 1.45, 1.35, 1.25, 1.00, 0.70], dtype=float),
+    }
+    RV_K_PREFACTOR_MS = 28.4329
+
     # Per-instrument presets. NIRPS (J band) sees M dwarfs bright and less jittery, covering where
     # HARPS fails; take the per-planet best instrument, don't average. Constants from published
     # campaigns (e.g. HARPS-N TOI-1453: 100 points, 1.56 m/s). phot_full_mag = faintest mag that
@@ -97,9 +100,6 @@ class RVData:
         stellar_mass_radius_exponent: float = 1.0,
         validate_for_detection: bool = True,
     ):
-        self.catalog = self._as_dataframe(data)
-        self.source = self._infer_source(source)
-
         # Resolve instrument preset; explicit kwargs (not None) override preset values.
         self.instrument = str(instrument).upper().strip()
         preset = self.INSTRUMENT_PRESETS.get(self.instrument, self.INSTRUMENT_PRESETS["HARPS"])
@@ -107,15 +107,8 @@ class RVData:
 
         # Teff -> bolometric correction (M_bol = M_band + BC_band, so M_band = M_bol - BC_band).
         # V makes cool stars faint for optical RV; J makes them bright for NIRPS.
-        self.teff_grid = np.array([2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 7000, 8000], dtype=float)
-        self.bc_grids = {
-            "V": np.array([-4.0, -2.6, -1.6, -1.0, -0.6, -0.35, -0.2, -0.1, -0.05, -0.1], dtype=float),
-            "J": np.array([2.30, 2.10, 1.90, 1.70, 1.55, 1.45, 1.35, 1.25, 1.00, 0.70], dtype=float),
-        }
-        if self.band not in self.bc_grids:
-            raise ValueError(f"band must be one of {list(self.bc_grids)}, got {self.band!r}")
-
-        self.rv_k_prefactor_ms = 28.4329
+        if self.band not in self.BC_GRIDS:
+            raise ValueError(f"band must be one of {list(self.BC_GRIDS)}, got {self.band!r}")
         self.sigma_instr_ms = float(sigma_instr_ms if sigma_instr_ms is not None else preset["sigma_instr_ms"])
         self.sigma_phot_ref_ms = float(sigma_phot_ref_ms if sigma_phot_ref_ms is not None else preset["sigma_phot_ref_ms"])
         self.phot_full_mag = float(phot_full_mag if phot_full_mag is not None else preset["phot_full_mag"])
@@ -133,104 +126,11 @@ class RVData:
         self.sigmoid_steepness = float(sigmoid_steepness)
         self.stellar_mass_radius_exponent = float(stellar_mass_radius_exponent)
 
-        self.catalog = self._standardize(self.catalog, self.source)
-        self._add_basic_columns()
-        if validate_for_detection:
-            self._validate()
-
-    # ------------------------------------------------------------------
-    # Setup / standardization
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _as_dataframe(data) -> pd.DataFrame:
-        if Data is not None and isinstance(data, Data):
-            return pd.DataFrame(data.catalog).copy()
-        if isinstance(data, pd.DataFrame):
-            return data.copy()
-        return pd.DataFrame(data).copy()
-
-    def _infer_source(self, source: str) -> str:
-        source = str(source).lower().strip()
-        if source != "auto":
-            return source
-        cols = set(self.catalog.columns)
-        if {"pl_name", "pl_bmasse"}.issubset(cols) or {"pl_name", "pl_msinie"}.issubset(cols):
-            return "pscomppars"
-        if {"kepoi_name", "koi_prad"}.issubset(cols):
-            return "koi"
-        return "ppop"
-
-    def _standardize(self, df: pd.DataFrame, source: str) -> pd.DataFrame:
-        df = df.copy()
-        rename = {
-            # NASA PSCompPars
-            "pl_name": "planet_name", "hostname": "host_name",
-            "pl_orbper": "p_orb", "pl_orbsmax": "semimajor_p", "pl_orbincl": "inc_p",
-            "pl_orbeccen": "ecc_p", "pl_rade": "radius_p",
-            "pl_bmasse": "mass_p", "pl_msinie": "msini_p",
-            "pl_rvamp": "rv_amp_obs", "pl_insol": "flux_p",
-            "st_rad": "radius_s", "st_mass": "mass_s", "st_teff": "teff_s",
-            "st_lum": "st_lum_log10", "sy_dist": "distance_s",
-            "sy_vmag": "vmag", "sy_gaiamag": "gaiamag",
-            # KOI-ish
-            "kepoi_name": "planet_name", "koi_period": "p_orb", "koi_prad": "radius_p",
-            "koi_incl": "inc_p", "koi_srad": "radius_s", "koi_smass": "mass_s",
-            "koi_steff": "teff_s", "koi_insol": "flux_p",
-            # P-Pop aliases
-            "luminosity_s": "l_sun", "temp_s": "teff_s", "insolation": "flux_p",
-            "Vmag": "vmag", "gaia_g_mag": "gaiamag",
-        }
-        # Apply one at a time: several source names can map to the same target
-        # (st_teff and temp_s both mean teff_s), and a single comprehension
-        # evaluates its guard against the original columns, so both would pass
-        # and produce two columns with one name.
-        for src_col, dst_col in rename.items():
-            if src_col in df.columns and dst_col not in df.columns:
-                df = df.rename(columns={src_col: dst_col})
-
-        if "st_lum_log10" in df.columns and "l_sun" not in df.columns:
-            df["l_sun"] = 10 ** pd.to_numeric(df["st_lum_log10"], errors="coerce")
-
-        for col in ["mass_p", "msini_p", "radius_p", "p_orb", "semimajor_p", "inc_p",
-                    "ecc_p", "radius_s", "mass_s", "teff_s", "l_sun", "distance_s",
-                    "flux_p", "vmag", "gaiamag", "rv_amp_obs"]:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors="coerce")
-
-        df["dataset_source"] = {
-            "pscomppars": "NASA_PSCompPars", "nasa": "NASA_PSCompPars", "koi": "NASA_KOI",
-        }.get(source, "P-Pop_simulated")
-        return df
-
-    def _add_basic_columns(self) -> None:
-        if "stype" not in self.catalog.columns:
-            teff = self.catalog.get("teff_s", pd.Series(np.nan, index=self.catalog.index))
-            self.catalog["stype"] = infer_stellar_type(teff)
-        else:
-            # normalize to single uppercase letter
-            self.catalog["stype"] = (
-                self.catalog["stype"].astype(str).str.strip().str.upper().str[0]
-                .where(lambda s: s.isin(["A", "F", "G", "K", "M"]), "Unknown")
-            )
-        if "ecc_p" not in self.catalog.columns:
-            self.catalog["ecc_p"] = 0.0
-        self.catalog["ecc_p"] = pd.to_numeric(self.catalog["ecc_p"], errors="coerce").fillna(0.0).clip(0.0, 0.95)
-        if "habitable" not in self.catalog.columns and "flux_p" in self.catalog.columns:
-            flux = pd.to_numeric(self.catalog["flux_p"], errors="coerce")
-            self.catalog["habitable"] = (flux >= 0.25) & (flux <= 2.0)
-
-    def _validate(self) -> None:
-        required = ["mass_p", "p_orb"]
-        missing = [c for c in required if c not in self.catalog.columns]
-        # mass_p may be absent for NASA rows that only carry msini_p
-        if "mass_p" in missing and "msini_p" in self.catalog.columns:
-            missing.remove("mass_p")
-        if missing:
-            raise ValueError(
-                f"Missing required RV detection columns: {missing}. "
-                "Need a planet mass (mass_p or msini_p) and orbital period (p_orb)."
-            )
+        self.catalog, self.source = data_processing.prepare_catalog(
+            data,
+            source,
+            validate_for_detection=validate_for_detection,
+        )
 
     # ------------------------------------------------------------------
     # Flat-universe input: stellar mass and instrumental brightness
@@ -272,10 +172,10 @@ class RVData:
             return pd.Series(np.nan, index=self.catalog.index)
         l = pd.to_numeric(self.catalog["l_sun"], errors="coerce").clip(lower=1e-12)
         d = pd.to_numeric(self.catalog["distance_s"], errors="coerce").clip(lower=1e-6)
-        m_bol = 4.74 - 2.5 * np.log10(l) + 5 * np.log10(d / 10.0)
+        m_bol = pd.Series(apparent_bolometric_mag(l, d), index=self.catalog.index)
         if "teff_s" in self.catalog.columns:
             teff = pd.to_numeric(self.catalog["teff_s"], errors="coerce")
-            bc = pd.Series(np.interp(teff.clip(2500, 8000).to_numpy(float), self.teff_grid, bc_grid),
+            bc = pd.Series(np.interp(teff.clip(2500, 8000).to_numpy(float), self.TEFF_GRID, bc_grid),
                            index=self.catalog.index)
             return m_bol - bc  # M_bol = M_band + BC_band
         return m_bol
@@ -287,7 +187,7 @@ class RVData:
         if "vmag" in self.catalog.columns:
             cv = pd.to_numeric(self.catalog["vmag"], errors="coerce")
             v = v.where(cv.isna(), cv); src = src.where(cv.isna(), "vmag_catalog")
-        m_v = self._mag_from_lum(self.bc_grids["V"])
+        m_v = self._mag_from_lum(self.BC_GRIDS["V"])
         need = v.isna() & m_v.notna()
         v = v.where(~need, m_v); src = src.where(~need, "vmag_from_lum_distance_bc")
         if "gaiamag" in self.catalog.columns:
@@ -306,7 +206,7 @@ class RVData:
         if self.band == "V":
             mag = v.copy(); src = self.catalog["rv_vmag_source"].copy()
         else:
-            mag = self._mag_from_lum(self.bc_grids[self.band])
+            mag = self._mag_from_lum(self.BC_GRIDS[self.band])
             src = pd.Series(f"mag_{self.band}_from_lum_distance_bc", index=self.catalog.index, dtype=object)
             # fall back to V where the band magnitude could not be built
             mag = mag.where(mag.notna(), v)
@@ -357,7 +257,7 @@ class RVData:
         ecc = pd.to_numeric(self.catalog["ecc_p"], errors="coerce").fillna(0.0).clip(0.0, 0.95)
 
         k = (
-            self.rv_k_prefactor_ms
+            self.RV_K_PREFACTOR_MS
             * m_jup
             * mstar ** (-2.0 / 3.0)
             * p_yr ** (-1.0 / 3.0)
@@ -459,8 +359,6 @@ class RVData:
         Calibration rows can carry published pl_rvamp -> rv_amp_obs for comparison, but
         the detector always uses the same forward model for K and sigma_K.
         """
-        self._validate()
-
         # 1. Forward model the RV signal and its uncertainty.
         snr = self.calc_snr()
 

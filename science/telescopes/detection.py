@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from science import physics_constants as const
 from science.catalogs import parameter_box_mask, restrict_science_window
 from science.physics import add_stellar_type, is_super_earth, radius_on_curve
 from science.universes.flat_baseline import flat_nonphysical
@@ -149,7 +150,7 @@ def prepare_tess_catalog(
             frame[column] = True
     if "tess_enough_transits" not in frame:
         frame["tess_enough_transits"] = (
-            pd.to_numeric(frame["tess_n_transits"], errors="coerce") >= 2
+            pd.to_numeric(frame["tess_n_transits"], errors="coerce") >= 3
             if "tess_n_transits" in frame else True
         )
     required = [
@@ -339,8 +340,8 @@ def select_rocky_transiting(catalog, curve_mass, curve_radius, *, minimum_radius
     selected = catalog[
         rocky & (catalog["radius_p"].to_numpy() > minimum_radius)
     ].copy()
-    stellar_radius_au = selected["radius_s"].to_numpy() * TESSData.R_SUN_AU
-    planet_radius_au = selected["radius_p"].to_numpy() * TESSData.R_EARTH_AU
+    stellar_radius_au = selected["radius_s"].to_numpy() * const.R_SUN_IN_AU
+    planet_radius_au = selected["radius_p"].to_numpy() * const.R_EARTH_IN_AU
     impact = (
         selected["semimajor_p"].to_numpy()
         * np.abs(np.cos(selected["inc_p"].to_numpy()))

@@ -28,14 +28,11 @@ from typing import Union
 import numpy as np
 import pandas as pd
 
-from science import physics_constants as const
-from science.physics import infer_stellar_type
+from science.physics import (
+    apparent_bolometric_mag,
+)
+from science.telescopes.kepler import data_processing
 from science.telescopes import transit_shape
-
-try:
-    from lifesim.core.data import Data
-except Exception:  # lets this file import outside the lifesim environment
-    Data = None
 
 
 class KeplerData:
@@ -73,17 +70,6 @@ class KeplerData:
         detection_model: str = "threshold",
         sigmoid_steepness: float = 1.5,
     ):
-        if Data is not None and isinstance(data, Data):
-            self.catalog = pd.DataFrame(data.catalog)
-        elif isinstance(data, pd.DataFrame):
-            self.catalog = data.copy()
-        else:
-            self.catalog = pd.DataFrame(data)
-
-        if self.catalog is None or not isinstance(self.catalog, pd.DataFrame):
-            raise ValueError("Catalog must be a valid pandas DataFrame.")
-
-        self.source = self._infer_source(source)
         self.mission_duration_days = mission_duration_days
         self.min_transits = min_transits
         self.mes_threshold = mes_threshold
@@ -120,225 +106,12 @@ class KeplerData:
         self.assume_bright_if_kepmag_missing_for_nasa = assume_bright_if_kepmag_missing_for_nasa
         self.estimate_missing_semimajor_axis = estimate_missing_semimajor_axis
 
-        # Make outside datasets speak the local project language.
-        self.catalog = self.standardize_catalog_columns(self.catalog, self.source)
-        self.nasa_like_source = self.source in {"pscomppars", "ps", "nasa", "koi"}
-        self._add_basic_helper_columns()
-
-        if self.estimate_missing_semimajor_axis:
-            self._estimate_missing_semimajor_axis_if_possible()
-
-        if validate_for_detection:
-            self._validate_detection_columns()
-
-    # ============================================================
-    # Source inference and column standardization
-    # ============================================================
-
-    def _infer_source(self, source: str) -> str:
-        source = str(source).lower().strip()
-        if source != "auto":
-            return source
-
-        cols = set(self.catalog.columns)
-        if {"pl_name", "pl_rade", "pl_insol"}.issubset(cols):
-            return "pscomppars"
-        if {"kepoi_name", "koi_prad", "koi_insol"}.issubset(cols):
-            return "koi"
-        return "ppop"
-
-    @staticmethod
-    def standardize_catalog_columns(df: pd.DataFrame, source: str) -> pd.DataFrame:
-        """Rename NASA / KOI / P-Pop columns to the shared internal names: mass_p, radius_p [Earth],
-        flux_p [Earth insolation], radius_s [Sun], semimajor_p [AU], p_orb [d], inc_p [deg], kepmag.
-        """
-        df = df.copy()
-        source = str(source).lower().strip()
-
-        ps_map = {
-            "pl_name": "planet_name",
-            "hostname": "host_name",
-            "discoverymethod": "discovery_method",
-            "disc_facility": "discovery_facility",
-            "disc_telescope": "discovery_telescope",
-            "tran_flag": "tran_flag",
-            "pl_orbper": "p_orb",
-            "pl_orbsmax": "semimajor_p",
-            "pl_rade": "radius_p",
-            "pl_bmasse": "mass_p",
-            "pl_masse": "mass_p",
-            "pl_insol": "flux_p",
-            "pl_orbincl": "inc_p",
-            "st_rad": "radius_s",
-            "st_mass": "mass_s",
-            "st_teff": "teff_s",
-            "st_lum": "st_lum_log10",
-            "sy_dist": "distance_s",
-            "sy_kepmag": "kepmag",
-            "sy_gaiamag": "gaiamag",
-            "pl_trandep": "observed_transit_depth_percent",
-            "pl_trandur": "observed_transit_duration_hr",
-            "pl_bmasse_reflink": "mass_reference",
-            "pl_rade_reflink": "radius_reference",
-        }
-
-        koi_map = {
-            "kepid": "kepid",
-            "kepoi_name": "planet_name",
-            "kepler_name": "kepler_name",
-            "koi_disposition": "koi_disposition",
-            "koi_pdisposition": "koi_pdisposition",
-            "koi_score": "koi_score",
-            "koi_period": "p_orb",
-            "koi_prad": "radius_p",
-            "koi_sma": "semimajor_p",
-            "koi_insol": "flux_p",
-            "koi_depth": "observed_transit_depth_ppm",
-            "koi_duration": "observed_transit_duration_hr",
-            "koi_ror": "observed_radius_ratio",
-            "koi_incl": "inc_p",
-            "koi_steff": "teff_s",
-            "koi_srad": "radius_s",
-            "koi_smass": "mass_s",
-            "koi_kepmag": "kepmag",
-        }
-
-        # Helpful P-Pop / older-project aliases, only used when internal column missing.
-        generic_map = {
-            "luminosity_s": "l_sun",
-            "temp_s": "teff_s",
-            "star_teff": "teff_s",
-            "pl_insol": "flux_p",
-            "insolation": "flux_p",
-        }
-
-        if source in {"pscomppars", "ps", "nasa"}:
-            rename_map = {k: v for k, v in ps_map.items() if k in df.columns and v not in df.columns}
-            df = df.rename(columns=rename_map)
-            df["dataset_source"] = "NASA_PSCompPars"
-
-        elif source == "koi":
-            rename_map = {k: v for k, v in koi_map.items() if k in df.columns and v not in df.columns}
-            df = df.rename(columns=rename_map)
-            df["dataset_source"] = "NASA_KOI"
-
-        elif source == "ppop":
-            df["dataset_source"] = "P-Pop_simulated"
-
-        else:
-            raise ValueError("source must be one of: ppop, pscomppars, nasa, ps, koi")
-
-        # Apply generic aliases after source-specific renaming.
-        rename_map = {k: v for k, v in generic_map.items() if k in df.columns and v not in df.columns}
-        if rename_map:
-            df = df.rename(columns=rename_map)
-
-        # PSCompPars st_lum is log10(L/Lsun). Convert to L/Lsun if present.
-        if "st_lum_log10" in df.columns and "l_sun" not in df.columns:
-            st_lum = pd.to_numeric(df["st_lum_log10"], errors="coerce")
-            df["l_sun"] = 10 ** st_lum
-            df["l_sun_source"] = "10**st_lum_from_PSCompPars"
-
-        # Make important columns numeric.
-        numeric_cols = [
-            "mass_p", "radius_p", "flux_p", "radius_s", "mass_s", "teff_s",
-            "semimajor_p", "p_orb", "inc_p", "kepmag", "gaiamag", "distance_s",
-            "observed_transit_depth_ppm", "observed_transit_depth_percent",
-            "observed_transit_duration_hr", "l_sun",
-            "rrmscdpp01p5", "rrmscdpp02p0", "rrmscdpp02p5", "rrmscdpp03p0",
-            "rrmscdpp03p5", "rrmscdpp04p5", "rrmscdpp05p0", "rrmscdpp06p0",
-            "rrmscdpp07p5", "rrmscdpp09p0", "rrmscdpp10p5", "rrmscdpp12p0",
-            "rrmscdpp12p5", "rrmscdpp15p0", "dataspan", "dutycycle",
-            "koi_max_sngle_ev", "koi_max_mult_ev", "koi_model_snr", "koi_num_transits",
-        ]
-        for col in numeric_cols:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors="coerce")
-
-        # NASA PSCompPars transit depth is percent; convert percent to ppm.
-        if "observed_transit_depth_percent" in df.columns:
-            depth_percent = pd.to_numeric(df["observed_transit_depth_percent"], errors="coerce")
-            # If observed_transit_depth_ppm already exists, keep it where non-null.
-            depth_ppm_from_percent = depth_percent * 1e4
-            if "observed_transit_depth_ppm" in df.columns:
-                existing = pd.to_numeric(df["observed_transit_depth_ppm"], errors="coerce")
-                df["observed_transit_depth_ppm"] = existing.fillna(depth_ppm_from_percent)
-            else:
-                df["observed_transit_depth_ppm"] = depth_ppm_from_percent
-
-        return df
-
-    def _add_basic_helper_columns(self) -> None:
-        """Add useful columns that both P-Pop and NASA plotting scripts expect."""
-        # Spectral type from stellar temperature if stype is missing.
-        if "stype" not in self.catalog.columns:
-            if "teff_s" in self.catalog.columns:
-                self.catalog["stype"] = infer_stellar_type(self.catalog["teff_s"])
-            else:
-                self.catalog["stype"] = "Unknown"
-
-        # Habitable is not central here, but some old plotting paths expect it.
-        if "habitable" not in self.catalog.columns:
-            if "flux_p" in self.catalog.columns:
-                flux = pd.to_numeric(self.catalog["flux_p"], errors="coerce")
-                self.catalog["habitable"] = (flux >= 0.25) & (flux <= 2.0)
-            else:
-                self.catalog["habitable"] = False
-
-        # Some old plotting code expects luminosity_s and temp_s.
-        if "l_sun" in self.catalog.columns and "luminosity_s" not in self.catalog.columns:
-            self.catalog["luminosity_s"] = self.catalog["l_sun"]
-        if "teff_s" in self.catalog.columns and "temp_s" not in self.catalog.columns:
-            self.catalog["temp_s"] = self.catalog["teff_s"]
-
-    def _estimate_missing_semimajor_axis_if_possible(self) -> None:
-        """Fill missing semimajor_p from period and stellar mass: a_AU = (M_star * P_yr^2)^(1/3)."""
-        if "semimajor_p" not in self.catalog.columns:
-            self.catalog["semimajor_p"] = np.nan
-
-        missing_a = self.catalog["semimajor_p"].isna()
-        if not missing_a.any():
-            return
-
-        if "p_orb" not in self.catalog.columns:
-            return
-
-        p_days = pd.to_numeric(self.catalog["p_orb"], errors="coerce")
-        if "mass_s" in self.catalog.columns:
-            mstar = pd.to_numeric(self.catalog["mass_s"], errors="coerce").fillna(1.0)
-            mass_source = "mass_s"
-        else:
-            mstar = pd.Series(1.0, index=self.catalog.index)
-            mass_source = "assumed_1Msun"
-
-        p_year = p_days / 365.25
-        a_est = (mstar * p_year ** 2) ** (1.0 / 3.0)
-
-        self.catalog.loc[missing_a, "semimajor_p"] = a_est.loc[missing_a]
-        self.catalog["semimajor_p_source"] = np.where(
-            missing_a,
-            f"estimated_from_period_and_{mass_source}",
-            "catalog",
+        self.catalog, self.source, self.nasa_like_source = data_processing.prepare_catalog(
+            data,
+            source,
+            estimate_missing_semimajor_axis=self.estimate_missing_semimajor_axis,
+            validate_for_detection=validate_for_detection,
         )
-
-    def _validate_detection_columns(self) -> None:
-        required = ["radius_p", "radius_s", "semimajor_p", "p_orb"]
-        missing = [col for col in required if col not in self.catalog.columns]
-        if missing:
-            raise ValueError(
-                "Missing required columns for Kepler detection: "
-                + str(missing)
-                + "\nIf this is NASA PSCompPars and you only want plotting, use "
-                + "KeplerData(df, source='pscomppars', validate_for_detection=False)."
-            )
-
-        bad = []
-        for col in required:
-            values = pd.to_numeric(self.catalog[col], errors="coerce")
-            if values.notna().sum() == 0:
-                bad.append(col)
-        if bad:
-            raise ValueError(f"Detection columns exist but are entirely NaN: {bad}")
 
     # ============================================================
     # Flat-universe gate 1: does the planet transit?
@@ -365,22 +138,23 @@ class KeplerData:
     def _radius_ratio(self) -> pd.Series:
         """k = Rp / R*: fitted ratio (KOI), else the radii, else a measured depth."""
         rp = pd.to_numeric(self.catalog["radius_p"], errors="coerce")
-        rs = pd.to_numeric(self.catalog["radius_s"], errors="coerce") * const.R_SUN_IN_R_EARTH
+        rs = pd.to_numeric(self.catalog["radius_s"], errors="coerce")
         k = pd.to_numeric(self.catalog.get("observed_radius_ratio", pd.Series(np.nan, index=self.catalog.index)), errors="coerce")
         observed = pd.to_numeric(self.catalog.get("observed_transit_depth_ppm", pd.Series(np.nan, index=self.catalog.index)), errors="coerce")
-        return k.fillna(rp / rs).fillna(np.sqrt(observed.clip(lower=0) / 1e6))
+        model = pd.Series(transit_shape.radius_ratio(rp, rs), index=self.catalog.index)
+        return k.fillna(model).fillna(np.sqrt(observed.clip(lower=0) / 1e6))
 
     def _a_over_rstar(self) -> pd.Series:
         a = pd.to_numeric(self.catalog["semimajor_p"], errors="coerce")
-        return a / (pd.to_numeric(self.catalog["radius_s"], errors="coerce") * const.R_SUN_IN_AU)
+        rs = pd.to_numeric(self.catalog["radius_s"], errors="coerce")
+        return pd.Series(transit_shape.a_over_rstar(a, rs), index=self.catalog.index)
 
     def _impact_from_inclination(self) -> pd.Series:
         inc_col = next((c for c in ["inc_p", "inclination", "pl_orbincl", "koi_incl"] if c in self.catalog.columns), None)
         if inc_col is None:
             return pd.Series(np.nan, index=self.catalog.index)
         inc = pd.to_numeric(self.catalog[inc_col], errors="coerce")
-        inc_rad = inc if inc.max(skipna=True) <= 3.2 else np.deg2rad(inc)
-        return self._a_over_rstar() * np.abs(np.cos(inc_rad))
+        return pd.Series(transit_shape.impact_from_inclination(self._a_over_rstar(), inc), index=self.catalog.index)
 
     def _impact_parameter(self) -> pd.Series:
         """b from a measured T14, else the inclination, else (1 + k) / 2, the mean for isotropic
@@ -413,7 +187,7 @@ class KeplerData:
 
         l_sun = pd.to_numeric(self.catalog["l_sun"], errors="coerce").clip(lower=1e-12)
         distance_s = pd.to_numeric(self.catalog["distance_s"], errors="coerce").clip(lower=1e-12)
-        return 4.74 - 2.5 * np.log10(l_sun) + 5 * np.log10(distance_s / 10)
+        return pd.Series(apparent_bolometric_mag(l_sun, distance_s), index=self.catalog.index)
 
     def _bright_enough_kepler(self):
         """Require 8 <= kepmag <= 16. NASA rows missing sy_kepmag can optionally pass, so missing
@@ -455,9 +229,7 @@ class KeplerData:
     # ============================================================
 
     def _transit_depth_fraction(self):
-        r_planet_rearth = pd.to_numeric(self.catalog["radius_p"], errors="coerce")
-        r_star_rearth = pd.to_numeric(self.catalog["radius_s"], errors="coerce") * const.R_SUN_IN_R_EARTH
-        return (r_planet_rearth / r_star_rearth) ** 2
+        return self._radius_ratio() ** 2
 
     # Calibration-only input A: real KOI/PSCompPars transit depths can replace the model depth.
     def _transit_depth_ppm(self):
@@ -632,8 +404,6 @@ class KeplerData:
         Calibration rows can use observed depth, duration and CDPP, but the final logical
         detector is intentionally the same threshold model.
         """
-        self._validate_detection_columns()
-
         # 1. Transit geometry: P-Pop inclinations; NASA/KOI rows may use observed tran_flag.
         transiting = self._transiting()
         self._impact_parameter()

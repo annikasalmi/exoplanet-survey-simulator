@@ -25,7 +25,8 @@ from science.telescopes.kepler.detection_model import KeplerData
 from science.telescopes.tess.detection_model import TESSData
 from science.telescopes.rv.detection_model import RVData
 from science.telescopes.tess import download_tce_stats
-from science.telescopes.tess.build_reference_data import MAX_SECTOR
+from science.telescopes.tess import data_processing as tess_data_processing
+from science.telescopes.tess.data_processing import MAX_SECTOR
 
 OUT_DIR = Path(CALIBRATION_DIR) / "recovery_3x1"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -398,7 +399,7 @@ def tess_run(df: pd.DataFrame) -> pd.DataFrame:
         raise FileNotFoundError(f"SPOC CDPP CSVs not found in {CDPP_DIR}")
     # SPOC 2-min runs only search sectors where the star was a 2-min target, i.e. is in that
     # sector's CDPP table; the TOI's Sectors column also lists FFI-only sectors.
-    cdpp = TESSData._load_cdpp_tables(TESSData.__new__(TESSData), CDPP_DIR)
+    cdpp = tess_data_processing.load_cdpp_tables(CDPP_DIR, TESSData.CDPP_COLS)
     two_min = set(zip(cdpp["ticid"].astype("Int64").astype(int), cdpp["sector"].astype(int)))
     tic = pd.to_numeric(df["ticid"], errors="coerce")
     df = df.copy()

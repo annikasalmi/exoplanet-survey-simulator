@@ -9,6 +9,8 @@ from functools import lru_cache
 
 import numpy as np
 
+from science import physics_constants as const
+
 # Quadratic coefficients (a, b) for a solar-type star: PHOENIX, Teff 5800 K, log g 4.5, [M/H] 0,
 # least-squares fit.
 LIMB_DARKENING = {
@@ -80,6 +82,30 @@ def signal_rms_ppm(k, b, band: str, observed_depth_ppm=None):
     with np.errstate(divide="ignore", invalid="ignore"):
         scaled = np.where(peak > 0, observed * rms / peak, np.where(np.isfinite(peak), 0.0, np.nan))
     return np.where(np.isfinite(observed), scaled, model)
+
+
+def radius_ratio(radius_p_rearth, radius_s_rsun):
+    """Planet/star radius ratio for Rp in Earth radii and Rstar in Solar radii."""
+    return np.asarray(radius_p_rearth, float) / (np.asarray(radius_s_rsun, float) * const.R_SUN_IN_R_EARTH)
+
+
+def a_over_rstar(a_au, radius_s_rsun):
+    """Semi-major axis in stellar-radius units for a in AU and Rstar in Solar radii."""
+    return np.asarray(a_au, float) / (np.asarray(radius_s_rsun, float) * const.R_SUN_IN_AU)
+
+
+def inclination_to_radians(inclination):
+    """Return inclination in radians, accepting either radians or degrees."""
+    inc = np.asarray(inclination, float)
+    finite = inc[np.isfinite(inc)]
+    if finite.size == 0:
+        return inc
+    return inc if np.nanmax(np.abs(finite)) <= 3.2 else np.deg2rad(inc)
+
+
+def impact_from_inclination(a_rstar, inclination):
+    """Transit impact parameter b = (a/R*) |cos i|, accepting i in radians or degrees."""
+    return np.asarray(a_rstar, float) * np.abs(np.cos(inclination_to_radians(inclination)))
 
 
 def t14_hours(p_days, a_over_rstar, k, b):

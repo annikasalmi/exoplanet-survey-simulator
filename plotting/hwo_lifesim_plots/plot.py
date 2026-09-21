@@ -2,9 +2,9 @@ import multiprocessing as mp
 from functools import partial
 import matplotlib
 import os
-from plotting.plot_by_type import PlotPlanetType
-from plotting.plot_by_type_LTC3 import PlotPlanetTypeLTC3, PlanetDetectionPlotterLTC3
-from plotting.plot_detections import PlanetDetectionPlotter
+from plotting.hwo_lifesim_plots.plot_by_type import PlotPlanetType
+from plotting.hwo_lifesim_plots.plot_by_type_LTC3 import PlotPlanetTypeLTC3, PlanetDetectionPlotterLTC3
+from plotting.hwo_lifesim_plots.plot_detections import PlanetDetectionPlotter
 import matplotlib.pyplot as plt
 
 plt.rcParams.update({'font.size': 16})
@@ -60,8 +60,8 @@ def plot_all(df, nruns=1, star_catalog='Gaia', sim_name='kepler', use_multiproce
     # Add rejection plotting only for HWO
     if sim_name == 'HWO' or sim_name == 'HWO_exoplanets':
         # HWO-specific figure; import it only for HWO plotting runs.
-        from plotting.plot_hz_limits import PlotHZLimits
-        from plotting.plot_rejections import PlanetRejectionPlotter
+        from plotting.hwo_lifesim_plots.plot_hz_limits import PlotHZLimits
+        from plotting.hwo_lifesim_plots.plot_rejections import PlanetRejectionPlotter
         plotting_tasks.append((PlanetRejectionPlotter, {}))
         plotting_tasks.append((PlotHZLimits, {}))
         

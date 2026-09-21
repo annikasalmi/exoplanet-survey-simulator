@@ -82,6 +82,23 @@ def is_super_earth(mass, radius, *, minimum_mass=SUPER_EARTH_MIN_MASS):
     return rocky & (mass > minimum_mass)
 
 
+def is_cold_rocky_super_earth(
+    mass,
+    radius,
+    insolation,
+    *,
+    minimum_mass=SUPER_EARTH_MIN_MASS,
+    max_insolation=50.0,
+):
+    """Classify low-insolation rocky super-Earths."""
+    mass = np.asarray(mass, dtype=float)
+    insolation = np.asarray(insolation, dtype=float)
+    return (
+        is_super_earth(mass, radius, minimum_mass=minimum_mass)
+        & (insolation < max_insolation)
+    )
+
+
 def infer_stellar_type(teff) -> pd.Series | np.ndarray:
     """Classify effective temperatures using the project's A/F/G/K/M bounds."""
     is_series = isinstance(teff, pd.Series)
@@ -173,7 +190,7 @@ def calculate_system_fluxes(T_star, T_planet, R_star, R_planet, D, wavelength_m,
 
 __all__ = [
     "SUPER_EARTH_MIN_MASS", "add_stellar_type", "blackbody_spectral_radiance",
-    "compute_rocky_threshold_shift", "infer_stellar_type", "is_rocky", "is_super_earth",
-    "is_volatile", "load_mass_radius_curve", "load_rocky_reference_curve",
-    "radius_on_curve",
+    "compute_rocky_threshold_shift", "infer_stellar_type",
+    "is_cold_rocky_super_earth", "is_rocky", "is_super_earth", "is_volatile",
+    "load_mass_radius_curve", "load_rocky_reference_curve", "radius_on_curve",
 ]

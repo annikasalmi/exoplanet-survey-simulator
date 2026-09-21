@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 
-from plotting.base_plotter import BasePlotter
+from plotting.hwo_lifesim_plots.base_plotter import BasePlotter
 from science.statistics import binned_fraction_2d
 from tools.plotting_constants import PLOT_CONFIGS, PANEL_CONFIGS
 

@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-from plotting.base_plotter import BasePlotter
+from plotting.hwo_lifesim_plots.base_plotter import BasePlotter
 from tools.physics_constants import HWOConstants
 import pandas as pd
 from tools.plotting_constants import REJECTION_COLUMN_MAPPING, REJECTION_COLORS, REJECTION_SCENARIO_LABELS

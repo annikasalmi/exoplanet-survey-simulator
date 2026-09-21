@@ -10,7 +10,11 @@ from pathlib import Path
 
 from tools.paths import REPO_ROOT, PSCOMPPARS_CSV, ANALYSIS_DIR
 from science.catalogs import load_measured_planets
-from science.physics import is_rocky, load_mass_radius_curve, radius_on_curve
+from science.physics import (
+    is_cold_rocky_super_earth,
+    load_mass_radius_curve,
+    radius_on_curve,
+)
 from science.comparison import COLD_DESERT_MAX_INSOLATION
 from science.statistics import fractional_error_to_log10_sigma
 ROOT = Path(REPO_ROOT)
@@ -122,16 +126,19 @@ def get_detected_pool(df):
     pool = df[df["universe_type"] == "superearths_supneptunes"]
     joint = (pool["kepler_detected"].to_numpy(bool)
              & pool["rv_detected"].to_numpy(bool))
-    m_sil, r_sil = load_mass_radius_curve()
     det = pd.DataFrame({
         "mass": pool["mass_p"].to_numpy(float)[joint],
         "radius": pool["radius_p"].to_numpy(float)[joint],
         "flux": pool["flux_p"].to_numpy(float)[joint],
         "teff": pool["teff_s"].to_numpy(float)[joint],
     })
-    rocky = is_rocky(det["mass"].to_numpy(), det["radius"].to_numpy(), m_sil, r_sil)
-    det["corner"] = rocky & (det["mass"].to_numpy() > MASS_MIN) & \
-        (det["flux"].to_numpy() < LOW_INSOLATION_MAX)
+    det["corner"] = is_cold_rocky_super_earth(
+        det["mass"].to_numpy(),
+        det["radius"].to_numpy(),
+        det["flux"].to_numpy(),
+        minimum_mass=MASS_MIN,
+        max_insolation=LOW_INSOLATION_MAX,
+    )
     print(f"    joint-detected {len(det)}/{len(pool)} ({100*len(det)/len(pool):.2f}%)")
     pi = det["corner"].mean()
     print(f"    selected-group share of detected planets (pi): {100 * pi:.2f}%  "
@@ -571,9 +578,16 @@ def explainer_verdict(cfg, m_sil, r_sil):
     XB_ca, cor_ca, nasa = cfg["XB_ca"], cfg["cor_ca"], cfg["nasa"]
     n = cfg["n_nasa"]
     m, r, i = 10.0 ** XB_ca[:, 0], 10.0 ** XB_ca[:, 1], 10.0 ** XB_ca[:, 2]
-    obs_corner = is_rocky(m, r, m_sil, r_sil) & (m > MASS_MIN) & (i < LOW_INSOLATION_MAX)
-    nasa_corner = int((is_rocky(nasa["m"], nasa["r"], m_sil, r_sil)
-                       & (nasa["m"] > MASS_MIN) & (nasa["ins"] < LOW_INSOLATION_MAX)).sum())
+    obs_corner = is_cold_rocky_super_earth(
+        m, r, i, minimum_mass=MASS_MIN, max_insolation=LOW_INSOLATION_MAX
+    )
+    nasa_corner = int(is_cold_rocky_super_earth(
+        nasa["m"],
+        nasa["r"],
+        nasa["ins"],
+        minimum_mass=MASS_MIN,
+        max_insolation=LOW_INSOLATION_MAX,
+    ).sum())
 
     Xn = np.column_stack([np.log10(nasa["m"]), np.log10(nasa["r"]),
                           np.log10(nasa["ins"]), nasa["teff"]])

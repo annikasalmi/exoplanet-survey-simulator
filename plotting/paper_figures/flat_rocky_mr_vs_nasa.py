@@ -9,7 +9,7 @@ import os
 import sys
 from pathlib import Path
 
-from tools.paths import REPO_ROOT, ANALYSIS_DIR, PAPER_FIGURES_DIR
+from tools.paths import REPO_ROOT, ANALYSIS_DIR
 ROOT = Path(REPO_ROOT)
 
 import numpy as np
@@ -17,11 +17,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from science.catalogs import load_measured_planets
-from science.physics import is_super_earth, is_volatile, load_mass_radius_curve
+from science.physics import is_super_earth, load_mass_radius_curve
+from science.physics_constants import MR_RELATIONS as RELATIONS
 from science.comparison import (
     mock_survey_volatile_fractions,
     monte_carlo_observed_fraction,
-    monte_carlo_population_fraction,
 )
 from science.populations.universes.flat_baseline import (
     MR_SCATTER_DEX,
@@ -36,7 +36,6 @@ from science.statistics import (
 from tools.paths import PSCOMPPARS_CSV
 
 OUT_DIR = os.path.join(ANALYSIS_DIR, "flat_rocky_mr_vs_nasa")
-PAPER_FIG_DIR = Path(PAPER_FIGURES_DIR)
 
 MASS_LIMS = (0.0, 12.0)
 RADIUS_LIMS = (0.5, 2.4)
@@ -44,14 +43,6 @@ FLAT_N = 150000
 SEED = 0
 MC_REPEATS = 4000
 RV_MAG_TARGET = 12.0
-
-# (name, equation, applies-over, {mr_C, mr_beta})   R = C·M^β  (R in R⊕, M in M⊕)
-RELATIONS = [
-    ("Chen & Kipping 2017", r"$R=1.01\,M^{0.28}$", r"M < 2.04 $M_\oplus$ (Terran)", dict(mr_C=1.01, mr_beta=0.28)),
-    ("Otegi et al. 2020",   r"$R=1.03\,M^{0.29}$", r"rocky branch",                dict(mr_C=1.03, mr_beta=0.29)),
-    ("Edmondson et al. 2023", r"$R=0.99\,M^{0.34}$", r"M $\lesssim$ 4-5 $M_\oplus$", dict(mr_C=0.99, mr_beta=0.34)),
-    ("Müller et al. 2024",  r"$R=1.02\,M^{0.27}$", r"M < 4.37 $M_\oplus$",         dict(mr_C=1.02, mr_beta=0.27)),
-]
 
 
 def noised_scatter_by_population(population, cut, rng, n_plot=400, window=None):

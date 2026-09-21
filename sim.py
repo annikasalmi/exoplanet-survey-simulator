@@ -14,7 +14,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from plotting.plot_population import plot_population
+from plotting.hwo_lifesim_plots.plot_population import plot_population
 from science.catalogs import read_nasa_csv
 from science.populations.universes.flat_baseline import flat_nonphysical
 from science.populations.universes.flat_curves import flat_radii_curves, is_super_earth

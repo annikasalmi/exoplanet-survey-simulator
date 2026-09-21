@@ -13,7 +13,7 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 from matplotlib.ticker import FuncFormatter
 
-from tools.paths import REPO_ROOT, ANALYSIS_DIR, PAPER_FIGURES_DIR
+from tools.paths import REPO_ROOT, ANALYSIS_DIR, PAPER_FIGURES_DIR, PSCOMPPARS_CSV
 ROOT = Path(REPO_ROOT)
 
 from science.telescopes.detection import (
@@ -103,7 +103,14 @@ def main(paper_copy: bool = True):
         rows[2] = (f"Transit ({TRANSIT_MISSION}) + RV", "joint_detected")
     m_ref, r_ref = load_rocky_reference_curve()
     shift = compute_rocky_threshold_shift(m_ref, r_ref)
-    _, rocky = load_and_filter_nasa(m_ref, r_ref, shift)
+    _, rocky = load_and_filter_nasa(
+        PSCOMPPARS_CSV,
+        m_ref,
+        r_ref,
+        shift,
+        redownload=rocky_scatter.FORCE_REDOWNLOAD_NASA,
+        download_if_missing=rocky_scatter.DOWNLOAD_NASA_IF_MISSING,
+    )
     rocky_win = restrict_science_window(
         rocky,
         insolation=rocky_scatter.INSOLATION_LIMITS,

@@ -12,7 +12,7 @@ import pandas as pd
 
 from tools.paths import (
     SILICON_CURVE, ANALYSIS_DIR, PAPER_FIGURES_DIR, KEPLER_DATA_DIR,
-    TESS_DATA_DIR, REPO_ROOT, _EXOPLANET_CSV_DIR,
+    TESS_DATA_DIR, REPO_ROOT, _EXOPLANET_CSV_DIR, PSCOMPPARS_CSV,
 )
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
@@ -817,7 +817,14 @@ def main():
     shift = compute_rocky_threshold_shift(m_ref, r_ref)
     print()
 
-    nasa_all, rocky = load_and_filter_nasa(m_ref, r_ref, shift)
+    nasa_all, rocky = load_and_filter_nasa(
+        PSCOMPPARS_CSV,
+        m_ref,
+        r_ref,
+        shift,
+        redownload=FORCE_REDOWNLOAD_NASA,
+        download_if_missing=DOWNLOAD_NASA_IF_MISSING,
+    )
 
     # Limit the planets used in ALL figures to the context window.
     rocky_win = restrict_science_window(

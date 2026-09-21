@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from tools import physics_constants as const
+from science import physics_constants as const
 from tools.paths import SILICON_CURVE
 
 
@@ -52,6 +52,31 @@ def radius_on_curve(mass, curve_mass, curve_radius, *, shift=0.0, outside="nan")
         left=radius[0] if left is None else left,
         right=radius[-1] if right is None else right,
     )
+
+
+def extend_mass_radius_curve_power_law(
+    curve_mass,
+    curve_radius,
+    mass_min,
+    mass_max,
+    *,
+    n=400,
+):
+    """Evaluate a mass-radius curve, power-law extrapolated past tabulated ends."""
+    curve_mass = np.asarray(curve_mass, dtype=float)
+    curve_radius = np.asarray(curve_radius, dtype=float)
+    mass_grid = np.linspace(mass_min, mass_max, n)
+    log_mass = np.log(curve_mass)
+    log_radius = np.log(curve_radius)
+    radius_grid = np.exp(np.interp(np.log(mass_grid), log_mass, log_radius))
+
+    below = mass_grid < curve_mass[0]
+    above = mass_grid > curve_mass[-1]
+    low_slope = (log_radius[1] - log_radius[0]) / (log_mass[1] - log_mass[0])
+    high_slope = (log_radius[-1] - log_radius[-2]) / (log_mass[-1] - log_mass[-2])
+    radius_grid[below] = curve_radius[0] * (mass_grid[below] / curve_mass[0]) ** low_slope
+    radius_grid[above] = curve_radius[-1] * (mass_grid[above] / curve_mass[-1]) ** high_slope
+    return mass_grid, radius_grid
 
 
 def is_rocky(mass, radius, curve_mass=None, curve_radius=None, *, shift=0.0):
@@ -191,6 +216,7 @@ def calculate_system_fluxes(T_star, T_planet, R_star, R_planet, D, wavelength_m,
 __all__ = [
     "SUPER_EARTH_MIN_MASS", "add_stellar_type", "blackbody_spectral_radiance",
     "compute_rocky_threshold_shift", "infer_stellar_type",
-    "is_cold_rocky_super_earth", "is_rocky", "is_super_earth", "is_volatile",
-    "load_mass_radius_curve", "load_rocky_reference_curve", "radius_on_curve",
+    "extend_mass_radius_curve_power_law", "is_cold_rocky_super_earth",
+    "is_rocky", "is_super_earth", "is_volatile", "load_mass_radius_curve",
+    "load_rocky_reference_curve", "radius_on_curve",
 ]

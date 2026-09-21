@@ -1,8 +1,4 @@
-"""Rocky-planet figures: FGKM detection-fraction maps from stacked Gaia-60pc Kepler/TESS catalogs
-with NASA rocky planets overlaid, plus the paper's rocky_mr_insolation_3panel / rocky_scatter_standalone.
-Run: python plotting/scripts/analysis/rocky_scatter_gaia60pc.py [--full]
-The paper figures need no universes. --full adds the maps, from the 10 Gaia-60pc
-universes the Kepler/TESS lines in `sim.py` write (~3-4 h).
+"""Makes the rocky_mr_insolation_3panel plot, which is the 3 insolations versus mass and radius
 """
 
 from __future__ import annotations
@@ -112,11 +108,6 @@ FACILITY_RELABEL = {
     "Transiting Exoplanet Survey Satellite (TESS)": "TESS",
     "Next-Generation Transit Survey (NGTS)": "NGTS",
 }
-
-
-
-
-
 
 
 # ── Grid helpers ──────────────────────────────────────────────────────────────

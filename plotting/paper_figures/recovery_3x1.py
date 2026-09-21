@@ -1,13 +1,4 @@
-"""The three detector recovery panels in one figure (recovery_3x1.png).
-
-Each panel scores one detector against the planets the real survey found: the model's value against
-the survey's own, coloured by whether the model detects it, with error bars from the published
-uncertainty. Both transit panels use MES, the matched-filter statistic each pipeline searched on;
-TESS's comes from the SPOC run named in each TOI's Source, since MES grows with the sectors a run
-stacked and ExoFOP publishes only "Planet SNR", which is neither the MES nor the DV model SNR.
-
-Everything each panel needs is here, so there is one script and one figure.
-Run from repo root: python plotting/scripts/calibration/recovery_3x1.py
+"""The three detector recovery panels in one figure (recovery_3x1.png)
 """
 
 from __future__ import annotations
@@ -24,15 +15,11 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from tools.paths import (REPO_ROOT, KOI_CUMULATIVE_CSV, PAPER_FIGURES_DIR,
-                         CALIBRATION_DIR, TESS_DATA_DIR, KEPLER_DATA_DIR, _EXOPLANET_CSV_DIR)
+from tools.paths import ( KOI_CUMULATIVE_CSV, EXOFOP_TOI_CSV, PAPER_FIGURES_DIR,
+                         CALIBRATION_DIR, TESS_DATA_DIR, KEPLER_DATA_DIR)
 from science.catalogs import nasa_tap_url, read_nasa_csv
 from science.physics import infer_stellar_type
-from tools.plotting_constants import PAPER_STYLE
-
-ROOT = Path(REPO_ROOT)
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+from plotting.figure_style import PAPER_STYLE
 
 from science.telescopes.kepler.detection_model import KeplerData
 from science.telescopes.tess.detection_model import TESSData
@@ -208,21 +195,19 @@ def kepler_run(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 def draw_kepler(ax, out: pd.DataFrame) -> float:
-    """One panel: model MES against the official DR25 MES for the planets Kepler found, coloured by
-    whether the model would detect each one. MES is the matched-filter statistic the 7.1 threshold
-    is defined on, and the same kind of quantity SPOC reports for TESS, so the two panels compare
-    like with like. koi_model_snr is not: it divides the depth at mid-transit, so a matched filter
-    reads about 0.85 of it by definition."""
+    """One panel: model vs official MES for Kepler planets, coloured by detection."""
+    is_planet = out["koi_disposition"].astype(str).str.upper().isin(PLANET_DISPOSITIONS)
+
+    # MES to MES comparison
     official = pd.to_numeric(out["koi_max_mult_ev"], errors="coerce")
     model = pd.to_numeric(out["kepler_mes"], errors="coerce")
-    is_planet = out["koi_disposition"].astype(str).str.upper().isin(PLANET_DISPOSITIONS)
+    x_label, y_label, title = "Kepler MES", "Model MES", "Kepler model planet recovery"
+
     keep = official.gt(0) & model.gt(0) & is_planet
     official, model = official[keep], model[keep]
     passed = out.loc[keep, "detected"].astype(bool).to_numpy()
 
-    # The published signal-to-noise scales with the measured depth, so the KOI's fractional depth
-    # uncertainty carries over to it. The model value has no independent error, so bars are
-    # horizontal only.
+    # Error bars on official value (from depth uncertainty)
     depth = pd.to_numeric(out.loc[keep, "observed_transit_depth_ppm"], errors="coerce")
     depth_err = pd.concat([
         pd.to_numeric(out.loc[keep, "koi_depth_err1"], errors="coerce").abs(),
@@ -240,9 +225,9 @@ def draw_kepler(ax, out: pd.DataFrame) -> float:
     ax.axhline(MES_THRESHOLD, color="0.4", ls=":", lw=1.2)
     ax.set_xscale("log"); ax.set_yscale("log")
     ax.set_xlim(lims); ax.set_ylim(lims)
-    ax.set_xlabel("Kepler MES")
-    ax.set_ylabel("Model MES")
-    ax.set_title("Kepler model planet recovery")
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+    ax.set_title(title)
     ax.tick_params(labelsize=22)
     ax.legend(loc="upper left", fontsize=19, markerscale=2.2)
     ax.text(0.97, 0.05, f"Overall recovery = {passed.mean():.0%}", transform=ax.transAxes,
@@ -272,7 +257,7 @@ def tess_load(redownload: bool = False) -> pd.DataFrame:
     """ExoFOP TOI table. Reads the copy in data/; downloads only when DOWNLOAD_NASA_DATA
     (or redownload) is set, and saves what it fetches back to data/.
     """
-    local = _EXOPLANET_CSV_DIR / "exofop_toi.csv"
+    local = Path(EXOFOP_TOI_CSV)
     if local.exists() and not (DOWNLOAD_NASA_DATA or redownload):
         print(f"Loading local TOI table: {local}")
         df = read_nasa_csv(local)
@@ -422,7 +407,7 @@ def tess_run(df: pd.DataFrame) -> pd.DataFrame:
     df = df.dropna(subset=["tess_sectors"])
     print(f"TOIs with at least one searched 2-min sector: {len(df):,}")
 
-    out = TESSData(df, source="nasa", min_transits=2, snr_threshold=SNR_THRESHOLD, tmag_limit=16.0,
+    out = TESSData(df, source="nasa", min_transits=3, snr_threshold=SNR_THRESHOLD, tmag_limit=16.0,
                    use_catalog_sectors=True, phase_mode="expected", cdpp_dir=CDPP_DIR,
                    validate_for_detection=True).determine_detectable()
     out["toy_over_official_snr"] = (
@@ -432,17 +417,17 @@ def tess_run(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 def draw_tess(ax, out: pd.DataFrame) -> float:
-    """One panel: model SNR against SPOC's own SNR for the TOIs it found, coloured by whether the
-    model would detect each one. Points on the 1:1 line mean the SNR is right; the misses show
-    where the model is stricter than the pipeline."""
+    """One panel: model vs official MES for TESS TOIs, coloured by detection."""
+    # Load official MES and model SNR
     official = pd.to_numeric(out.get("official_mes", pd.Series(np.nan, index=out.index)), errors="coerce")
     model = pd.to_numeric(out["tess_snr"], errors="coerce")
+    x_label, y_label, title = "TESS MES", "Model SNR", "TESS model planet recovery"
+
     keep = official.gt(0) & model.gt(0)
     official, model = official[keep], model[keep]
     passed = out.loc[keep, "tess_detected"].astype(bool).to_numpy()
 
-    # SPOC's SNR scales with the measured depth, so the TOI's fractional depth uncertainty carries
-    # over to its SNR. The model SNR has no independent error, so the bars are horizontal only.
+    # Error bars on official value (from depth uncertainty)
     depth = pd.to_numeric(out.loc[keep, "observed_depth_ppm"], errors="coerce")
     depth_err = pd.to_numeric(out.loc[keep, "observed_depth_err_ppm"], errors="coerce")
     xerr = (official * (depth_err / depth)).fillna(0.0).clip(lower=0.0)
@@ -457,14 +442,15 @@ def draw_tess(ax, out: pd.DataFrame) -> float:
     ax.axhline(SNR_THRESHOLD, color="0.4", ls=":", lw=1.2)
     ax.set_xscale("log"); ax.set_yscale("log")
     ax.set_xlim(lims); ax.set_ylim(lims)
-    ax.set_xlabel("TESS MES")
-    ax.set_ylabel("Model MES")
-    ax.set_title("TESS model planet recovery")
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+    ax.set_title(title)
     ax.tick_params(labelsize=22)
     ax.legend(loc="upper left", fontsize=19, markerscale=2.2)
     ax.text(0.97, 0.05, f"Overall recovery = {passed.mean():.0%}", transform=ax.transAxes,
             ha="right", va="bottom", fontsize=20)
-    print(f"  Recovered {passed.mean():.0%} of {len(official):,} SPOC TOIs (matched to a run MES)")
+    n_tois = len(official)
+    print(f"  Recovered {passed.mean():.0%} of {n_tois:,} TESS TOIs (matched to SPOC MES)")
     return float(passed.mean())
 
 
@@ -625,8 +611,9 @@ def main() -> None:
     draw_kepler(axes[0], kepler_run(kepler_prepare(attach_depth_errors(
         kepler_load(redownload=args.redownload)))))
     print("TESS...")
-    draw_tess(axes[1], tess_run(attach_official_mes(tess_prepare(
-        tess_load(redownload=args.redownload)))))
+    tess_data = tess_prepare(tess_load(redownload=args.redownload))
+    tess_data = attach_official_mes(tess_data)
+    draw_tess(axes[1], tess_run(tess_data))
     print("Radial velocity...")
     draw_rv(axes[2], rv_prepare(load_rvamp_sample(), RV_ARGS))
 

@@ -1,9 +1,9 @@
 import pandas as pd
 import numpy as np
 
-import tools.physics_constants as const
+import science.physics_constants as const
 from science.physics import blackbody_spectral_radiance
-from tools.physics_constants import HWOConstants as HWO
+from science.physics_constants import HWOConstants as HWO
 from lifesim.core.data import Data
 from typing import Union
 

@@ -5,7 +5,7 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 from science.physics import calculate_system_fluxes
-from tools import physics_constants as const
+from science import physics_constants as const
 from tools.paths import OTHER_FIGURES_DIR
 from lifesim.util.habitable import single_habitable_zone
 

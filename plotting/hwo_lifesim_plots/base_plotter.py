@@ -5,7 +5,7 @@ import pandas as pd
 from typing import Optional, Tuple
 
 from tools.paths import PLOTS_DIR
-from tools import physics_constants as const
+from science import physics_constants as const
 
 class BasePlotter:
     """

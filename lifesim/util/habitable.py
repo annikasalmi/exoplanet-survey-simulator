@@ -1,5 +1,5 @@
 import numpy as np
-import tools.physics_constants as const
+import science.physics_constants as const
 
 
 def single_habitable_zone(model: str,

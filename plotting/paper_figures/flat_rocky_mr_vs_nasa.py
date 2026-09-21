@@ -1,27 +1,25 @@
-"""Which rocky M-R relation (Chen & Kipping 2017, Otegi 2020, Edmondson 2023, Müller 2024), imposed
-on flat_nonphysical, best matches NASA's volatile (sub-Neptune) fraction? Makes the 2x4 grids and the
-paper's Otegi panels. Run: python plotting/scripts/analysis/flat_rocky_mr_vs_nasa.py
+"""Makes the 2x1 plot of the sub-Neptune and super-Earth vs just super-Earth scenario,
+with the resulting histogram after running through the telescope detections.
+
+Which rocky M-R relation (Chen & Kipping 2017, Otegi 2020, Edmondson 2023, Müller 2024), imposed
+on flat_nonphysical, best matches NASA's volatile (sub-Neptune) fraction?
 """
 
 from __future__ import annotations
 
-import os
 import sys
-from pathlib import Path
-
-from tools.paths import REPO_ROOT, ANALYSIS_DIR
-ROOT = Path(REPO_ROOT)
 
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 
 from science.catalogs import load_measured_planets
-from science.physics import is_super_earth, load_mass_radius_curve
-from science.physics_constants import MR_RELATIONS as RELATIONS
+from science.physics import extend_mass_radius_curve_power_law, load_mass_radius_curve
 from science.comparison import (
     mock_survey_volatile_fractions,
     monte_carlo_observed_fraction,
+    noised_detected_population_sample,
+    observed_measurement_arrays,
+    true_detected_population_sample,
 )
 from science.populations.universes.flat_baseline import (
     MR_SCATTER_DEX,
@@ -31,11 +29,12 @@ from science.populations.universes.flat_curves import flat_radii_curves
 from science.telescopes.detection import run_transit_rv_selection
 from science.statistics import gaussian_density
 from science.statistics import (
-    NASA_MEASUREMENT_ERROR, SIMULATED_MEASUREMENT_ERROR, perturb_fractional,
+    NASA_MEASUREMENT_ERROR, SIMULATED_MEASUREMENT_ERROR,
 )
-from tools.paths import PSCOMPPARS_CSV
+from science.physics_constants import MR_RELATIONS as RELATIONS
+from tools.paths import ANALYSIS_DIR, PAPER_FIGURES_DIR, PSCOMPPARS_CSV
 
-OUT_DIR = os.path.join(ANALYSIS_DIR, "flat_rocky_mr_vs_nasa")
+OUT_DIR = ANALYSIS_DIR / "flat_rocky_mr_vs_nasa"
 
 MASS_LIMS = (0.0, 12.0)
 RADIUS_LIMS = (0.5, 2.4)
@@ -43,32 +42,6 @@ FLAT_N = 150000
 SEED = 0
 MC_REPEATS = 4000
 RV_MAG_TARGET = 12.0
-
-
-def noised_scatter_by_population(population, cut, rng, n_plot=400, window=None):
-    """One detected and noised draw, split by whether rocky super-Earths remain.
-    window=(m_hi, r_lo, r_hi) keeps the draw inside the panel, which spans a fraction of the
-    universe's radius range, so the points shown are not mostly off-scale."""
-    mass = population["mass"].to_numpy()
-    radius = population["radius"].to_numpy()
-    keep = population["joint_detected"].to_numpy().copy()
-    if cut.get("insol_max"):
-        keep &= population["insolation"].to_numpy() < cut["insol_max"]
-    idx = np.flatnonzero(keep)
-    mo, ro = perturb_fractional(mass[idx], radius[idx], rng)
-    tmass, trad = mass[idx], radius[idx]
-    if cut.get("mass_min"):
-        k = mo > cut["mass_min"]
-        mo, ro, tmass, trad = mo[k], ro[k], tmass[k], trad[k]
-    dropped = is_super_earth(tmass, trad)
-    if window is not None:
-        m_hi, r_lo, r_hi = window
-        inside = (mo <= m_hi) & (ro >= r_lo) & (ro <= r_hi)
-        mo, ro, dropped = mo[inside], ro[inside], dropped[inside]
-    if mo.size > n_plot:
-        j = rng.choice(mo.size, n_plot, replace=False)
-        mo, ro, dropped = mo[j], ro[j], dropped[j]
-    return mo, ro, dropped
 
 
 CUTS = [("all (no cut)", {}, "flat_rocky_mr_relations_2x4.png"),
@@ -82,54 +55,7 @@ OTEGI_2X2_CUTS = [("All detected planets", {}),
                    dict(mass_min=2.0, insol_max=50.0))]
 
 
-def nasa_cut(nasa, cut):
-    selected = np.ones(len(nasa), dtype=bool)
-    if cut.get("insol_max"):
-        selected &= nasa["insolation"].to_numpy() < cut["insol_max"]
-    if cut.get("mass_min"):
-        selected &= nasa["mass"].to_numpy() > cut["mass_min"]
-    return tuple(
-        nasa.loc[selected, column].to_numpy()
-        for column in (
-            "mass", "radius", "mass_error_plus", "mass_error_minus",
-            "radius_error_plus", "radius_error_minus",
-        )
-    )
-
-
-def true_sample(population, cut, n, rng, only_subneptunes=False):
-    """n detected planets at their TRUE masses and radii, with the cut applied to
-    true values, optionally excluding rocky super-Earths."""
-    mass = population["mass"].to_numpy()
-    radius = population["radius"].to_numpy()
-    keep = population["joint_detected"].to_numpy().copy()
-    if cut.get("insol_max"):
-        keep &= population["insolation"].to_numpy() < cut["insol_max"]
-    if cut.get("mass_min"):
-        keep &= mass > cut["mass_min"]
-    if only_subneptunes:
-        keep &= ~is_super_earth(mass, radius)
-    idx = np.flatnonzero(keep)
-    if idx.size > n:
-        idx = rng.choice(idx, n, replace=False)
-    return mass[idx], radius[idx]
-
-
 SCATTER_LABELS = ("Sub-Neptunes", "Sub-Neptunes and super-Earths")
-
-
-def extend_silicate(m_sil, r_sil, m_lo, m_hi, n=400):
-    """The silicate curve on [m_lo, m_hi], continued past its tabulated ends
-    as power laws with the slopes of its first and last segments."""
-    m = np.linspace(m_lo, m_hi, n)
-    lm, lr = np.log(m_sil), np.log(r_sil)
-    r = np.exp(np.interp(np.log(m), lm, lr))
-    lo, hi = m < m_sil[0], m > m_sil[-1]
-    s_lo = (lr[1] - lr[0]) / (lm[1] - lm[0])
-    s_hi = (lr[-1] - lr[-2]) / (lm[-1] - lm[-2])
-    r[lo] = r_sil[0] * (m[lo] / m_sil[0]) ** s_lo
-    r[hi] = r_sil[-1] * (m[hi] / m_sil[-1]) ** s_hi
-    return m, r
 
 
 def _draw_scatter(ax, arr, cut, nasa, m_sil, r_sil, rng, title,
@@ -137,9 +63,12 @@ def _draw_scatter(ax, arr, cut, nasa, m_sil, r_sil, rng, title,
     """Top-row panel: one detected, noise-perturbed mass-radius draw. With
     true_values, the planets are drawn at their true masses and radii with the
     simulated measurement errors as error bars instead."""
-    nmc, nrc, nme1, nme2, nre1, nre2 = nasa_cut(nasa, cut)
+    nmc, nrc, nme1, nme2, nre1, nre2 = observed_measurement_arrays(nasa, cut)
     # sil_range=(lo, hi) draws the curve across that whole mass range.
-    m_c, r_c = extend_silicate(m_sil, r_sil, *sil_range) if sil_range else (m_sil, r_sil)
+    m_c, r_c = (
+        extend_mass_radius_curve_power_law(m_sil, r_sil, *sil_range)
+        if sil_range else (m_sil, r_sil)
+    )
     ax.fill_between(m_c, r_c, 2.6, color="0.965", zorder=0)
     ax.plot(m_c, r_c, "k-", lw=1.2, zorder=6, label="Pure silicate")
     if true_values:
@@ -147,7 +76,9 @@ def _draw_scatter(ax, arr, cut, nasa, m_sil, r_sil, rng, title,
         for above_only, n, colour, lbl, z in [
                 (True, N_SURVEY_BLUE, "tab:blue", labels[0], 4),
                 (False, N_SURVEY_ORANGE, "tab:orange", labels[1], 3)]:
-            mt, rt = true_sample(arr, cut, n, rng, only_subneptunes=above_only)
+            mt, rt = true_detected_population_sample(
+                arr, cut, n, rng, exclude_super_earths=above_only
+            )
             ax.errorbar(mt, rt,
                         xerr=np.array([mt * (1 - np.exp(-SIMULATED_MEASUREMENT_ERROR["mass"])),
                                        mt * (np.exp(SIMULATED_MEASUREMENT_ERROR["mass"]) - 1)]),
@@ -156,7 +87,9 @@ def _draw_scatter(ax, arr, cut, nasa, m_sil, r_sil, rng, title,
                         fmt="o", ms=4, color=colour, alpha=0.6, elinewidth=0.6,
                         capsize=0, zorder=z, label=lbl)
     else:
-        mo, ro, dropped = noised_scatter_by_population(arr, cut, rng, window=(MASS_LIMS[1], *RADIUS_LIMS))
+        mo, ro, dropped = noised_detected_population_sample(
+            arr, cut, rng, window=(MASS_LIMS[1], *RADIUS_LIMS)
+        )
         ax.scatter(mo[~dropped], ro[~dropped], s=15, color="tab:blue", alpha=0.45, lw=0,
                    zorder=3, label=labels[0])
         ax.scatter(mo[dropped], ro[dropped], s=15, color="tab:orange", alpha=0.5, lw=0,
@@ -185,12 +118,12 @@ def make_figure(cut_label, cut, fname, pools, nasa, m_sil, r_sil, rng):
         _draw_scatter(axes[0, ci], arr, cut, nasa, m_sil, r_sil, rng, name)
         _draw_density_1x2(axes[1, ci], arr, cut, nasa, m_sil, r_sil, rng, tag=f"[{cut_label}] {name}")
     fig.tight_layout()
-    out_png = os.path.join(OUT_DIR, fname)
+    out_png = OUT_DIR / fname
     fig.savefig(out_png, dpi=170, bbox_inches="tight")
     if fname == "flat_rocky_mr_relations_2x4_low-insolation_corner.png":
-        PAPER_FIG_DIR.mkdir(parents=True, exist_ok=True)
-        fig.savefig(PAPER_FIG_DIR / fname, dpi=170, bbox_inches="tight")
-        print(f"--> Saved paper copy: {PAPER_FIG_DIR / fname}")
+        PAPER_FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+        fig.savefig(PAPER_FIGURES_DIR / fname, dpi=170, bbox_inches="tight")
+        print(f"--> Saved paper copy: {PAPER_FIGURES_DIR / fname}")
     plt.close(fig)
     print(f"--> Saved: {out_png}")
 
@@ -277,17 +210,17 @@ def make_otegi_1x2(nasa, m_sil, r_sil, rng, show_full_population=False):
         fig.suptitle("Simulated detections of low-insolation massive planets", y=1.01, va="bottom")
     fname = ("flat_otegi_1x2_with_full_population.png" if show_full_population
              else "flat_otegi_1x2_low-insolation_selection.png")
-    out_png = os.path.join(OUT_DIR, fname)
+    out_png = OUT_DIR / fname
     fig.savefig(out_png, dpi=170, bbox_inches="tight")
-    PAPER_FIG_DIR.mkdir(parents=True, exist_ok=True)
-    fig.savefig(PAPER_FIG_DIR / fname, dpi=170, bbox_inches="tight")
+    PAPER_FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+    fig.savefig(PAPER_FIGURES_DIR / fname, dpi=170, bbox_inches="tight")
     plt.close(fig)
     print(f"--> Saved: {out_png}")
-    print(f"--> Saved paper copy: {PAPER_FIG_DIR / fname}")
+    print(f"--> Saved paper copy: {PAPER_FIGURES_DIR / fname}")
 
 
 def main():
-    os.makedirs(OUT_DIR, exist_ok=True)
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
     m_sil, r_sil = load_mass_radius_curve()
     rng = np.random.default_rng(SEED)
     nasa = load_measured_planets(
@@ -308,7 +241,6 @@ def main():
     for cut_label, cut, fname in CUTS:
         make_figure(cut_label, cut, fname, pools, nasa, m_sil, r_sil, rng)
 
-    otegi_arr = next(arr for name, eq, applies, arr in pools if "Otegi" in name)
     make_otegi_1x2(nasa, m_sil, r_sil, rng)
 
 

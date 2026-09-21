@@ -8,7 +8,7 @@ import os
 from tools.paths import OTHER_FIGURES_DIR, EXOPLANETS_2026_CSV
 from science.catalogs import read_nasa_csv
 from science.physics import blackbody_spectral_radiance
-import tools.physics_constants as const
+import science.physics_constants as const
 
 def plot_planetary_vs_stellar_flux():
     """

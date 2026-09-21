@@ -14,7 +14,7 @@ from science.physics import (
     blackbody_spectral_radiance,
     radius_on_curve,
 )
-from tools import physics_constants as const
+from science import physics_constants as const
 
 
 COMPARISON_PARAMETER_BOX = {

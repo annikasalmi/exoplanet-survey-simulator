@@ -1,5 +1,12 @@
 import numpy as np
 
+MR_RELATIONS = [
+    ("Chen & Kipping 2017", r"$R=1.01\,M^{0.28}$", r"M < 2.04 $M_\oplus$ (Terran)", dict(mr_C=1.01, mr_beta=0.28)),
+    ("Otegi et al. 2020", r"$R=1.03\,M^{0.29}$", r"rocky branch", dict(mr_C=1.03, mr_beta=0.29)),
+    ("Edmondson et al. 2023", r"$R=0.99\,M^{0.34}$", r"M $\lesssim$ 4-5 $M_\oplus$", dict(mr_C=0.99, mr_beta=0.34)),
+    ("Muller et al. 2024", r"$R=1.02\,M^{0.27}$", r"M < 4.37 $M_\oplus$", dict(mr_C=1.02, mr_beta=0.27)),
+]
+
 h = 6.62607015e-34    # Planck's constant (J·s)
 c = 2.99792458e8      # Speed of light (m/s)
 k = 1.380649e-23      # Boltzmann constant (J/K)

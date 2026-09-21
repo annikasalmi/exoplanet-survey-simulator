@@ -13,7 +13,7 @@ from tools.paths import CDPP_DIR
 from science.telescopes.tess.build_reference_data import MAX_SECTOR
 
 PAGE_URL = "https://archive.stsci.edu/tess/bulk_downloads/bulk_downloads_tce.html"
-FILE_URL = "https://archive.stsci.edu/missions/tess/catalogs/cdpp/{}
+FILE_URL = "https://archive.stsci.edu/missions/tess/catalogs/cdpp/{}"
 
 
 def single_sector_files(page: str) -> list[str]:

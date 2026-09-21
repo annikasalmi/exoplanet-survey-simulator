@@ -1,7 +1,7 @@
 """HWO habitable-zone detection-limit plots."""
 
 from plotting.hwo_lifesim_plots.base_plotter import BasePlotter
-from tools import physics_constants as const
+from science import physics_constants as const
 from tools.plotting_constants import DETECTION_COLORS
 import pandas as pd
 import numpy as np

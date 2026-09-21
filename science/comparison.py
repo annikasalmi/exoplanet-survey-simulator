@@ -107,6 +107,89 @@ def monte_carlo_observed_fraction(
     return fractions[valid], int(round(counts[valid].mean())) if valid.any() else 0
 
 
+def observed_measurement_arrays(sample, cut):
+    """Return observed mass/radius values and uncertainties after science cuts."""
+    selected = np.ones(len(sample), dtype=bool)
+    if cut.get("insol_max") is not None:
+        selected &= sample["insolation"].to_numpy() < cut["insol_max"]
+    if cut.get("mass_min") is not None:
+        selected &= sample["mass"].to_numpy() > cut["mass_min"]
+    columns = (
+        "mass", "radius", "mass_error_plus", "mass_error_minus",
+        "radius_error_plus", "radius_error_minus",
+    )
+    return tuple(sample.loc[selected, column].to_numpy() for column in columns)
+
+
+def noised_detected_population_sample(
+    population,
+    cut,
+    rng,
+    *,
+    n_plot=400,
+    window=None,
+):
+    """Draw detected planets with measurement noise, flagged by rocky super-Earth status."""
+    mass = population["mass"].to_numpy()
+    radius = population["radius"].to_numpy()
+    selected = population["joint_detected"].to_numpy(bool, copy=True)
+    if cut.get("insol_max") is not None:
+        selected &= population["insolation"].to_numpy() < cut["insol_max"]
+
+    idx = np.flatnonzero(selected)
+    observed_mass, observed_radius = perturb_fractional(mass[idx], radius[idx], rng)
+    true_mass = mass[idx]
+    true_radius = radius[idx]
+    if cut.get("mass_min") is not None:
+        keep = observed_mass > cut["mass_min"]
+        observed_mass = observed_mass[keep]
+        observed_radius = observed_radius[keep]
+        true_mass = true_mass[keep]
+        true_radius = true_radius[keep]
+
+    super_earth = is_super_earth(true_mass, true_radius)
+    if window is not None:
+        mass_hi, radius_lo, radius_hi = window
+        inside = (
+            (observed_mass <= mass_hi)
+            & (observed_radius >= radius_lo)
+            & (observed_radius <= radius_hi)
+        )
+        observed_mass = observed_mass[inside]
+        observed_radius = observed_radius[inside]
+        super_earth = super_earth[inside]
+    if observed_mass.size > n_plot:
+        chosen = rng.choice(observed_mass.size, n_plot, replace=False)
+        observed_mass = observed_mass[chosen]
+        observed_radius = observed_radius[chosen]
+        super_earth = super_earth[chosen]
+    return observed_mass, observed_radius, super_earth
+
+
+def true_detected_population_sample(
+    population,
+    cut,
+    sample_size,
+    rng,
+    *,
+    exclude_super_earths=False,
+):
+    """Sample detected planets at true mass/radius values after science cuts."""
+    mass = population["mass"].to_numpy()
+    radius = population["radius"].to_numpy()
+    selected = population["joint_detected"].to_numpy(bool, copy=True)
+    if cut.get("insol_max") is not None:
+        selected &= population["insolation"].to_numpy() < cut["insol_max"]
+    if cut.get("mass_min") is not None:
+        selected &= mass > cut["mass_min"]
+    if exclude_super_earths:
+        selected &= ~is_super_earth(mass, radius)
+    idx = np.flatnonzero(selected)
+    if idx.size > sample_size:
+        idx = rng.choice(idx, sample_size, replace=False)
+    return mass[idx], radius[idx]
+
+
 def observed_volatile_count(
     sample, lo, hi, curve_mass, curve_radius, *, mass_min=None,
 ):
@@ -266,7 +349,8 @@ def observed_volatile_fraction_draws(
 __all__ = [
     "COLD_DESERT_MAX_INSOLATION", "INSOLATION_BINS", "detection_fraction_map",
     "mock_survey_volatile_fractions", "monte_carlo_observed_fraction",
-    "monte_carlo_population_fraction", "observed_fraction_uncertainty",
+    "monte_carlo_population_fraction", "noised_detected_population_sample",
+    "observed_fraction_uncertainty", "observed_measurement_arrays",
     "observed_volatile_count", "observed_volatile_fraction_draws",
-    "predicted_volatile_fraction",
+    "predicted_volatile_fraction", "true_detected_population_sample",
 ]

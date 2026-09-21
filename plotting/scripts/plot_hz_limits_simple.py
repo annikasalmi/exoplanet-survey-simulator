@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 
-from tools import physics_constants as const
+from science import physics_constants as const
 from tools.paths import OTHER_FIGURES_DIR
 
 OUT_PATH = OTHER_FIGURES_DIR / "distance_luminosity_simple.png"

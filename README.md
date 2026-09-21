@@ -69,9 +69,8 @@ python make_paper_figures.py
 ```
 
 This writes every paper figure to `results/paper/`, downloading and caching the catalogues
-it needs; no P-Pop universe is required. `--list` prints each script and the figures it
-makes, and naming a script runs only that one. To run them individually instead, the
-scripts are under `plotting/scripts/`.
+it needs; no P-Pop universe is required. To run them individually instead, the paper
+figure scripts are under `plotting/paper_figures/`.
 This table summarizes the detectors:
 ## Instrument model fidelity
 

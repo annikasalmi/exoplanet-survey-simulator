@@ -1,4 +1,8 @@
-"""Uniform-radius flat universe with configurable mass-radius and analysis bounds."""
+"""
+A universe where all planet characteristics have a uniform prior, as defined in DEFAULTS.
+Only exception is masses are drawn from Otegi rocky mass-radius relation with scatter after the radius is drawn
+from a uniform distribution.
+"""
 
 from __future__ import annotations
 

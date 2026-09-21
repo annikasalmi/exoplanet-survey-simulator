@@ -1,4 +1,4 @@
-"""Catalog ingestion, normalization, and scientific sample selection."""
+"""Inspect and work with NASA Exoplanet Archive catalogs."""
 
 from __future__ import annotations
 

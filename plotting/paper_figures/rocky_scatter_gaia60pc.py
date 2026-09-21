@@ -1,4 +1,4 @@
-"""Makes the rocky_mr_insolation_3panel plot, which is the 3 insolations versus mass and radius
+"""Makes the rocky mass/radius and insolation plots. fig 1 and 2 in the paper
 """
 
 from __future__ import annotations

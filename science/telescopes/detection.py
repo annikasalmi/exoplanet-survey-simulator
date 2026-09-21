@@ -11,8 +11,8 @@ import pandas as pd
 
 from science.catalogs import parameter_box_mask, restrict_science_window
 from science.physics import add_stellar_type, is_super_earth, radius_on_curve
-from science.populations.universes.flat_baseline import flat_nonphysical
-from science.populations.universes.flat_curves import flat_radii_curves
+from science.universes.flat_baseline import flat_nonphysical
+from science.universes.flat_curves import flat_radii_curves
 from science.telescopes.kepler.detection_model import KeplerData
 from science.telescopes.rv.detection_model import RVData
 from science.telescopes.tess.detection_model import TESSData

@@ -1,6 +1,3 @@
-"""
-Constants for plotting routines in the project.
-"""
 from typing import List, Optional
 import numpy as np
 

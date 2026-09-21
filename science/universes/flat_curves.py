@@ -1,4 +1,8 @@
-"""Curve-based flat universe with explicit radius-curve variants."""
+"""
+A universe where all planet characteristics have a uniform prior, as defined in DEFAULTS, except for mass and radius.
+(ie distance from earth, period, eccentricity, and stellar type are all uniform in the ranges given in DEFAULTS).
+Only exception is radii follow Otegi volatile and/or silicate mass-radius relations with scatter after the mass is drawn.
+."""
 
 from __future__ import annotations
 
@@ -6,7 +10,7 @@ import numpy as np
 import pandas as pd
 
 from science.physics import is_super_earth, load_mass_radius_curve, radius_on_curve
-from science.populations.universes.flat_baseline import DEFAULTS, flat_nonphysical
+from science.universes.flat_baseline import DEFAULTS, flat_nonphysical
 
 OTEGI_VOLATILE = dict(mr_C=0.70, mr_beta=0.63)   # R = 0.70 M^0.63 (Otegi et al. 2020)
 SUPER_EARTH_FRAC_SD = 0.20        # fractional radius width around the silicate line

@@ -1,6 +1,4 @@
-"""Paper selection map (flat_transit_rv_3x3_otegi.png): rows = TESS transit, RV mass (best of
-HARPS/NIRPS), both; columns = G, K, M hosts. Background = rocky planets from flat_nonphysical.
-Run: python plotting/scripts/analysis/flat_transit_rv_3x3.py
+"""Makes 3x3 plot showing how well telescopes can detect certain planets (fig 3 in the paper)
 """
 
 from __future__ import annotations

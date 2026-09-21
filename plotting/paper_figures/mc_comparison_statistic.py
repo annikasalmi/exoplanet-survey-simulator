@@ -1,7 +1,5 @@
-"""Paper MC figure (mc_comparison_statistic_<N_DRAWS>.png): distribution of x_k = (f_k - f_obs)^2 /
-sigma_obs^2 for I<10, I<50, I>50 (M>2), each draw a NASA-sized (7/27/75) mock survey with the
-sample's 25%/8% errors, using the shared science.comparison machinery.
-Run: [N_DRAWS=500] python plotting/scripts/analysis/mc_comparison_statistic.py
+"""Paper MC figure (mc_comparison_statistic_<N_DRAWS>.png) showing how accurate draws are to observed populations.
+fig 5 in the paper
 """
 
 import os

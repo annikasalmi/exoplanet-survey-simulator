@@ -1,12 +1,12 @@
-"""The three detector recovery panels in one figure (recovery_3x1.png)
+"""The three detector recovery panels in one figure (recovery_3x1.png); the appendix figure
 """
 
 from __future__ import annotations
 
-import argparse
 import re
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from urllib.parse import quote
 
 import numpy as np
@@ -49,7 +49,7 @@ ESO_TARGETS_CACHE = Path(KEPLER_DATA_DIR) / "NASA" / "eso_harps_nirps_targets.cs
 ESO_TAP = "http://archive.eso.org/tap_obs/sync"
 ESO_MATCH_ARCSEC = 10.0
 ESO_MIN_EXPOSURES = 10
-RV_ARGS = argparse.Namespace(instrument="HARPS", n_obs=100, snr_threshold=5.0)
+RV_ARGS = SimpleNamespace(instrument="HARPS", n_obs=100, snr_threshold=5.0)
 
 
 # ── Kepler ────────────────────────────────────────────────────────────────────
@@ -61,12 +61,12 @@ CDPP_COLS = [
     "rrmscdpp12p5", "rrmscdpp15p0",
 ]
 
-def kepler_load(redownload: bool = False) -> pd.DataFrame:
+def kepler_load() -> pd.DataFrame:
     """KOI cumulative + stellar CDPP. Reads the copy in data/; downloads only when
-    DOWNLOAD_NASA_DATA (or redownload) is set, and saves what it fetches back to data/.
+    DOWNLOAD_NASA_DATA is set, and saves what it fetches back to data/.
     """
     local = Path(KOI_CUMULATIVE_CSV)
-    if local.exists() and not (DOWNLOAD_NASA_DATA or redownload):
+    if local.exists() and not DOWNLOAD_NASA_DATA:
         print(f"Loading local KOI table: {local}")
         df = read_nasa_csv(local)
         missing = [c for c in ("koi_max_mult_ev", "koi_num_transits")
@@ -77,7 +77,7 @@ def kepler_load(redownload: bool = False) -> pd.DataFrame:
                 "refresh it from the NASA Exoplanet Archive.")
         return df
 
-    if not (DOWNLOAD_NASA_DATA or redownload):
+    if not DOWNLOAD_NASA_DATA:
         raise RuntimeError(
             f"{local} not found. Set DOWNLOAD_NASA_DATA = True to fetch the KOI "
             "cumulative table from the NASA Exoplanet Archive.")
@@ -253,12 +253,12 @@ def searched_sectors(sectors_text, source_text):
 
 EXOFOP_TOI_URL = "https://exofop.ipac.caltech.edu/tess/download_toi.php?sort=toi&output=csv"
 
-def tess_load(redownload: bool = False) -> pd.DataFrame:
+def tess_load() -> pd.DataFrame:
     """ExoFOP TOI table. Reads the copy in data/; downloads only when DOWNLOAD_NASA_DATA
-    (or redownload) is set, and saves what it fetches back to data/.
+    is set, and saves what it fetches back to data/.
     """
     local = Path(EXOFOP_TOI_CSV)
-    if local.exists() and not (DOWNLOAD_NASA_DATA or redownload):
+    if local.exists() and not DOWNLOAD_NASA_DATA:
         print(f"Loading local TOI table: {local}")
         df = read_nasa_csv(local)
         if "Period (days)" not in df.columns:
@@ -267,7 +267,7 @@ def tess_load(redownload: bool = False) -> pd.DataFrame:
                 "column). Set DOWNLOAD_NASA_DATA = True to refresh it.")
         return df
 
-    if not (DOWNLOAD_NASA_DATA or redownload):
+    if not DOWNLOAD_NASA_DATA:
         raise RuntimeError(
             f"{local} not found. Set DOWNLOAD_NASA_DATA = True to fetch the TOI "
             "table from ExoFOP.")
@@ -599,9 +599,6 @@ def draw_rv(ax, df: pd.DataFrame) -> float:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--redownload", action="store_true")
-    args = ap.parse_args()
     plt.rcParams.update(PAPER_STYLE)
 
     width, height = PANEL_SIZE
@@ -609,9 +606,9 @@ def main() -> None:
 
     print("Kepler...")
     draw_kepler(axes[0], kepler_run(kepler_prepare(attach_depth_errors(
-        kepler_load(redownload=args.redownload)))))
+        kepler_load()))))
     print("TESS...")
-    tess_data = tess_prepare(tess_load(redownload=args.redownload))
+    tess_data = tess_prepare(tess_load())
     tess_data = attach_official_mes(tess_data)
     draw_tess(axes[1], tess_run(tess_data))
     print("Radial velocity...")

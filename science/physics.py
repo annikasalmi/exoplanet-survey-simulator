@@ -1,5 +1,3 @@
-"""Physical relations and classifications shared across the project."""
-
 from __future__ import annotations
 
 from functools import lru_cache

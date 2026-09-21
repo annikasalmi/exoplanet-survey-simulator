@@ -1,5 +1,3 @@
-"""Reusable statistics and uncertainty models with no presentation dependencies."""
-
 from __future__ import annotations
 
 import numpy as np

@@ -1,5 +1,5 @@
 """Makes the 2x1 plot of the sub-Neptune and super-Earth vs just super-Earth scenario,
-with the resulting histogram after running through the telescope detections.
+with the resulting histogram after running through the telescope detections. (fig 4 in the paper)
 
 Which rocky M-R relation (Chen & Kipping 2017, Otegi 2020, Edmondson 2023, Müller 2024), imposed
 on flat_nonphysical, best matches NASA's volatile (sub-Neptune) fraction?
@@ -21,11 +21,11 @@ from science.comparison import (
     observed_measurement_arrays,
     true_detected_population_sample,
 )
-from science.populations.universes.flat_baseline import (
+from science.universes.flat_baseline import (
     MR_SCATTER_DEX,
     flat_nonphysical,
 )
-from science.populations.universes.flat_curves import flat_radii_curves
+from science.universes.flat_curves import flat_radii_curves
 from science.telescopes.detection import run_transit_rv_selection
 from science.statistics import gaussian_density
 from science.statistics import (

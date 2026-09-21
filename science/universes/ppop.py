@@ -1,4 +1,7 @@
-"""P-Pop occurrence-rate universe and catalog conversion."""
+"""P-Pop occurrence-rate universe and catalog conversion.
+This models a fake universe where planet population follows observed/extrapolated statistics from exoplanets we have 
+observed so far.
+"""
 
 import os
 import sys

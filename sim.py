@@ -16,9 +16,9 @@ import pandas as pd
 
 from plotting.hwo_lifesim_plots.plot_population import plot_population
 from science.catalogs import read_nasa_csv
-from science.populations.universes.flat_baseline import flat_nonphysical
-from science.populations.universes.flat_curves import flat_radii_curves, is_super_earth
-from science.populations.universes.ppop import PPop
+from science.universes.flat_baseline import flat_nonphysical
+from science.universes.flat_curves import flat_radii_curves, is_super_earth
+from science.universes.ppop import PPop
 from science.telescopes.detection import run_rv_best
 from science.telescopes.kepler.detection_model import KeplerData
 from science.telescopes.tess.detection_model import TESSData

@@ -1,6 +1,24 @@
-"""Kepler toy transit detector for P-Pop catalogs and NASA PSCompPars/KOI tables, e.g.
-KeplerData(df, source='pscomppars').determine_detectable(). A planet is detected if it transits,
-is bright enough and passes the MES threshold. No DR25 one-sigma-depth maps or window functions.
+"""Kepler toy transit detector for P-Pop catalogs and NASA PSCompPars/KOI tables.
+
+KEPLER MODEL
+
+Included for flat-universe simulations:
+- min transits: >= 3 observed transits by default
+- MES threshold: >= 7.1, the Kepler TPS matched-filter threshold
+- transit shape: limb-darkened Kepler-band signal RMS from Claret & Bloemen 2011
+
+Included for calibration against real Kepler planets:
+- CDPP: rrmscdpp01p5-rrmscdpp15p0 from the Kepler archive, interpolated to T14
+- official MES comparison: plotting/paper_figures/recovery_3x1.py compares kepler_mes
+  to koi_max_mult_ev from the NASA KOI cumulative table
+
+Not included:
+- DR25 one-sigma-depth maps, period/window completeness, injection recovery, dilution,
+  secondary vetting, or other pipeline disposition logic. Crossing 7.1 MES is necessary
+  for a Threshold-Crossing Event, not sufficient for planet validation.
+
+Calibration data source:
+- NASA KOI cumulative table joined to Kepler stellar CDPP columns
 """
 
 from __future__ import annotations
@@ -231,6 +249,7 @@ class KeplerData:
             "rrmscdpp03p5", "rrmscdpp04p5", "rrmscdpp05p0", "rrmscdpp06p0",
             "rrmscdpp07p5", "rrmscdpp09p0", "rrmscdpp10p5", "rrmscdpp12p0",
             "rrmscdpp12p5", "rrmscdpp15p0", "dataspan", "dutycycle",
+            "koi_max_sngle_ev", "koi_max_mult_ev", "koi_model_snr", "koi_num_transits",
         ]
         for col in numeric_cols:
             if col in df.columns:
@@ -322,27 +341,10 @@ class KeplerData:
             raise ValueError(f"Detection columns exist but are entirely NaN: {bad}")
 
     # ============================================================
-    # Transit / depth / brightness calculations
+    # Flat-universe gate 1: does the planet transit?
     # ============================================================
 
-    def calc_transit_depth_fraction(self):
-        r_planet_rearth = pd.to_numeric(self.catalog["radius_p"], errors="coerce")
-        r_star_rearth = pd.to_numeric(self.catalog["radius_s"], errors="coerce") * const.R_SUN_IN_R_EARTH
-        return (r_planet_rearth / r_star_rearth) ** 2
-
-    # Observed depth for NASA rows that have one, else the (Rp/R*)^2 model depth.
-    def calc_transit_depth_ppm(self):
-        if self.nasa_like_source and self.use_observed_transit_depth_for_nasa:
-            if "observed_transit_depth_ppm" in self.catalog.columns:
-                observed = pd.to_numeric(self.catalog["observed_transit_depth_ppm"], errors="coerce")
-                model = self.calc_transit_depth_fraction() * 1e6
-                depth = observed.fillna(model)
-                self.catalog["transit_depth_source"] = np.where(observed.notna(), "observed", "model_Rp_Rstar")
-                return depth
-        self.catalog["transit_depth_source"] = "model_Rp_Rstar"
-        return self.calc_transit_depth_fraction() * 1e6
-
-    def calc_transiting_from_inclination(self):
+    def _transiting(self):
         """P-Pop: use geometric inclination. NASA PSCompPars/KOI: optionally use tran_flag,
         since those planets are already observed to transit.
         """
@@ -380,7 +382,7 @@ class KeplerData:
         inc_rad = inc if inc.max(skipna=True) <= 3.2 else np.deg2rad(inc)
         return self._a_over_rstar() * np.abs(np.cos(inc_rad))
 
-    def impact_parameter(self) -> pd.Series:
+    def _impact_parameter(self) -> pd.Series:
         """b from a measured T14, else the inclination, else (1 + k) / 2, the mean for isotropic
         orbits that transit. Catalogued inclinations come from fits with their own a/R*, so pairing
         them with the stellar a/R* here can put an observed transit off the star."""
@@ -396,15 +398,11 @@ class KeplerData:
         self.catalog["impact_parameter_source"] = source
         return b
 
-    def signal_rms_ppm(self) -> pd.Series:
-        """rms of the limb-darkened transit dip over T14 (see transit_shape); what the MES uses."""
-        observed = None
-        if self.nasa_like_source and self.use_observed_transit_depth_for_nasa and "observed_transit_depth_ppm" in self.catalog.columns:
-            observed = pd.to_numeric(self.catalog["observed_transit_depth_ppm"], errors="coerce")
-        rms = transit_shape.signal_rms_ppm(self._radius_ratio(), self.catalog["impact_parameter"], "Kepler", observed)
-        return pd.Series(rms, index=self.catalog.index)
+    # ============================================================
+    # Flat-universe gate 2: is the host bright enough?
+    # ============================================================
 
-    def estimate_kepler_mag_from_bolometric_proxy(self):
+    def _estimate_kepler_mag_from_bolometric_proxy(self):
         """Fallback only. Prefer real Kepler magnitude."""
         required = ["l_sun", "distance_s"]
         missing = [col for col in required if col not in self.catalog.columns]
@@ -417,7 +415,7 @@ class KeplerData:
         distance_s = pd.to_numeric(self.catalog["distance_s"], errors="coerce").clip(lower=1e-12)
         return 4.74 - 2.5 * np.log10(l_sun) + 5 * np.log10(distance_s / 10)
 
-    def calc_bright_enough_kepler(self):
+    def _bright_enough_kepler(self):
         """Require 8 <= kepmag <= 16. NASA rows missing sy_kepmag can optionally pass, so missing
         metadata isn't counted as a failed detection.
         """
@@ -438,7 +436,7 @@ class KeplerData:
 
         # P-Pop fallback: approximate bolometric magnitude if possible.
         if "l_sun" in self.catalog.columns and "distance_s" in self.catalog.columns:
-            approx_mbol = self.estimate_kepler_mag_from_bolometric_proxy()
+            approx_mbol = self._estimate_kepler_mag_from_bolometric_proxy()
             bright = approx_mbol <= self.kepler_mag_limit
             self.catalog["kepler_mag_used"] = approx_mbol
             self.catalog["kepler_mag_source"] = "approx_mbol_proxy"
@@ -453,15 +451,42 @@ class KeplerData:
         return bright
 
     # ============================================================
-    # Kepler-ish MES/depth significance
+    # Flat-universe gate 3: enough transits and high enough MES
     # ============================================================
+
+    def _transit_depth_fraction(self):
+        r_planet_rearth = pd.to_numeric(self.catalog["radius_p"], errors="coerce")
+        r_star_rearth = pd.to_numeric(self.catalog["radius_s"], errors="coerce") * const.R_SUN_IN_R_EARTH
+        return (r_planet_rearth / r_star_rearth) ** 2
+
+    # Calibration-only input A: real KOI/PSCompPars transit depths can replace the model depth.
+    def _transit_depth_ppm(self):
+        """Observed depth for calibration rows when available; otherwise model (Rp/R*)^2."""
+        if self.nasa_like_source and self.use_observed_transit_depth_for_nasa:
+            if "observed_transit_depth_ppm" in self.catalog.columns:
+                observed = pd.to_numeric(self.catalog["observed_transit_depth_ppm"], errors="coerce")
+                model = self._transit_depth_fraction() * 1e6
+                depth = observed.fillna(model)
+                self.catalog["transit_depth_source"] = np.where(observed.notna(), "observed", "model_Rp_Rstar")
+                return depth
+        self.catalog["transit_depth_source"] = "model_Rp_Rstar"
+        return self._transit_depth_fraction() * 1e6
+
+    def _signal_rms_ppm(self) -> pd.Series:
+        """Limb-darkened transit RMS over T14; this is the signal term in MES."""
+        observed = None
+        if self.nasa_like_source and self.use_observed_transit_depth_for_nasa and "observed_transit_depth_ppm" in self.catalog.columns:
+            observed = pd.to_numeric(self.catalog["observed_transit_depth_ppm"], errors="coerce")
+        rms = transit_shape.signal_rms_ppm(self._radius_ratio(), self.catalog["impact_parameter"], "Kepler", observed)
+        return pd.Series(rms, index=self.catalog.index)
 
     def _observed_duration(self) -> pd.Series:
         if self.nasa_like_source and "observed_transit_duration_hr" in self.catalog.columns:
             return pd.to_numeric(self.catalog["observed_transit_duration_hr"], errors="coerce")
         return pd.Series(np.nan, index=self.catalog.index)
 
-    def estimate_transit_duration_hours(self):
+    # Calibration-only input A, continued: real KOI/PSCompPars durations can replace model T14.
+    def _transit_duration_hours(self):
         """T14 in hours: the observed value for NASA rows, else a circular orbit with impact parameter b."""
         observed = self._observed_duration()
         p_days = pd.to_numeric(self.catalog["p_orb"], errors="coerce")
@@ -472,7 +497,7 @@ class KeplerData:
         self.catalog["transit_duration_source"] = np.where(observed.notna(), "observed", "model_t14")
         return duration_hr
 
-    def estimate_cdpp_from_kepler_mag(self):
+    def _estimate_cdpp_from_kepler_mag(self):
         """Photon-noise CDPP fallback for rows without real rrmscdpp columns (e.g. P-Pop/Gaia):
         CDPP(Kp) = fallback_cdpp_ppm * 10**(0.2 * (Kp - cdpp_kp_ref_mag)), so faint stars are noisier.
         """
@@ -484,7 +509,7 @@ class KeplerData:
         elif "kepmag" in self.catalog.columns:
             mag = pd.to_numeric(self.catalog["kepmag"], errors="coerce")
         elif "l_sun" in self.catalog.columns and "distance_s" in self.catalog.columns:
-            mag = self.estimate_kepler_mag_from_bolometric_proxy()
+            mag = self._estimate_kepler_mag_from_bolometric_proxy()
         else:
             mag = pd.Series(np.nan, index=self.catalog.index)
 
@@ -497,7 +522,8 @@ class KeplerData:
         cdpp = np.sqrt(cdpp_photon ** 2 + self.cdpp_variability_ppm ** 2)
         return cdpp.clip(lower=self.cdpp_min_ppm, upper=self.cdpp_max_ppm)
 
-    def get_cdpp_ppm_for_duration(self, duration_hr):
+    # Calibration-only input B: real Kepler rrmscdpp columns replace the magnitude fallback CDPP.
+    def _cdpp_ppm_for_duration(self, duration_hr):
         """CDPP at T14: the star's own rrmscdpp columns interpolated log-log (extrapolated past 1.5
         or 15 h), else the magnitude fallback scaled from 6.5 h by the measured CDPP_SCALING."""
         duration_hr = np.asarray(duration_hr, float)
@@ -516,7 +542,7 @@ class KeplerData:
 
         scale = (transit_shape.loglog_interp(duration_hr, self.cdpp_scaling_hr, self.cdpp_scaling)
                  / transit_shape.loglog_interp(self.fallback_cdpp_duration_hr, self.cdpp_scaling_hr, self.cdpp_scaling))
-        fallback = self.estimate_cdpp_from_kepler_mag().to_numpy(float) * scale
+        fallback = self._estimate_cdpp_from_kepler_mag().to_numpy(float) * scale
 
         cdpp_ppm = pd.Series(np.where(has_own, own, fallback), index=self.catalog.index)
         self.catalog["kepler_cdpp_ppm"] = cdpp_ppm
@@ -525,7 +551,7 @@ class KeplerData:
             "kepmag_cdpp_fallback" if self.use_kepmag_cdpp_fallback else "fallback_cdpp_ppm")
         return cdpp_ppm
 
-    def calc_number_of_observed_transits_keplerish(self):
+    def _number_of_observed_transits(self):
         p_orb_days = pd.to_numeric(self.catalog["p_orb"], errors="coerce").replace(0, np.nan)
 
         if "dataspan" in self.catalog.columns:
@@ -547,13 +573,13 @@ class KeplerData:
         self.catalog["n_transits_keplerish"] = n_transits
         return n_transits
 
-    def calc_kepler_mes(self):
+    def _kepler_mes(self):
         """MES = rms dip over T14 / CDPP(T14) * sqrt(N transits)."""
-        transit_depth_ppm = self.calc_transit_depth_ppm()
-        signal_ppm = self.signal_rms_ppm()
-        duration_hr = self.estimate_transit_duration_hours()
-        cdpp_ppm = self.get_cdpp_ppm_for_duration(duration_hr)
-        n_transits = self.calc_number_of_observed_transits_keplerish()
+        transit_depth_ppm = self._transit_depth_ppm()
+        signal_ppm = self._signal_rms_ppm()
+        duration_hr = self._transit_duration_hours()
+        cdpp_ppm = self._cdpp_ppm_for_duration(duration_hr)
+        n_transits = self._number_of_observed_transits()
 
         sqrt_n = np.sqrt(n_transits.clip(lower=1))
         mes = (signal_ppm / cdpp_ppm.replace(0, np.nan) * sqrt_n).replace([np.inf, -np.inf], np.nan).fillna(0.0)
@@ -564,15 +590,15 @@ class KeplerData:
         self.catalog["kepler_mes_threshold"] = self.mes_threshold
         return mes
 
-    def calc_depth_good_keplerish(self):
-        mes = self.calc_kepler_mes()
+    def _mes_detection_pass(self):
+        mes = self._kepler_mes()
         n_transits = self.catalog["n_transits_keplerish"]
         depth_good = (n_transits >= self.min_transits) & (mes >= self.mes_threshold)
 
         self.catalog["kepler_enough_transits"] = n_transits >= self.min_transits
         return depth_good.fillna(False)
 
-    def add_miss_reason_category(self):
+    def _add_miss_reason_category(self):
         """Explain why each row passes or fails the current toy Kepler detector."""
         transiting = self.catalog["transiting_geometric"].astype(bool)
         bright = self.catalog["bright_enough_kepler"].astype(bool)
@@ -596,15 +622,27 @@ class KeplerData:
 
     def determine_detectable(self):
         """
-        Kepler-ish detector:
-            detected = transiting and bright_enough_kepler and depth_good
+        Run the toy Kepler detector.
+
+        Flat-universe detection uses three gates:
+            1. transiting geometry / observed transit flag
+            2. bright enough for Kepler follow-up
+            3. enough transits and MES >= threshold
+
+        Calibration rows can use observed depth, duration and CDPP, but the final logical
+        detector is intentionally the same threshold model.
         """
         self._validate_detection_columns()
 
-        transiting = self.calc_transiting_from_inclination()
-        self.impact_parameter()
-        bright_enough_kepler = self.calc_bright_enough_kepler()
-        depth_good = self.calc_depth_good_keplerish()
+        # 1. Transit geometry: P-Pop inclinations; NASA/KOI rows may use observed tran_flag.
+        transiting = self._transiting()
+        self._impact_parameter()
+
+        # 2. Brightness gate: real Kp when available, otherwise a labeled bolometric proxy.
+        bright_enough_kepler = self._bright_enough_kepler()
+
+        # 3. Detection statistic: >= min_transits and MES >= mes_threshold.
+        depth_good = self._mes_detection_pass()
 
         detected = transiting & bright_enough_kepler & depth_good
 
@@ -627,7 +665,7 @@ class KeplerData:
         self.catalog["detected_best"] = detected
         self.catalog["detected_worst"] = detected
 
-        self.add_miss_reason_category()
+        self._add_miss_reason_category()
 
         return self.catalog
 
@@ -638,6 +676,8 @@ class KeplerData:
 
 # FUTURE UPGRADE 1: replace CDPP * sqrt(N_transits) with the official DR25 one-sigma depth maps
 # (KeplerPORTs: MES = depth_ppm / one_sigma_depth_ppm * 1.003), which include period-dependent gaps.
+# Also not included: TPS vetting beyond threshold-crossing, odd/even checks, secondary eclipses,
+# centroid vetting, injection-recovery completeness, dilution, and catalog disposition logic.
 
 # UPGRADE 2 (implemented): detection_model='sigmoid' gives
 # kepler_p_detect = logistic(sigmoid_steepness * (MES - mes_threshold)), used as a weight.

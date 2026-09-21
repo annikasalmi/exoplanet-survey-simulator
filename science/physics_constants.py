@@ -19,6 +19,7 @@ au_to_m = 1.496e11      # 1 au in meters
 R_SUN_IN_AU = 0.00465047
 R_EARTH_IN_AU = 4.26352e-5
 R_SUN_IN_R_EARTH = 109.076
+M_EARTH_IN_M_JUP = 1.0 / 317.828
 A_g_earth = 0.3         # Albedo of Earth
 Phi_alpha = 0.5         # Phase function at quadrature
 arcsec_to_radians = np.pi / (180 * 3600)  # 1 arcsecond in radians

@@ -1,6 +1,30 @@
-"""HARPS/NIRPS-style RV detector for P-Pop and NASA tables: is a planet's mass recoverable?
-rv_detected = bright enough AND K / sigma_K >= snr_threshold, with sigma_K = sqrt(2/N_obs) * sigma_rv
-and K from M sin i (apply_sini=False uses true mass). A survey-averaged toy model.
+"""HARPS/NIRPS-style RV detector for P-Pop and NASA PSCompPars tables.
+
+RADIAL VELOCITY MODEL
+
+Included for flat-universe simulations:
+- K semi-amplitude formula:
+  K [m/s] = 28.4329 * m_jup * M_star^(-2/3) * P_year^(-1/3) / sqrt(1 - e^2)
+- SNR threshold: detected when K / sigma_K >= 5.0 by default
+- instrument model: HARPS (High Accuracy Radial velocity Planet Searcher) and
+  NIRPS (Near InfraRed Planet Searcher), with photon noise, instrument floor,
+  stellar-jitter RMS by spectral type, and n_obs = 100 observations by default
+- eccentricity: clipped to [0, 0.95]
+- M sin i preference: use pl_msinie if available; otherwise use pl_bmasse / mass_p
+
+Included for calibration against real RV planets:
+- published K values: pl_rvamp from NASA PSCompPars is normalized to rv_amp_obs
+- ESO archive matching: plotting/paper_figures/recovery_3x1.py marks which hosts
+  were actually observed by HARPS/NIRPS
+
+Not included:
+- long-term trends / polynomial drift, explicit observing cadence, full correlated
+  stellar-activity models, multi-planet dynamics, or non-HARPS/NIRPS RV instruments
+  such as CARMENES, ESPRESSO, APF, HIRES, etc.
+
+Calibration data sources:
+- NASA PSCompPars: published K, masses and orbital parameters
+- ESO HARPS/NIRPS archive matching in the calibration plotting code
 """
 
 from __future__ import annotations
@@ -10,6 +34,7 @@ from typing import Optional, Union
 import numpy as np
 import pandas as pd
 
+from science import physics_constants as const
 from science.physics import infer_stellar_type
 
 try:
@@ -19,32 +44,13 @@ except Exception:  # lets this file import outside the lifesim environment
 
 
 class RVData:
-    # ------------------------------------------------------------------
-    # Physical constants
-    # ------------------------------------------------------------------
-    M_EARTH_IN_M_JUP = 1.0 / 317.828  # Earth masses -> Jupiter masses
-    K_CONST_MS = 28.4329              # m/s, canonical RV semi-amplitude prefactor
-
-    # Stellar RV jitter (m/s RMS) by spectral type, visible band: Bellotti & Korhonen (2021) Table 3
-    # median peak-to-peak / 2.8. Reflects their sample's activity mix, not a universal law; A is
-    # extrapolated. Replaces earlier values tuned to pl_rvamperr (M-dwarf jitter now ~10x lower).
-    JITTER_BY_STYPE_MS = {"A": 5.0, "F": 1.6, "G": 2.4, "K": 3.5, "M": 0.25, "Unknown": 2.0}
-
-    # Teff -> bolometric correction (M_bol = M_band + BC_band, so M_band = M_bol - BC_band).
-    # BC_V is large and NEGATIVE for cool stars -> M dwarfs faint in V (optical RV struggles).
-    # BC_J is POSITIVE and large for cool stars -> M dwarfs BRIGHT in J (NIR RV / NIRPS wins).
-    _TEFF_GRID = np.array([2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 7000, 8000], dtype=float)
-    _BC_V_GRID = np.array([-4.0, -2.6, -1.6, -1.0, -0.6, -0.35, -0.2, -0.1, -0.05, -0.1], dtype=float)
-    _BC_J_GRID = np.array([2.30, 2.10, 1.90, 1.70, 1.55, 1.45, 1.35, 1.25, 1.00, 0.70], dtype=float)
-    _BC_GRIDS = {"V": _BC_V_GRID, "J": _BC_J_GRID}
-
     # Per-instrument presets. NIRPS (J band) sees M dwarfs bright and less jittery, covering where
     # HARPS fails; take the per-planet best instrument, don't average. Constants from published
     # campaigns (e.g. HARPS-N TOI-1453: 100 points, 1.56 m/s). phot_full_mag = faintest mag that
     # still reaches sigma_phot_ref with longer exposures; fainter stars get noisier.
     INSTRUMENT_PRESETS = {
-        # HARPS jitter grounded to Bellotti & Korhonen (2021) Table 3 (visible domain);
-        # see JITTER_BY_STYPE_MS above for the p2p->RMS conversion and caveats.
+        # HARPS jitter grounded to Bellotti & Korhonen (2021) Table 3 (visible domain),
+        # median peak-to-peak / 2.8, with A extrapolated.
         "HARPS": dict(band="V", sigma_instr_ms=0.8, sigma_phot_ref_ms=1.0, phot_full_mag=12.0,
                       jitter_by_stype={"A": 5.0, "F": 1.6, "G": 2.4, "K": 3.5, "M": 0.25, "Unknown": 2.0}),
         # NIRPS: NIR band J; M dwarfs bright + lower activity jitter in the IR.  Bellotti &
@@ -98,8 +104,18 @@ class RVData:
         self.instrument = str(instrument).upper().strip()
         preset = self.INSTRUMENT_PRESETS.get(self.instrument, self.INSTRUMENT_PRESETS["HARPS"])
         self.band = (band or preset["band"]).upper().strip()
-        if self.band not in self._BC_GRIDS:
-            raise ValueError(f"band must be one of {list(self._BC_GRIDS)}, got {self.band!r}")
+
+        # Teff -> bolometric correction (M_bol = M_band + BC_band, so M_band = M_bol - BC_band).
+        # V makes cool stars faint for optical RV; J makes them bright for NIRPS.
+        self.teff_grid = np.array([2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 7000, 8000], dtype=float)
+        self.bc_grids = {
+            "V": np.array([-4.0, -2.6, -1.6, -1.0, -0.6, -0.35, -0.2, -0.1, -0.05, -0.1], dtype=float),
+            "J": np.array([2.30, 2.10, 1.90, 1.70, 1.55, 1.45, 1.35, 1.25, 1.00, 0.70], dtype=float),
+        }
+        if self.band not in self.bc_grids:
+            raise ValueError(f"band must be one of {list(self.bc_grids)}, got {self.band!r}")
+
+        self.rv_k_prefactor_ms = 28.4329
         self.sigma_instr_ms = float(sigma_instr_ms if sigma_instr_ms is not None else preset["sigma_instr_ms"])
         self.sigma_phot_ref_ms = float(sigma_phot_ref_ms if sigma_phot_ref_ms is not None else preset["sigma_phot_ref_ms"])
         self.phot_full_mag = float(phot_full_mag if phot_full_mag is not None else preset["phot_full_mag"])
@@ -199,7 +215,7 @@ class RVData:
             )
         if "ecc_p" not in self.catalog.columns:
             self.catalog["ecc_p"] = 0.0
-        self.catalog["ecc_p"] = pd.to_numeric(self.catalog["ecc_p"], errors="coerce").fillna(0.0).clip(0.0, 0.99)
+        self.catalog["ecc_p"] = pd.to_numeric(self.catalog["ecc_p"], errors="coerce").fillna(0.0).clip(0.0, 0.95)
         if "habitable" not in self.catalog.columns and "flux_p" in self.catalog.columns:
             flux = pd.to_numeric(self.catalog["flux_p"], errors="coerce")
             self.catalog["habitable"] = (flux >= 0.25) & (flux <= 2.0)
@@ -217,7 +233,7 @@ class RVData:
             )
 
     # ------------------------------------------------------------------
-    # Stellar properties
+    # Flat-universe input: stellar mass and instrumental brightness
     # ------------------------------------------------------------------
 
     def stellar_mass_msun(self) -> pd.Series:
@@ -259,7 +275,7 @@ class RVData:
         m_bol = 4.74 - 2.5 * np.log10(l) + 5 * np.log10(d / 10.0)
         if "teff_s" in self.catalog.columns:
             teff = pd.to_numeric(self.catalog["teff_s"], errors="coerce")
-            bc = pd.Series(np.interp(teff.clip(2500, 8000).to_numpy(float), self._TEFF_GRID, bc_grid),
+            bc = pd.Series(np.interp(teff.clip(2500, 8000).to_numpy(float), self.teff_grid, bc_grid),
                            index=self.catalog.index)
             return m_bol - bc  # M_bol = M_band + BC_band
         return m_bol
@@ -271,7 +287,7 @@ class RVData:
         if "vmag" in self.catalog.columns:
             cv = pd.to_numeric(self.catalog["vmag"], errors="coerce")
             v = v.where(cv.isna(), cv); src = src.where(cv.isna(), "vmag_catalog")
-        m_v = self._mag_from_lum(self._BC_V_GRID)
+        m_v = self._mag_from_lum(self.bc_grids["V"])
         need = v.isna() & m_v.notna()
         v = v.where(~need, m_v); src = src.where(~need, "vmag_from_lum_distance_bc")
         if "gaiamag" in self.catalog.columns:
@@ -290,7 +306,7 @@ class RVData:
         if self.band == "V":
             mag = v.copy(); src = self.catalog["rv_vmag_source"].copy()
         else:
-            mag = self._mag_from_lum(self._BC_GRIDS[self.band])
+            mag = self._mag_from_lum(self.bc_grids[self.band])
             src = pd.Series(f"mag_{self.band}_from_lum_distance_bc", index=self.catalog.index, dtype=object)
             # fall back to V where the band magnitude could not be built
             mag = mag.where(mag.notna(), v)
@@ -300,7 +316,7 @@ class RVData:
         return mag
 
     # ------------------------------------------------------------------
-    # Signal, noise, S/N
+    # Flat-universe signal: planet mass choice and K semi-amplitude
     # ------------------------------------------------------------------
 
     def planet_mass_for_signal_mearth(self) -> pd.Series:
@@ -335,13 +351,13 @@ class RVData:
     def calc_semiamplitude(self) -> pd.Series:
         """RV semi-amplitude K in m/s (canonical formula)."""
         m_signal_mearth = self.planet_mass_for_signal_mearth()
-        m_jup = m_signal_mearth * self.M_EARTH_IN_M_JUP
+        m_jup = m_signal_mearth * const.M_EARTH_IN_M_JUP
         mstar = self.stellar_mass_msun()
         p_yr = pd.to_numeric(self.catalog["p_orb"], errors="coerce") / 365.25
-        ecc = pd.to_numeric(self.catalog["ecc_p"], errors="coerce").fillna(0.0).clip(0.0, 0.99)
+        ecc = pd.to_numeric(self.catalog["ecc_p"], errors="coerce").fillna(0.0).clip(0.0, 0.95)
 
         k = (
-            self.K_CONST_MS
+            self.rv_k_prefactor_ms
             * m_jup
             * mstar ** (-2.0 / 3.0)
             * p_yr ** (-1.0 / 3.0)
@@ -350,6 +366,10 @@ class RVData:
         k = k.replace([np.inf, -np.inf], np.nan).fillna(0.0).clip(lower=0.0)
         self.catalog["rv_k_ms"] = k
         return k
+
+    # ------------------------------------------------------------------
+    # Flat-universe noise model: instrument + photon noise + toy stellar jitter
+    # ------------------------------------------------------------------
 
     def calc_noise(self) -> pd.Series:
         """Per-measurement RV precision sigma_rv (m/s): instrument, photon and jitter in quadrature.
@@ -372,6 +392,10 @@ class RVData:
         self.catalog["rv_sigma_jitter_ms"] = jitter
         self.catalog["rv_sigma_ms"] = sigma_rv
         return sigma_rv
+
+    # ------------------------------------------------------------------
+    # Flat-universe detection statistic: K / sigma_K
+    # ------------------------------------------------------------------
 
     def calc_snr(self) -> pd.Series:
         """rv_snr = K / sigma_K, with sigma_K^2 = (2/N)[instr^2 + phot^2 + ((1-f) jit)^2] + (f jit)^2.
@@ -404,7 +428,6 @@ class RVData:
     def classify_reasons(self) -> pd.Series:
         bright = self.catalog["rv_star_bright_enough"].astype(bool)
         snr = pd.to_numeric(self.catalog["rv_snr"], errors="coerce").fillna(0.0)
-        k = pd.to_numeric(self.catalog["rv_k_ms"], errors="coerce").fillna(0.0)
         jitter = pd.to_numeric(self.catalog["rv_sigma_jitter_ms"], errors="coerce").fillna(0.0)
         sigma = pd.to_numeric(self.catalog["rv_sigma_ms"], errors="coerce").fillna(np.inf)
         detected = self.catalog["rv_detected"].astype(bool)
@@ -427,12 +450,25 @@ class RVData:
     # ------------------------------------------------------------------
 
     def determine_detectable(self) -> pd.DataFrame:
+        """Run the toy RV detector.
+
+        Flat-universe detection uses two gates:
+            1. target is bright enough for the chosen HARPS/NIRPS preset
+            2. RV mass SNR = K / sigma_K passes snr_threshold
+
+        Calibration rows can carry published pl_rvamp -> rv_amp_obs for comparison, but
+        the detector always uses the same forward model for K and sigma_K.
+        """
         self._validate()
+
+        # 1. Forward model the RV signal and its uncertainty.
         snr = self.calc_snr()
+
+        # 2. Target feasibility: apparent magnitude in the active instrument band.
         bright = self.bright_enough()
 
+        # 3. Detection threshold: default is a 5-sigma secure-mass cut.
         snr_pass = snr >= self.snr_threshold
-        
         detected = bright & snr_pass
         self.catalog["rv_snr_pass"] = snr_pass
         self.catalog["rv_detected"] = detected

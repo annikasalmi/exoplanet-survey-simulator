@@ -30,9 +30,6 @@ CALIBRATION_DIR = os.path.join(FIGURES_DIR, "calibration")
 OTHER_FIGURES_DIR = os.path.join(FIGURES_DIR, "other")   # plotting/scripts/*.py
 PAPER_FIGURES_DIR = os.path.join(RESULTS_DIR, "paper")
 
-LOGGING = os.path.join(RESULTS_DIR, "logs")
-DEMO_DIR = os.path.join(RESULTS_DIR, "demo")  # hwo_demo / lifesim_demo
-
 
 SILICON_CURVE = os.path.join(DATA_DIR, "silicon_curve.ddat")
 EXOPLANET_CSV_DIR = os.path.join(DATA_DIR, "exoplanet_csv")
@@ -45,3 +42,4 @@ PSCOMPPARS_CSV = os.path.join(EXOPLANET_CSV_DIR, "pscomppars_2026.csv")
 PSCOMPPARS_TRANSITING_CSV = os.path.join(EXOPLANET_CSV_DIR, "pscomppars_transiting_mass_insol.csv")
 KEPLER_REF_CURVE = os.path.join(
     REPO_ROOT, "science", "telescopes", "kepler", "reference_curves", "ref.ddat")
+CDPP_DIR = os.path.join(DATA_DIR, "CDPP")

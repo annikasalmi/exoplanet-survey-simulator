@@ -64,7 +64,14 @@ Simulation runs should go through `sim.py`.
 
 ## Reproducing the paper's analysis figures
 
-Run the individual scripts under `plotting/scripts/`.
+```bash
+python make_paper_figures.py
+```
+
+This writes every paper figure to `results/paper/`, downloading and caching the catalogues
+it needs; no P-Pop universe is required. `--list` prints each script and the figures it
+makes, and naming a script runs only that one. To run them individually instead, the
+scripts are under `plotting/scripts/`.
 This table summarizes the detectors:
 ## Instrument model fidelity
 

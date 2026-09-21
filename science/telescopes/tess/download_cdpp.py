@@ -9,12 +9,11 @@ import sys
 import urllib.request
 from pathlib import Path
 
-from tools.paths import TESS_DATA_DIR
+from tools.paths import CDPP_DIR
 from science.telescopes.tess.build_reference_data import MAX_SECTOR
 
 PAGE_URL = "https://archive.stsci.edu/tess/bulk_downloads/bulk_downloads_tce.html"
-FILE_URL = "https://archive.stsci.edu/missions/tess/catalogs/cdpp/{}"
-CDPP_DIR = Path(TESS_DATA_DIR) / "CDPP"
+FILE_URL = "https://archive.stsci.edu/missions/tess/catalogs/cdpp/{}
 
 
 def single_sector_files(page: str) -> list[str]:

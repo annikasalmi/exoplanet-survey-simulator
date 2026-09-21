@@ -4,11 +4,11 @@
 detection pipelines. It also includes the configurations, data snapshots, and scripts
 needed to reproduce the accompanying paper. It focuses on rocky to sub-Neptune sized planets.
 
-The framework can generate synthetic planets, apply selection effects, propagate
+This repo can generate synthetic planets, apply selection effects, propagate
 measurement uncertainties, compare detections with catalogued planets, and produce
 analysis figures. 
 
-The framework supports different science questions by allowing population models,
+It supports different science questions by allowing population models,
 instruments, selection cuts, and comparison statistics to be changed without rewriting the
 full pipeline. Included detection models cover Kepler, TESS, HARPS/NIRPS-like
 radial-velocity observations, HWO, and LIFE.
@@ -21,7 +21,7 @@ radial-velocity observations, HWO, and LIFE.
 4. Compare the recovered population with observed exoplanet catalogues.
 5. Generate calibration, selection-function, and population-comparison figures.
 
-The P-Pop "real" universe is vendored from [P-Pop](https://github.com/kammerje/P-pop) and
+The P-Pop "real" universe is from [P-Pop](https://github.com/kammerje/P-pop) and
 [Forecaster](https://github.com/chenjj2/forecaster). The LIFE planetary detction model is based on the included
 [LIFEsim](https://github.com/fdannert/LIFEsim) fork. `UPSTREAM.md` files list the changes.
 
@@ -71,6 +71,7 @@ python make_paper_figures.py
 This writes every paper figure to `results/paper/`, downloading and caching the catalogues
 it needs; no P-Pop universe is required. To run them individually instead, the paper
 figure scripts are under `plotting/paper_figures/`.
+
 This table summarizes the detectors:
 ## Instrument model fidelity
 

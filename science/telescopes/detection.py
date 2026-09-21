@@ -103,11 +103,7 @@ def prepare_kepler_catalog(
     if "detected" not in frame and "detected_best" in frame:
         frame["detected"] = frame["detected_best"]
     if "bright_enough_kepler" not in frame:
-        source = (
-            "kepler_star_bright_enough"
-            if "kepler_star_bright_enough" in frame.columns else None
-        )
-        frame["bright_enough_kepler"] = frame[source] if source else True
+        frame["bright_enough_kepler"] = True
     if "kepler_enough_transits" not in frame:
         frame["kepler_enough_transits"] = (
             frame["n_transits_keplerish"] >= 3

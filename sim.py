@@ -50,14 +50,6 @@ STAR_CATALOG = "Gaia"
 
 ### SET UP TELESCOPE BEING USED
 TELESCOPES = ("kepler", "tess", "rv")
-RV_MAG_TARGET = 12.0
-TESS_DEFAULTS = {
-    "use_cdpp_tables": False,
-    "min_transits": 2,
-    "snr_threshold": 7.1,
-    "phase_mode": "random",
-    "tmag_limit": 16.0,
-}
 
 ### RUN MULTIPLE TELESCOPES / UNIVERSES
 NRUNS = 1
@@ -110,12 +102,12 @@ def run_telescope(catalog, telescope, seed):
         return catalog
     if telescope == "tess":
         out = TESSData(
-            catalog.copy(), source=source, random_seed=seed, **TESS_DEFAULTS
+            catalog.copy(), source=source, random_seed=seed
         ).determine_detectable()
         catalog["tess_detected"] = out["detected"].astype(bool).to_numpy()
         return catalog
     if telescope == "rv":
-        out = run_rv_best(catalog, mag_target=RV_MAG_TARGET, source=source)
+        out = run_rv_best(catalog, source=source)
         catalog["rv_detected"] = out["detected"].astype(bool).to_numpy()
         for col in ("rv_is_target", "rv_best_band"):
             if col in out:

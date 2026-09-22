@@ -19,7 +19,7 @@ from science.telescopes.rv.detection_model import RVData
 from science.telescopes.tess.detection_model import TESSData
 
 
-DEFAULT_RV_MAG_TARGET = 12.0
+DEFAULT_RV_MAG_TARGET = None
 POPULATION_GENERATORS = {
     "superearths_supneptunes": partial(
         flat_radii_curves, variant="superearths_supneptunes"
@@ -28,8 +28,12 @@ POPULATION_GENERATORS = {
 }
 
 
-def run_rv_best(catalog: pd.DataFrame, mag_target: float = 12.0, source: str = "ppop") -> pd.DataFrame:
-    """Combine each planet's HARPS and NIRPS detections and target eligibility."""
+def run_rv_best(
+    catalog: pd.DataFrame,
+    mag_target: float | None = None,
+    source: str = "ppop",
+) -> pd.DataFrame:
+    """Combine each planet's HARPS and NIRPS detections."""
     harps = RVData(
         catalog.copy(), source=source, instrument="HARPS"
     ).determine_detectable()
@@ -42,9 +46,10 @@ def run_rv_best(catalog: pd.DataFrame, mag_target: float = 12.0, source: str = "
     best["detected_worst"] = best["detected"]
     harps_magnitude = pd.to_numeric(harps["rv_mag"], errors="coerce")
     nirps_magnitude = pd.to_numeric(nirps["rv_mag"], errors="coerce")
-    best["rv_is_target"] = (
-        (harps_magnitude <= mag_target) | (nirps_magnitude <= mag_target)
-    )
+    if mag_target is not None:
+        best["rv_is_target"] = (
+            (harps_magnitude <= mag_target) | (nirps_magnitude <= mag_target)
+        )
     best["rv_best_band"] = np.where(
         nirps["detected"].astype(bool) & ~harps["detected"].astype(bool),
         "NIRPS",
@@ -194,7 +199,7 @@ def run_transit_rv_selection(
         transit_eligible = transit["transiting_geometric"].astype(bool).to_numpy()
     elif mission == "tess":
         transit = TESSData(
-            catalog.copy(), source="ppop", use_cdpp_tables=False
+            catalog.copy(), source="ppop"
         ).determine_detectable()
         transit_eligible = (
             transit["tess_observed"].astype(bool)
@@ -380,7 +385,7 @@ def build_stellar_selection_panel(
     period_limits=(0.2, 20_000.0),
     minimum_radius=0.6,
     transit_mission="TESS",
-    rv_mag_target=12.0,
+    rv_mag_target=DEFAULT_RV_MAG_TARGET,
 ):
     """Generate the main and optional map-only selection samples for one host type."""
     samples = []

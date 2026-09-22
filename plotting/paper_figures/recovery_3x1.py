@@ -409,8 +409,9 @@ def tess_run(df: pd.DataFrame) -> pd.DataFrame:
     df = df.dropna(subset=["tess_sectors"])
     print(f"TOIs with at least one searched 2-min sector: {len(df):,}")
 
-    out = TESSData(df, source="nasa", min_transits=3, snr_threshold=SNR_THRESHOLD, tmag_limit=16.0,
+    out = TESSData(df, source="nasa", min_transits=3, snr_threshold=SNR_THRESHOLD,
                    use_catalog_sectors=True, phase_mode="expected", cdpp_dir=CDPP_DIR,
+                   use_cdpp_tables=True,
                    validate_for_detection=True).determine_detectable()
     out["toy_over_official_snr"] = (
         pd.to_numeric(out["tess_snr"], errors="coerce") /

@@ -87,7 +87,7 @@ class RVData:
                                            # small planets f=0 recovers 57.6% at >=5 sigma (58.5% published),
                                            # f=0.5 only 10.8%. Kept as a sensitivity knob.
         snr_threshold: float = 5.0,        # 5-sigma "secure mass" (analog of 7.1 MES)
-        vmag_limit: float = 16.0,          # generous faint cutoff for follow-up feasibility
+        vmag_limit: Optional[float] = None, # optional faint cutoff for follow-up feasibility
         # --- mass / signal options ---
         apply_sini: bool = True,           # use Mp*sin i (realistic) vs true Mp
         # --- detection-efficiency model (matches kepler/tess) ---
@@ -120,7 +120,7 @@ class RVData:
         self.n_obs = int(n_obs)
         self.jitter_red_frac = float(np.clip(jitter_red_frac, 0.0, 1.0))
         self.snr_threshold = float(snr_threshold)
-        self.vmag_limit = float(vmag_limit)
+        self.vmag_limit = float(vmag_limit) if vmag_limit is not None else None
         self.apply_sini = bool(apply_sini)
         self.detection_model = detection_model.lower().strip()
         self.sigmoid_steepness = float(sigmoid_steepness)
@@ -282,7 +282,7 @@ class RVData:
         if not self.photon_beats_floor:
             excess = excess.clip(lower=0.0)
         sigma_phot = (self.sigma_phot_ref_ms * 10 ** (0.2 * excess)).clip(lower=self.sigma_phot_sys_floor)
-        sigma_phot = sigma_phot.replace([np.inf, -np.inf], np.nan).fillna(self.sigma_phot_ref_ms)
+        sigma_phot = sigma_phot.replace(-np.inf, np.nan).fillna(np.inf)
 
         jitter = self.catalog["stype"].map(self.jitter_by_stype).astype(float)
         jitter = jitter.fillna(self.jitter_by_stype.get("Unknown", 2.0))
@@ -320,7 +320,9 @@ class RVData:
 
     def bright_enough(self) -> pd.Series:
         mag = pd.to_numeric(self.catalog["rv_mag"], errors="coerce") if "rv_mag" in self.catalog.columns else self.apparent_band_mag()
-        bright = mag.le(self.vmag_limit).fillna(False)
+        bright = mag.notna()
+        if self.vmag_limit is not None:
+            bright &= mag.le(self.vmag_limit)
         self.catalog["rv_vmag_limit"] = self.vmag_limit
         self.catalog["rv_star_bright_enough"] = bright
         return bright

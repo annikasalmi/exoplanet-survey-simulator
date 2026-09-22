@@ -118,12 +118,12 @@ def make_figure(cut_label, cut, fname, pools, nasa, m_sil, r_sil, rng):
         _draw_scatter(axes[0, ci], arr, cut, nasa, m_sil, r_sil, rng, name)
         _draw_density_1x2(axes[1, ci], arr, cut, nasa, m_sil, r_sil, rng, tag=f"[{cut_label}] {name}")
     fig.tight_layout()
-    out_png = OUT_DIR / fname
-    fig.savefig(out_png, dpi=170, bbox_inches="tight")
     if fname == "flat_rocky_mr_relations_2x4_low-insolation_corner.png":
         PAPER_FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-        fig.savefig(PAPER_FIGURES_DIR / fname, dpi=170, bbox_inches="tight")
-        print(f"--> Saved paper copy: {PAPER_FIGURES_DIR / fname}")
+        out_png = PAPER_FIGURES_DIR / fname
+    else:
+        out_png = OUT_DIR / fname
+    fig.savefig(out_png, dpi=170, bbox_inches="tight")
     plt.close(fig)
     print(f"--> Saved: {out_png}")
 
@@ -210,13 +210,11 @@ def make_otegi_1x2(nasa, m_sil, r_sil, rng, show_full_population=False):
         fig.suptitle("Simulated detections of low-insolation massive planets", y=1.01, va="bottom")
     fname = ("flat_otegi_1x2_with_full_population.png" if show_full_population
              else "flat_otegi_1x2_low-insolation_selection.png")
-    out_png = OUT_DIR / fname
-    fig.savefig(out_png, dpi=170, bbox_inches="tight")
     PAPER_FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-    fig.savefig(PAPER_FIGURES_DIR / fname, dpi=170, bbox_inches="tight")
+    out_png = PAPER_FIGURES_DIR / fname
+    fig.savefig(out_png, dpi=170, bbox_inches="tight")
     plt.close(fig)
     print(f"--> Saved: {out_png}")
-    print(f"--> Saved paper copy: {PAPER_FIGURES_DIR / fname}")
 
 
 def main():

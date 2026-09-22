@@ -619,10 +619,10 @@ def main() -> None:
 
     for ax in axes:
         ax.set_title(ax.get_title().replace(" model planet recovery", ""))
-    fig.savefig(OUT_DIR / "recovery_3x1.png", bbox_inches="tight")
-    fig.savefig(PAPER_FIG_DIR / "recovery_3x1.png", bbox_inches="tight")
+    out = PAPER_FIG_DIR / "recovery_3x1.png"
+    fig.savefig(out, bbox_inches="tight")
     plt.close(fig)
-    print(f"  Saved paper copy: {PAPER_FIG_DIR / 'recovery_3x1.png'}")
+    print(f"  Saved: {out}")
 
 
 if __name__ == "__main__":

@@ -105,11 +105,10 @@ def main():
         ax.grid(alpha=0.15)
 
     fig.suptitle("MCMC runs of distribution compared to observed exoplanets", fontsize=30)
-    out = os.path.join(OUT_DIR, f"mc_comparison_statistic_{N_DRAWS}.png")
-    fig.savefig(out, dpi=150, bbox_inches="tight")
     os.makedirs(PAPER_FIGURES_DIR, exist_ok=True)
-    fig.savefig(os.path.join(PAPER_FIGURES_DIR, os.path.basename(out)), dpi=150, bbox_inches="tight")
-    print(f"--> Saved: {out}  ({time.time()-t0:.0f}s), plus a copy in {PAPER_FIGURES_DIR}")
+    out = os.path.join(PAPER_FIGURES_DIR, f"mc_comparison_statistic_{N_DRAWS}.png")
+    fig.savefig(out, dpi=150, bbox_inches="tight")
+    print(f"--> Saved: {out}  ({time.time()-t0:.0f}s)")
 
 
 if __name__ == "__main__":

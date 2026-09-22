@@ -16,7 +16,7 @@ import pandas as pd
 
 from tools.paths import (
     SILICON_CURVE, ANALYSIS_DIR, PAPER_FIGURES_DIR, KEPLER_DATA_DIR,
-    TESS_DATA_DIR, REPO_ROOT, _EXOPLANET_CSV_DIR,
+    TESS_DATA_DIR, REPO_ROOT, _EXOPLANET_CSV_DIR, PSCOMPPARS_CSV,
 )
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D

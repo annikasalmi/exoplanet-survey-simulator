@@ -37,6 +37,15 @@ LABELS = {"rocky_formation": "Sub-Neptune + Super-Earth",
 # The sample's precision cuts (M +-25%, R +-8%) as the noise model, on NASA and simulated planets alike.
 COMPARISON_ERROR = NASA_MEASUREMENT_ERROR
 
+BIG_TEXT_STYLE = {
+    "font.size": 30,
+    "axes.titlesize": 30,
+    "axes.labelsize": 30,
+    "xtick.labelsize": 26,
+    "ytick.labelsize": 26,
+    "legend.fontsize": 26,
+}
+
 
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
@@ -56,10 +65,10 @@ def main():
         "superearths_supneptunes", pool_size=MC_POOL_SIZE, chunk_size=MC_CHUNK_SIZE,
         cache_dir=OUT_DIR, box=COMPARISON_PARAMETER_BOX))
 
-    plt.rcParams.update(PAPER_STYLE)
+    plt.rcParams.update(PAPER_STYLE | BIG_TEXT_STYLE)
     rng = np.random.default_rng(0)
     fig, axes = plt.subplots(1, 3, figsize=(24, 7.5), layout="constrained")
-    for ax, (blabel, lo, hi) in zip(axes, INSOLATION_BINS):
+    for i, (ax, (blabel, lo, hi)) in enumerate(zip(axes, INSOLATION_BINS)):
         k_obs, n_obs = observed_volatile_count(
             nasa, lo, hi, m_sil, r_sil, mass_min=SUPER_EARTH_MIN_MASS)
         f_obs = k_obs / n_obs
@@ -94,17 +103,17 @@ def main():
         for key in ("rocky_formation", "escape_only"):
             c = "C0" if key == "rocky_formation" else "C1"
             ax.hist(stats[key], bins=edges, color=c, alpha=0.45, density=True)
-            ax.axvline(points[key], color=c, ls="--", lw=2, label=LABELS[key])
+            ax.axvline(points[key], color=c, ls="--", lw=3, label=LABELS[key])
             print(f"    {key:<16} x_k point = {points[key]:.2f}  "
                   f"(draws: {stats[key].mean():.2f} +- {stats[key].std():.2f})")
         ax.set_xlim(left=-0.05)
         ax.set_title(f"{blabel} (M>2) $I_\\oplus$")
         ax.set_xlabel(r"$x_k = (f_k - f_{\rm obs})^2\,/\,\hat\sigma_{\rm obs}^2$")
         ax.set_ylabel("Probability density")
-        ax.legend(loc="upper right")
-        ax.grid(alpha=0.15)
+        if i == 0:
+            ax.legend(loc="upper right", handlelength=1.4)
 
-    fig.suptitle("MCMC runs of distribution compared to observed exoplanets", fontsize=30)
+    fig.suptitle("MCMC Volatile-Fraction Discrepancy Relative to Observations", fontsize=30)
     os.makedirs(PAPER_FIGURES_DIR, exist_ok=True)
     out = os.path.join(PAPER_FIGURES_DIR, f"mc_comparison_statistic_{N_DRAWS}.png")
     fig.savefig(out, dpi=150, bbox_inches="tight")

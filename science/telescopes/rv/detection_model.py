@@ -55,11 +55,13 @@ class RVData:
         # HARPS jitter grounded to Bellotti & Korhonen (2021) Table 3 (visible domain),
         # median peak-to-peak / 2.8, with A extrapolated.
         "HARPS": dict(band="V", sigma_instr_ms=0.8, sigma_phot_ref_ms=1.0, phot_full_mag=12.0,
+                      mag_limit=12.0,
                       jitter_by_stype={"A": 5.0, "F": 1.6, "G": 2.4, "K": 3.5, "M": 0.25, "Unknown": 2.0}),
         # NIRPS: NIR band J; M dwarfs bright + lower activity jitter in the IR.  Bellotti &
         # Korhonen (2021) is VISIBLE-domain (bluer = larger jitter), so their values do not
         # transfer to the NIR; NIRPS jitter kept lower here by design.  Not grounded to their table.
         "NIRPS": dict(band="J", sigma_instr_ms=1.0, sigma_phot_ref_ms=1.0, phot_full_mag=11.0,
+                      mag_limit=11.0,
                       jitter_by_stype={"A": 6.0, "F": 4.0, "G": 2.5, "K": 1.6, "M": 1.2, "Unknown": 2.0}),
     }
 
@@ -87,7 +89,8 @@ class RVData:
                                            # small planets f=0 recovers 57.6% at >=5 sigma (58.5% published),
                                            # f=0.5 only 10.8%. Kept as a sensitivity knob.
         snr_threshold: float = 5.0,        # 5-sigma "secure mass" (analog of 7.1 MES)
-        vmag_limit: Optional[float] = None, # optional faint cutoff for follow-up feasibility
+        mag_limit: Optional[float] = None,  # optional faint cutoff in the active instrument band
+        vmag_limit: Optional[float] = None, # deprecated alias for mag_limit
         # --- mass / signal options ---
         apply_sini: bool = True,           # use Mp*sin i (realistic) vs true Mp
         # --- detection-efficiency model (matches kepler/tess) ---
@@ -120,7 +123,11 @@ class RVData:
         self.n_obs = int(n_obs)
         self.jitter_red_frac = float(np.clip(jitter_red_frac, 0.0, 1.0))
         self.snr_threshold = float(snr_threshold)
-        self.vmag_limit = float(vmag_limit) if vmag_limit is not None else None
+        if mag_limit is not None and vmag_limit is not None:
+            raise ValueError("Use only one of mag_limit or vmag_limit.")
+        limit = mag_limit if mag_limit is not None else vmag_limit
+        self.mag_limit = float(limit if limit is not None else preset["mag_limit"])
+        self.vmag_limit = self.mag_limit
         self.apply_sini = bool(apply_sini)
         self.detection_model = detection_model.lower().strip()
         self.sigmoid_steepness = float(sigmoid_steepness)
@@ -321,9 +328,10 @@ class RVData:
     def bright_enough(self) -> pd.Series:
         mag = pd.to_numeric(self.catalog["rv_mag"], errors="coerce") if "rv_mag" in self.catalog.columns else self.apparent_band_mag()
         bright = mag.notna()
-        if self.vmag_limit is not None:
-            bright &= mag.le(self.vmag_limit)
-        self.catalog["rv_vmag_limit"] = self.vmag_limit
+        if self.mag_limit is not None:
+            bright &= mag.le(self.mag_limit)
+        self.catalog["rv_mag_limit"] = self.mag_limit
+        self.catalog["rv_vmag_limit"] = self.mag_limit
         self.catalog["rv_star_bright_enough"] = bright
         return bright
 

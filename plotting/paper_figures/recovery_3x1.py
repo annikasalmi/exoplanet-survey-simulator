@@ -16,7 +16,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from tools.paths import ( KOI_CUMULATIVE_CSV, PAPER_FIGURES_DIR, DATA_DIR,
-                         CALIBRATION_DIR, TESS_DATA_DIR, KEPLER_DATA_DIR)
+                         CALIBRATION_DIR, KEPLER_DATA_DIR, CDPP_DIR)
 from science.catalogs import nasa_tap_url, read_nasa_csv
 from science.physics import infer_stellar_type
 from tools.plotting_constants import PAPER_STYLE
@@ -42,7 +42,6 @@ DOWNLOAD_NASA_DATA = False          # True refreshes the catalogues from the NAS
 MES_THRESHOLD = 7.1
 SNR_THRESHOLD = 7.1
 PLANET_DISPOSITIONS = ("CONFIRMED", "CANDIDATE")   # false positives are not planets to recover
-CDPP_DIR = Path(TESS_DATA_DIR) / "CDPP"
 MAX_CDPP_SECTOR = 106
 PANEL_SIZE = (7.0, 6.0)             # each panel, inches
 
@@ -51,7 +50,7 @@ ESO_TARGETS_CACHE = Path(KEPLER_DATA_DIR) / "NASA" / "eso_harps_nirps_targets.cs
 ESO_TAP = "http://archive.eso.org/tap_obs/sync"
 ESO_MATCH_ARCSEC = 10.0
 ESO_MIN_EXPOSURES = 10
-RV_ARGS = SimpleNamespace(instrument="HARPS", n_obs=100, snr_threshold=5.0)
+RV_ARGS = SimpleNamespace(instrument="best", n_obs=100, snr_threshold=5.0)
 
 
 # ── Kepler ────────────────────────────────────────────────────────────────────
@@ -542,16 +541,41 @@ def rv_prepare(df: pd.DataFrame, args) -> pd.DataFrame:
     print(f"  K calibration sample: {len(df):,}  |  median K_model/K_pub = {ratio.median():.3f}  "
           f"(16-84%: {ratio.quantile(0.16):.3f}-{ratio.quantile(0.84):.3f})")
 
-    # Run the full RV detector on the same planets, for the recovery figure.
-    rv = RVData(df.rename(columns={
+    rv_input = df.rename(columns={
         "pl_orbper": "p_orb", "pl_orbeccen": "ecc_p", "pl_orbincl": "inc_p",
         "pl_msinie": "msini_p", "pl_bmasse": "mass_p", "pl_rade": "radius_p",
         "st_mass": "mass_s", "st_rad": "radius_s", "st_teff": "teff_s",
         "st_lum": "st_lum_log10", "sy_dist": "distance_s", "sy_vmag": "vmag",
-    }), source="pscomppars", instrument=args.instrument if args.instrument.lower() != "best" else "HARPS",
-        apply_sini=True, n_obs=args.n_obs, snr_threshold=args.snr_threshold,
-        validate_for_detection=False)
-    cat = rv.determine_detectable()
+    })
+
+    # Run the full RV detector on the same planets, for the recovery figure.
+    if args.instrument.lower() == "best":
+        harps = RVData(
+            rv_input.copy(), source="pscomppars", instrument="HARPS",
+            apply_sini=True, n_obs=args.n_obs, snr_threshold=args.snr_threshold,
+            validate_for_detection=False,
+        ).determine_detectable()
+        nirps = RVData(
+            rv_input.copy(), source="pscomppars", instrument="NIRPS",
+            apply_sini=True, n_obs=args.n_obs, snr_threshold=args.snr_threshold,
+            validate_for_detection=False,
+        ).determine_detectable()
+        harps_snr = pd.to_numeric(harps["rv_snr"], errors="coerce").fillna(0.0)
+        nirps_snr = pd.to_numeric(nirps["rv_snr"], errors="coerce").fillna(0.0)
+        use_nirps = nirps_snr.gt(harps_snr)
+        cat = harps.copy()
+        cat["rv_detected"] = harps["rv_detected"].astype(bool) | nirps["rv_detected"].astype(bool)
+        cat["rv_sigma_K_ms"] = pd.to_numeric(harps["rv_sigma_K_ms"], errors="coerce").where(
+            ~use_nirps, pd.to_numeric(nirps["rv_sigma_K_ms"], errors="coerce"))
+        cat["rv_snr"] = harps_snr.where(~use_nirps, nirps_snr)
+        df["rv_best_instrument"] = np.where(use_nirps, "NIRPS", "HARPS")
+    else:
+        cat = RVData(
+            rv_input, source="pscomppars", instrument=args.instrument,
+            apply_sini=True, n_obs=args.n_obs, snr_threshold=args.snr_threshold,
+            validate_for_detection=False,
+        ).determine_detectable()
+        df["rv_best_instrument"] = str(args.instrument).upper()
     df["rv_pass"] = cat["rv_detected"].to_numpy()
     df["sigma_k_model"] = pd.to_numeric(cat["rv_sigma_K_ms"], errors="coerce").to_numpy()
     df["snr_model"] = pd.to_numeric(cat["rv_snr"], errors="coerce").to_numpy()

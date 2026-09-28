@@ -37,6 +37,7 @@ from science.statistics import (
 )
 from science.physics_constants import MR_RELATIONS as RELATIONS
 from tools.paths import ANALYSIS_DIR, PAPER_FIGURES_DIR, PSCOMPPARS_CSV
+from tools.plotting_constants import PAPER_STYLE
 
 OUT_DIR = ANALYSIS_DIR / "flat_rocky_mr_vs_nasa"
 
@@ -193,9 +194,9 @@ def _draw_density_1x2(ax, arr, cut, nasa, m_sil, r_sil, rng, tag=""):
 def make_otegi_1x2(nasa, m_sil, r_sil, rng, show_full_population=False):
     """Volatile-fraction density beside the mass-radius draw.
     show_full_population adds the same pair for the uncut population as a row on top.
-    Orange = superearths_supneptunes; blue = only_subneptunes. The mass-radius panel shows
-    true values with simulated error bars; the densities use noisy values, so some blue can fall
-    below the line."""
+    Orange = superearths_supneptunes; blue = only_subneptunes. The mass-radius panel shades
+    the underlying radius distributions; the densities use noisy values."""
+    plt.rcParams.update(PAPER_STYLE)
     cuts = list(OTEGI_2X2_CUTS) if show_full_population else [OTEGI_2X2_CUTS[1]]
     print(f"\n--> Otegi 1x2 ({len(cuts)} column(s); flat_radii_curves variants):")
     arr = run_transit_rv_selection(
@@ -222,7 +223,8 @@ def make_otegi_1x2(nasa, m_sil, r_sil, rng, show_full_population=False):
     if not show_full_population:
         # Figure-wide title over both panels (placed above the axes; the tight
         # bounding box on save keeps it).
-        fig.suptitle("Simulated detections of low-insolation massive planets", y=1.01, va="bottom")
+        fig.suptitle(r"Simulated Planet Detections at $I < 50\,I_\oplus$ and $M > 2\,M_\oplus$",
+                     y=1.01, va="bottom")
     fname = ("flat_otegi_1x2_with_full_population.png" if show_full_population
              else "flat_otegi_1x2_low-insolation_selection.png")
     PAPER_FIGURES_DIR.mkdir(parents=True, exist_ok=True)

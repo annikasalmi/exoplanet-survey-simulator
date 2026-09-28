@@ -3,26 +3,26 @@
 TESS MODEL
 
 Included for flat-universe simulations:
-- min transits: >= 3 observed transits by default
-- SNR threshold: >= 7.1 by default, theoretically matching Kepler's matched-filter threshold
-  (Sullivan et al. 2015, ApJ 809, 77); practical SPOC thresholds can be closer to 7.3
-- transit shape: limb-darkened TESS-band signal RMS from Claret 2017
-- observation window: fixed sectors by default, real tess-point sector grid optionally
-- brightness/noise gate: TESS magnitude limit plus per-sector CDPP/SNR calculation
+- min transits: >= 3 observed transits required to pass detection
+- SNR threshold: >= 7.1 (Sullivan et al. 2015, ApJ 809, 77), theoretically the
+  same as Kepler; practical SPOC thresholds can be closer to 7.3 after cosmic-ray rejection
+- transit shape: limb-darkened TESS-band signal RMS from Claret 2017, reducing
+  effective depth by about 13%
 
-Included for calibration against real TESS planets:
-- SPOC TCE MES: tce_max_mult_ev from multi-sector TCE tables, attached in recovery_3x1.py
-- per-TIC per-sector CDPP: SPOC noise measurements for 2-minute cadence targets
-- ExoFOP TOI sectors: catalog sectors can drive the searched observing windows
+Included for calibration against real TESS planets only, e.g. recovery_3x1.py:
+- SPOC TCE MES: tce_max_mult_ev from multi-sector TCE tables validates model accuracy
+- per-TIC per-sector CDPP: SPOC noise measurements for 2-minute cadence targets;
+  used to compute SNR = depth / CDPP
+- ExoFOP TOI sectors: catalog sectors drive the searched observing windows
 
 Not included:
-- FFI full-frame image search pipeline (only optional cadence scaling for smooth noise fallback)
-- DV Data Validation vetting after threshold crossing
+- FFI Full-Frame Image searches, including 30-minute cadence stars not in the
+  pre-selected 2-minute target list
+- DV Data Validation vetting after threshold crossing; the model stops at the TPS threshold
 - QLP Quicklook Pipeline detections or dispositions
-- injection-recovery completeness, full contamination modeling, or alternative TESS pipelines
 
 Calibration data sources:
-- ExoFOP TOI table
+- ExoFOP TOI table: 1,343 TOIs in the calibration sample
 - SPOC TCE tables, carrying tce_max_mult_ev for each multi-sector run
 - SPOC CDPP tables, carrying per-star per-sector noise floors
 """
@@ -82,7 +82,7 @@ class TESSData:
         default_n_sectors: int = 5,
         min_transits: int = 3,
         snr_threshold: float = 7.1,
-        tmag_limit: float = 16.0,
+        tmag_limit: Optional[float] = None,
         phase_mode: str = "random",  # random or expected
         random_seed: int = 42,
         # True: sectors from the real pointings in data/sector_grid.npz (tess-point on a sky grid).
@@ -95,12 +95,13 @@ class TESSData:
         # Take sectors from an input tess_sectors column ("1;2;5") instead, e.g. for TOIs.
         use_catalog_sectors: bool = False,
         sector_grid_path: Optional[Union[str, Path]] = None,
+        # Optional binned SPOC CDPP reference table; not loaded by default for flat simulations.
         noise_table_path: Optional[Union[str, Path]] = None,
         use_mast_tic: bool = False,
         mast_max_rows: int = 500,
-        # Per-TIC SPOC CDPP CSVs from MAST (results/catalogs/tess/CDPP); only rows with a ticid use them.
+        # Per-TIC SPOC CDPP CSVs from MAST (results/catalogs/tess/CDPP); calibration-only.
         cdpp_dir: Optional[Union[str, Path]] = None,
-        use_cdpp_tables: bool = True,
+        use_cdpp_tables: bool = False,
         # Last-resort noise when no SPOC table covers a row: 1-hr noise ~ ticgen's pre-launch model
         # (Sullivan et al. 2015 with its 60 ppm/hr systematic floor), within 10% for Tmag 6-12.
         smooth_noise_ref_ppm_1hr: float = 200.0,
@@ -126,7 +127,7 @@ class TESSData:
         self.default_n_sectors = int(default_n_sectors)
         self.min_transits = int(min_transits)
         self.snr_threshold = float(snr_threshold)
-        self.tmag_limit = float(tmag_limit)
+        self.tmag_limit = float(tmag_limit) if tmag_limit is not None else None
         self.phase_mode = phase_mode.lower().strip()
         self.rng = np.random.default_rng(random_seed)
 
@@ -134,7 +135,7 @@ class TESSData:
         self.condition_on_observed = bool(condition_on_observed)
         self.use_catalog_sectors = bool(use_catalog_sectors)
         self.sector_grid_path = Path(sector_grid_path) if sector_grid_path else TESS_REFERENCE_DATA_DIR / "sector_grid.npz"
-        self.noise_table_path = Path(noise_table_path) if noise_table_path else TESS_REFERENCE_DATA_DIR / "spoc_cdpp_tmag.csv"
+        self.noise_table_path = Path(noise_table_path) if noise_table_path else None
         self.use_mast_tic = bool(use_mast_tic)
         self.mast_max_rows = int(mast_max_rows)
         self.cdpp_dir = Path(cdpp_dir) if cdpp_dir is not None else None
@@ -163,7 +164,11 @@ class TESSData:
             data_processing.load_cdpp_tables(self.cdpp_dir, self.CDPP_COLS)
             if self.use_cdpp_tables else pd.DataFrame()
         )
-        self.noise_table = pd.read_csv(self.noise_table_path) if self.noise_table_path.exists() else pd.DataFrame()
+        self.noise_table = (
+            pd.read_csv(self.noise_table_path)
+            if self.noise_table_path is not None and self.noise_table_path.exists()
+            else pd.DataFrame()
+        )
 
         if self.use_mast_tic:
             self.catalog = data_processing.enrich_from_tic(self.catalog, self.mast_max_rows)
@@ -390,12 +395,14 @@ class TESSData:
         return self.catalog["tess_snr"]
 
     # ------------------------------------------------------------------
-    # Flat-universe gate 4: bright enough / noise feasible
+    # Optional magnitude feasibility gate
     # ------------------------------------------------------------------
 
     def _bright_enough(self) -> pd.Series:
-        """TESS brightness gate; mainly prevents impossible/noisy missing-Tmag cases from passing."""
-        bright = pd.to_numeric(self.catalog["tess_tmag"], errors="coerce").le(self.tmag_limit).fillna(False)
+        """Optional TESS magnitude cutoff; disabled by default."""
+        bright = pd.Series(True, index=self.catalog.index)
+        if self.tmag_limit is not None:
+            bright = pd.to_numeric(self.catalog["tess_tmag"], errors="coerce").le(self.tmag_limit).fillna(False)
         self.catalog["tess_tmag_limit"] = self.tmag_limit
         self.catalog["tess_star_bright_enough"] = bright
         return bright
@@ -424,12 +431,11 @@ class TESSData:
     def determine_detectable(self) -> pd.DataFrame:
         """Run the toy TESS detector.
 
-        Flat-universe detection uses five gates:
+        Flat-universe detection uses four gates:
             1. observed by TESS
             2. transiting geometry / observed transit flag
             3. enough observed transits
-            4. bright enough / noise feasible
-            5. SNR >= threshold
+            4. SNR >= threshold
 
         Calibration rows can use catalog sectors, measured depth/duration and SPOC CDPP,
         but the final logical detector is intentionally the same threshold model.
@@ -443,10 +449,10 @@ class TESSData:
         # 3. Count transits in the available sector windows.
         counts = self._transit_counts()
 
-        # 4. Brightness/noise feasibility, using real Tmag or a labeled proxy.
+        # Optional magnitude feasibility; disabled by default.
         self.catalog["tess_star_bright_enough"] = self._bright_enough()
 
-        # 5. Detection statistic: limb-darkened signal over per-sector CDPP.
+        # 4. Detection statistic: limb-darkened signal over per-sector CDPP.
         self.catalog["tess_transit_duration_hr"] = self._duration_hr()
         self.catalog["tess_transit_depth_ppm"] = self._depth_ppm()
         self.catalog["tess_snr"] = self._snr(counts)

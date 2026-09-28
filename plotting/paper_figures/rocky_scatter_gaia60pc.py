@@ -687,7 +687,6 @@ def plot_mr_insolation_panels(m_ref, r_ref, nasa_win: pd.DataFrame,
         ax.set_ylim(*YLIM)
         ax.set_title(title, fontsize=26)
         ax.set_xlabel(r"Mass [$M_\oplus$]", fontsize=24)
-        ax.grid(alpha=0.25, linestyle="--")
         ax.tick_params(labelsize=21)
 
     axes[0].set_ylabel(r"Radius [$R_\oplus$]", fontsize=24)
@@ -713,12 +712,11 @@ def plot_mr_insolation_panels(m_ref, r_ref, nasa_win: pd.DataFrame,
     # Extra horizontal padding so the legend frame clears the last panel.
     fig.get_layout_engine().set(w_pad=0.15)
 
-    out = OUT_DIR / "rocky_mr_insolation_3panel.png"
+    PAPER_FIG_DIR.mkdir(parents=True, exist_ok=True)
+    out = PAPER_FIG_DIR / "rocky_mr_insolation_3panel.png"
     fig.savefig(out, dpi=250, bbox_inches="tight")
-    fig.savefig(PAPER_FIG_DIR / "rocky_mr_insolation_3panel.png", dpi=250, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved mass-radius insolation panels: {out}")
-    print(f"Saved paper copy: {PAPER_FIG_DIR / 'rocky_mr_insolation_3panel.png'}")
     return out
 
 
@@ -793,12 +791,11 @@ def plot_rocky_scatter_standalone(rocky_win: pd.DataFrame, shift: float) -> Path
     ax.legend(loc="lower left", ncol=5, fontsize=16, framealpha=0.90, handlelength=1.4,
               handletextpad=0.4, columnspacing=1.0, borderaxespad=0.3).set_zorder(10)
 
-    out = OUT_DIR / "rocky_scatter_standalone.png"
+    PAPER_FIG_DIR.mkdir(parents=True, exist_ok=True)
+    out = PAPER_FIG_DIR / "rocky_scatter_standalone.png"
     fig.savefig(out, dpi=250, bbox_inches="tight")
-    fig.savefig(PAPER_FIG_DIR / "rocky_scatter_standalone.png", dpi=250, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved standalone rocky scatter: {out}")
-    print(f"Saved paper copy: {PAPER_FIG_DIR / 'rocky_scatter_standalone.png'}")
     return out
 
 

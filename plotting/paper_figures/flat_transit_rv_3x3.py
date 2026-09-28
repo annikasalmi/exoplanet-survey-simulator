@@ -15,9 +15,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
-from matplotlib.ticker import FuncFormatter
+from matplotlib.ticker import FuncFormatter, NullLocator
 
-from tools.paths import REPO_ROOT, ANALYSIS_DIR, PAPER_FIGURES_DIR, _EXOPLANET_CSV_DIR
+from tools.paths import REPO_ROOT, PAPER_FIGURES_DIR, _EXOPLANET_CSV_DIR
 ROOT = Path(REPO_ROOT)
 
 from science.telescopes.detection import (
@@ -29,14 +29,17 @@ from science.statistics import binned_fraction_2d, fit_quantile_power_law
 from science.physics import load_rocky_reference_curve, compute_rocky_threshold_shift
 from plotting.paper_figures import rocky_scatter_gaia60pc as rocky_scatter
 
-OUT_DIR = Path(ANALYSIS_DIR) / "flat_transit_rv_3x3"
 PAPER_FIG_DIR = Path(PAPER_FIGURES_DIR)
 NASA_FLAGS_CACHE = _EXOPLANET_CSV_DIR / "pscomppars_transiting_mass_insol.csv"
 
 FIGURE_STYLE = {
-    "font.size": 21, "axes.titlesize": 26, "axes.labelsize": 23,
-    "legend.fontsize": 21, "xtick.labelsize": 19, "ytick.labelsize": 19,
+    "font.size": 28, "axes.titlesize": 36, "axes.labelsize": 28,
+    "legend.fontsize": 28, "xtick.labelsize": 26, "ytick.labelsize": 26,
 }
+BADGE_FONTSIZE = 26
+PLANET_LABEL_FONTSIZE = BADGE_FONTSIZE - 1
+COLORBAR_LABELSIZE = FIGURE_STYLE["legend.fontsize"]
+COLORBAR_TICKSIZE = FIGURE_STYLE["legend.fontsize"]
 
 # Which transit pipeline fills the transit row: "TESS" (paper Fig. 2) or
 # "Kepler" (appendix comparison).
@@ -97,8 +100,8 @@ def build_column(stype: str, m_ref, r_ref) -> pd.DataFrame:
 
 
 @plt.rc_context(FIGURE_STYLE)
-def main(paper_copy: bool = True):
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
+def main():
+    PAPER_FIG_DIR.mkdir(parents=True, exist_ok=True)
     print("=" * 70)
     print("flat_transit_rv_3x3.py — flat-Otegi selection maps (paper Fig. 2)")
     print(f"Transit pipeline: {TRANSIT_MISSION}")
@@ -164,8 +167,8 @@ def main(paper_copy: bool = True):
                             elinewidth=1.5, capsize=4, ecolor=c, zorder=7)
                 ax.annotate("LHS 1140 b", xy=(row["flux_p"], row["radius_p"]),
                             xytext=(14, -6), textcoords="offset points", va="center",
-                            fontsize=20, color="black", zorder=8,
-                            bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none",
+                            fontsize=PLANET_LABEL_FONTSIZE, color="black", zorder=8,
+                            bbox=dict(boxstyle="round,pad=0.12", fc="white", ec="none",
                                       alpha=0.8))
             # Solar-system reference points on the G column: Earth and Venus
             # (I = 1.91 I_earth, R = 0.949 R_earth).
@@ -176,7 +179,7 @@ def main(paper_copy: bool = True):
                             mew=1.8, zorder=7)
                     ax.annotate(name, xy=(flux, radius), xytext=offset,
                                 textcoords="offset points", ha=ha, va="center",
-                                fontsize=20, color="white", zorder=8)
+                                fontsize=PLANET_LABEL_FONTSIZE, color="white", zorder=8)
 
             xlo = xbins[0]
             ax.fill_between([xlo, rocky_scatter.LOW_INSOLATION_REGION_INSOL], rocky_scatter.LOW_INSOLATION_REGION_RADIUS,
@@ -193,13 +196,14 @@ def main(paper_copy: bool = True):
             if fn is not None:
                 n_pass = n_denom - n_missed
                 ax.text(0.03, 0.97, f"{1 - fn:.0%} detected",
-                        transform=ax.transAxes, va="top", ha="left", fontsize=19,
+                        transform=ax.transAxes, va="top", ha="left", fontsize=BADGE_FONTSIZE,
                         color="darkred",
                         bbox=dict(boxstyle="round", fc="white", ec="darkred", alpha=0.85),
                         zorder=8)
                 print(f"  {row_name:14s} {stype}: {1 - fn:.1%} detected  ({n_pass}/{n_denom})")
 
             ax.set_xscale("log")
+            ax.xaxis.set_minor_locator(NullLocator())
             ax.set_yticks(Y_TICKS)
             ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
             ax.set_xlim(xbins[0], xbins[-1]); ax.set_ylim(Y_LIMS)
@@ -238,26 +242,22 @@ def main(paper_copy: bool = True):
               label=(r"$R>%.1f\,R_\oplus$, $I<%g\,I_\oplus$"
                      % (rocky_scatter.LOW_INSOLATION_REGION_RADIUS, rocky_scatter.LOW_INSOLATION_REGION_INSOL))),
     ]
-    # Anchored just below the figure (bbox_inches="tight" keeps it): with zero
-    # layout padding, an "outside" legend would overlap the bottom x-labels.
-    fig.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, 0.0),
-               ncol=len(handles), framealpha=0.9)
-    # Horizontal colour bar under the panels (the legend sits below it), with
-    # the pass fraction shown as a percentage.
-    fig.colorbar(mesh, ax=axes.ravel().tolist(), location="bottom", shrink=0.6,
-                 aspect=40, pad=0.02, label="Percent planets detected",
-                 format=FuncFormatter(lambda v, _: f"{v * 100:.0f}"))
+    # Bottom annotations are manually anchored so the horizontal colorbar sits
+    # on the left while the legend stacks to its right.
+    fig.legend(handles=handles, loc="upper right", bbox_to_anchor=(1.01, -0.02),
+               ncol=1, framealpha=0.9)
+    cbar_ax = fig.add_axes([0.095, -0.085, 0.54, 0.035])
+    cbar = fig.colorbar(mesh, cax=cbar_ax, orientation="horizontal",
+                        format=FuncFormatter(lambda v, _: f"{v * 100:.0f}"))
+    cbar.ax.tick_params(labelsize=COLORBAR_TICKSIZE)
+    cbar.set_label("Percent planets detected", fontsize=COLORBAR_LABELSIZE)
     # Panels sit edge to edge with no gaps between rows or columns.
     fig.get_layout_engine().set(w_pad=0.0, h_pad=0.0, wspace=0.0, hspace=0.0)
 
     suffix = "" if TRANSIT_MISSION == "TESS" else f"_{TRANSIT_MISSION.lower()}"
-    out = OUT_DIR / f"flat_transit_rv_3x3_otegi{suffix}.png"
+    out = PAPER_FIG_DIR / f"flat_transit_rv_3x3_otegi{suffix}.png"
     fig.savefig(out, dpi=170, bbox_inches="tight")
     print(f"\nSaved: {out}")
-    if paper_copy:
-        PAPER_FIG_DIR.mkdir(parents=True, exist_ok=True)
-        fig.savefig(PAPER_FIG_DIR / out.name, dpi=170, bbox_inches="tight")
-        print(f"Saved paper copy: {PAPER_FIG_DIR / out.name}")
     plt.close(fig)
 
 

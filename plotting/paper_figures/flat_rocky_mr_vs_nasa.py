@@ -25,7 +25,10 @@ from science.universes.flat_baseline import (
     MR_SCATTER_DEX,
     flat_nonphysical,
 )
-from science.universes.flat_curves import flat_radii_curves
+from science.universes.flat_curves import (
+    OTEGI_VOLATILE, SUB_NEPTUNE_FRAC_SD, SUPER_EARTH_FRAC_SD, flat_radii_curves,
+)
+from science.physics import SUPER_EARTH_MIN_MASS
 from science.telescopes.detection import run_transit_rv_selection
 from science.statistics import gaussian_density
 from science.statistics import (
@@ -72,20 +75,21 @@ def _draw_scatter(ax, arr, cut, nasa, m_sil, r_sil, rng, title,
     ax.fill_between(m_c, r_c, 2.6, color="0.965", zorder=0)
     ax.plot(m_c, r_c, "k-", lw=1.2, zorder=6, label="Pure silicate")
     if true_values:
-        # One illustrative survey for each flat_radii_curves variant.
-        for above_only, n, colour, lbl, z in [
-                (True, N_SURVEY_BLUE, "tab:blue", labels[0], 4),
-                (False, N_SURVEY_ORANGE, "tab:orange", labels[1], 3)]:
-            mt, rt = true_detected_population_sample(
-                arr, cut, n, rng, exclude_super_earths=above_only
-            )
-            ax.errorbar(mt, rt,
-                        xerr=np.array([mt * (1 - np.exp(-SIMULATED_MEASUREMENT_ERROR["mass"])),
-                                       mt * (np.exp(SIMULATED_MEASUREMENT_ERROR["mass"]) - 1)]),
-                        yerr=np.array([rt * (1 - np.exp(-SIMULATED_MEASUREMENT_ERROR["radius"])),
-                                       rt * (np.exp(SIMULATED_MEASUREMENT_ERROR["radius"]) - 1)]),
-                        fmt="o", ms=4, color=colour, alpha=0.6, elinewidth=0.6,
-                        capsize=0, zorder=z, label=lbl)
+        # Draws are discarded but kept so the density panel sees the same rng stream.
+        for above_only, n in [(True, N_SURVEY_BLUE), (False, N_SURVEY_ORANGE)]:
+            true_detected_population_sample(arr, cut, n, rng, exclude_super_earths=above_only)
+        # Underlying flat_radii_curves draw: mean curve x (1 +/- frac_sd).
+        m = np.linspace(max(cut.get("mass_min", 0.0), 1e-3), MASS_LIMS[1], 400)
+        r_sil_m = np.interp(m, m_c, r_c)
+        r_vol = OTEGI_VOLATILE["mr_C"] * m ** OTEGI_VOLATILE["mr_beta"]
+        vol_lo = np.maximum(r_vol * (1 - SUB_NEPTUNE_FRAC_SD), r_sil_m)
+        vol_hi = np.maximum(r_vol * (1 + SUB_NEPTUNE_FRAC_SD), r_sil_m)
+        ax.fill_between(m, vol_lo, vol_hi, color="tab:blue", alpha=0.5, lw=0, zorder=4)
+        ax.plot(m, r_vol, color="tab:blue", lw=1.5, zorder=4, label=labels[0])
+        se = m > SUPER_EARTH_MIN_MASS
+        ax.fill_between(m[se], r_sil_m[se] * (1 - SUPER_EARTH_FRAC_SD),
+                        r_sil_m[se] * (1 + SUPER_EARTH_FRAC_SD),
+                        color="tab:orange", alpha=0.5, lw=0, zorder=3, label=labels[1])
     else:
         mo, ro, dropped = noised_detected_population_sample(
             arr, cut, rng, window=(MASS_LIMS[1], *RADIUS_LIMS)

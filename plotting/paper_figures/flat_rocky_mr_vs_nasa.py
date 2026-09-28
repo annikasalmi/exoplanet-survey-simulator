@@ -11,6 +11,7 @@ import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.colors import to_rgb
 
 from science.catalogs import load_measured_planets
 from science.physics import extend_mass_radius_curve_power_law, load_mass_radius_curve
@@ -78,18 +79,28 @@ def _draw_scatter(ax, arr, cut, nasa, m_sil, r_sil, rng, title,
         # Draws are discarded but kept so the density panel sees the same rng stream.
         for above_only, n in [(True, N_SURVEY_BLUE), (False, N_SURVEY_ORANGE)]:
             true_detected_population_sample(arr, cut, n, rng, exclude_super_earths=above_only)
-        # Underlying flat_radii_curves draw: mean curve x (1 +/- frac_sd).
-        m = np.linspace(max(cut.get("mass_min", 0.0), 1e-3), MASS_LIMS[1], 400)
+        # Underlying flat_radii_curves draw, shaded as its normal radius scatter.
+        m = np.linspace(max(cut.get("mass_min", 0.0), 1e-3), MASS_LIMS[1], 600)
+        r = np.linspace(*RADIUS_LIMS, 600)[:, None]
         r_sil_m = np.interp(m, m_c, r_c)
         r_vol = OTEGI_VOLATILE["mr_C"] * m ** OTEGI_VOLATILE["mr_beta"]
-        vol_lo = np.maximum(r_vol * (1 - SUB_NEPTUNE_FRAC_SD), r_sil_m)
-        vol_hi = np.maximum(r_vol * (1 + SUB_NEPTUNE_FRAC_SD), r_sil_m)
-        ax.fill_between(m, vol_lo, vol_hi, color="tab:blue", alpha=0.5, lw=0, zorder=4)
-        ax.plot(m, r_vol, color="tab:blue", lw=1.5, zorder=4, label=labels[0])
-        se = m > SUPER_EARTH_MIN_MASS
-        ax.fill_between(m[se], r_sil_m[se] * (1 - SUPER_EARTH_FRAC_SD),
-                        r_sil_m[se] * (1 + SUPER_EARTH_FRAC_SD),
-                        color="tab:orange", alpha=0.5, lw=0, zorder=3, label=labels[1])
+        extent = (m[0], m[-1], *RADIUS_LIMS)
+        g_vol = np.exp(-0.5 * ((r / r_vol - 1) / SUB_NEPTUNE_FRAC_SD) ** 2)
+        g_sil = np.exp(-0.5 * ((r / r_sil_m - 1) / SUPER_EARTH_FRAC_SD) ** 2)
+        # Orange: Otegi + silicate (super-Earths); blue: Otegi above the silicate line.
+        # Dash offsets alternate the colours where the 1 sigma edges coincide.
+        for g, colour, z, dash in [
+                (np.maximum(g_vol, g_sil * (m > SUPER_EARTH_MIN_MASS)), "tab:orange", 3, (4, (4, 4))),
+                (g_vol * (r >= r_sil_m), "tab:blue", 4, (0, (4, 4)))]:
+            rgba = np.zeros((r.size, m.size, 4))
+            rgba[..., :3] = to_rgb(colour)
+            rgba[..., 3] = 0.7 * g
+            ax.imshow(rgba, extent=extent, origin="lower", aspect="auto",
+                      interpolation="bilinear", zorder=z)
+            ax.contour(m, r.ravel(), g, levels=[np.exp(-0.5)], colors=colour,
+                       linestyles=[dash], linewidths=1.5, zorder=5)
+        ax.fill_between([], [], color="tab:blue", alpha=0.7, lw=0, label=labels[0])
+        ax.fill_between([], [], color="tab:orange", alpha=0.7, lw=0, label=labels[1])
     else:
         mo, ro, dropped = noised_detected_population_sample(
             arr, cut, rng, window=(MASS_LIMS[1], *RADIUS_LIMS)

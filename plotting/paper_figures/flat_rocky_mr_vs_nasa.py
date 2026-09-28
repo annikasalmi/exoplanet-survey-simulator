@@ -25,12 +25,7 @@ from science.universes.flat_baseline import (
     MR_SCATTER_DEX,
     flat_nonphysical,
 )
-from science.universes.flat_curves import (
-    flat_radii_curves,
-    SUPER_EARTH_FRAC_SD,
-    SUB_NEPTUNE_FRAC_SD,
-    OTEGI_VOLATILE,
-)
+from science.universes.flat_curves import flat_radii_curves
 from science.telescopes.detection import run_transit_rv_selection
 from science.statistics import gaussian_density
 from science.statistics import (
@@ -116,43 +111,6 @@ N_SURVEY_BLUE = 50
 N_SURVEY_ORANGE = 100
 
 
-def _draw_distribution_bands(ax, m_sil, r_sil, nasa, title):
-    """Right panel alternative: underlying M-R distributions with error bands.
-    Silicate curve (super-Earths) and Otegi volatile curve (sub-Neptunes),
-    each with ±1σ scatter shaded at alpha=0.5."""
-    m_c, r_c = extend_mass_radius_curve_power_law(m_sil, r_sil, 1e-3, MASS_LIMS[1])
-    ax.fill_between(m_c, r_c, 2.6, color="0.965", zorder=0)
-
-    # Silicate curve with super-Earth scatter band
-    r_sil_lo = r_c / (1.0 + SUPER_EARTH_FRAC_SD)
-    r_sil_hi = r_c * (1.0 + SUPER_EARTH_FRAC_SD)
-    ax.fill_between(m_c, r_sil_lo, r_sil_hi, color="tab:orange", alpha=0.5, lw=0, zorder=1)
-    ax.plot(m_c, r_c, color="tab:orange", lw=2.0, zorder=6, label="Super-Earths (silicate)")
-
-    # Otegi volatile curve with sub-Neptune scatter
-    mr_C = OTEGI_VOLATILE["mr_C"]
-    mr_beta = OTEGI_VOLATILE["mr_beta"]
-    m_otegi = np.linspace(0.1, 3.0, 300)
-    r_otegi_mu = mr_C * m_otegi ** mr_beta
-    r_otegi_lo = r_otegi_mu / (1.0 + SUB_NEPTUNE_FRAC_SD)
-    r_otegi_hi = r_otegi_mu * (1.0 + SUB_NEPTUNE_FRAC_SD)
-    ax.fill_between(m_otegi, r_otegi_lo, r_otegi_hi, color="tab:blue", alpha=0.5, lw=0, zorder=2)
-    ax.plot(m_otegi, r_otegi_mu, color="tab:blue", lw=2.0, zorder=6, label="Sub-Neptunes (Otegi)")
-
-    # NASA planets with errors
-    nmc, nrc, nme1, nme2, nre1, nre2 = observed_measurement_arrays(nasa, {})
-    ax.errorbar(nmc, nrc, xerr=np.array([nme2, nme1]), yerr=np.array([nre2, nre1]),
-                fmt="o", mfc="none", mec="k", ecolor="k", ms=5, mew=1.0,
-                elinewidth=0.6, capsize=1.5, alpha=0.8, zorder=5,
-                label="Measured exoplanets")
-
-    ax.set_xlim(*MASS_LIMS); ax.set_ylim(*RADIUS_LIMS)
-    ax.set_title(title)
-    ax.legend(loc="lower right", framealpha=0.95)
-    ax.set_xlabel(r"Planet mass [$M_\oplus$]")
-    ax.set_ylabel(r"Planet radius [$R_\oplus$]")
-
-
 def make_figure(cut_label, cut, fname, pools, nasa, m_sil, r_sil, rng):
     print(f"\n--> [{cut_label}]")
     fig, axes = plt.subplots(2, 4, figsize=(23, 11))
@@ -234,9 +192,14 @@ def make_otegi_1x2(nasa, m_sil, r_sil, rng, show_full_population=False):
     fig, axes = plt.subplots(len(cuts), 2, figsize=(12.5, 5.6 * len(cuts)), squeeze=False)
     for ci, (cut_label, cut) in enumerate(cuts):
         ax_hist, ax_mr = axes[ci, 0], axes[ci, 1]
-        # The density draw runs first so it uses the same random stream as before the panels were swapped.
+        # The mass-radius draw runs first so the density draws use the same random
+        # stream as before the panels were swapped.
+        _draw_scatter(ax_mr, arr, cut, nasa, m_sil, r_sil, rng, "",
+                      labels=("Sub-Neptunes", "Sub-Neptunes and super-Earths"),
+                      true_values=True, sil_range=(1e-3, MASS_LIMS[1]))
         _draw_density_1x2(ax_hist, arr, cut, nasa, m_sil, r_sil, rng, tag=f"[1x2] {cut_label}")
-        _draw_distribution_bands(ax_mr, m_sil, r_sil, nasa, "")
+        ax_mr.set_xlabel(r"Planet mass [$M_\oplus$]")
+        ax_mr.set_ylabel(r"Planet radius [$R_\oplus$]")
         if show_full_population:
             ax_hist.set_title(cut_label)
             ax_mr.set_title(cut_label)

@@ -40,7 +40,12 @@ _MS_RAD = np.array([0.09, 0.11, 0.15, 0.20, 0.26, 0.36, 0.45, 0.59,
 _MS_MASS = np.array([0.08, 0.085, 0.10, 0.15, 0.21, 0.35, 0.44, 0.57,
                      0.68, 0.88, 0.92, 1.05, 1.30, 1.60, 2.10])
 
+# Star-to-star scatter at fixed Teff (Torres, Andersen & Gimenez 2010, A&ARv 18, 67).
+STAR_SCATTER_LOGM = 0.027         # dex, 6.4%
+STAR_SCATTER_LOGR = 0.014         # dex, 3.2%
+
 _YEAR_D = 365.25
+_RSUN_AU = 0.00465047
 
 
 _MEAN_MR_CURVE = None       # cached (R_grid, M_grid) for the mean-relation inverse R->M
@@ -107,14 +112,19 @@ def flat_nonphysical(
     mass_scatter_dex: float = MR_SCATTER_DEX,
     mr_C: float = OTEGI_ROCKY["mr_C"],
     mr_beta: float = OTEGI_ROCKY["mr_beta"],
+    star_scatter_logm: float = STAR_SCATTER_LOGM,
+    star_scatter_logr: float = STAR_SCATTER_LOGR,
 ) -> pd.DataFrame:
     """Draw uniform radii and Otegi rocky masses with scatter, plus flat orbital/host priors.
 
     radius_lims and mass_lims restrict analysis windows. mass_model="independent"
     gives a log-uniform mass grid for detectability maps; "mean" and "ppop" use
     the mean or probabilistic Forecaster relation. Mass cuts can reduce the row count.
+    Teff is the only stellar draw; R, M, L, a, flux and temp_p all follow from it.
     """
     rng = np.random.default_rng(seed)
+    # Own seed streams, so zero scatter reproduces the unscattered draws exactly.
+    rng_star = np.random.default_rng([seed, 2])
     keep_R, keep_M, keep_P, keep_E = [], [], [], []
     keep_inc, keep_T, keep_Rs, keep_Ms, keep_D, keep_L, keep_a, keep_F = ([] for _ in range(8))
 
@@ -134,6 +144,10 @@ def flat_nonphysical(
 
         radius_s = np.interp(teff_s, _MS_TEFF, _MS_RAD)
         mass_s = np.interp(teff_s, _MS_TEFF, _MS_MASS)
+        if star_scatter_logr > 0:
+            radius_s = radius_s * 10.0 ** rng_star.normal(0.0, star_scatter_logr, batch)
+        if star_scatter_logm > 0:
+            mass_s = mass_s * 10.0 ** rng_star.normal(0.0, star_scatter_logm, batch)
         l_sun = radius_s ** 2 * (teff_s / 5772.0) ** 4
         semimajor_p = (mass_s * (p_orb / _YEAR_D) ** 2) ** (1.0 / 3.0)   # AU
         flux_p = l_sun / semimajor_p ** 2                               # I_earth
@@ -180,6 +194,10 @@ def flat_nonphysical(
     df["stype"] = infer_stellar_type(teff)
     df["nstar"] = np.arange(len(df))   # one synthetic star per planet (independent draws)
     df["id"] = np.arange(len(df))
+    # Equilibrium temperature at a, with P-Pop's Uniform Bond albedo (same formula as System.getTp).
+    from PPop.AlbedoModels.Uniform import AlbedoModel
+    abond = AlbedoModel(np.random.default_rng([seed, 3])).getAbond(radius_p)
+    df["temp_p"] = teff * np.sqrt(radius_s * _RSUN_AU / (2.0 * semimajor_p)) * (1.0 - abond) ** 0.25
     # Swap the log-uniform mass for an M-R relation; nothing else depends on mass.
     if mass_model != "independent":
         df["mass_p"] = _mass_from_radius(df["radius_p"].to_numpy(), mass_model, rng,

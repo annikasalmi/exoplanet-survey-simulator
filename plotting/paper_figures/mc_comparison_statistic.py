@@ -85,14 +85,14 @@ def main():
                 repeats=N_DRAWS, mass_min=SUPER_EARTH_MIN_MASS,
                 error=COMPARISON_ERROR,
             )
-            stats[key] = ((fk - f_obs) / sig_obs) ** 2   # vs the raw observed number
-            points[key] = ((fk.mean() - f_obs) / sig_obs) ** 2
-        # an n_obs-planet survey can only give sqrt(x_k) = m * step for integer m. Put edges
+            stats[key] = ((fk - f_obs) / sig_obs) ** 4   # x_k^2, vs the raw observed number
+            points[key] = ((fk.mean() - f_obs) / sig_obs) ** 4
+        # an n_obs-planet survey can only give x_k^(1/4) = m * step for integer m. Put edges
         # halfway between allowed values (so no bin is empty), merging neighbours until each
         # bin is >= 1/20 of the range (so the narrow cells near 0 don't spike the density).
         step = 1.0 / (n_obs * sig_obs)
-        m_max = int(np.ceil(np.sqrt(max(s.max() for s in stats.values())) / step)) + 1
-        lattice = ((np.arange(m_max) + 0.5) * step) ** 2
+        m_max = int(np.ceil(max(s.max() for s in stats.values()) ** 0.25 / step)) + 1
+        lattice = ((np.arange(m_max) + 0.5) * step) ** 4
         min_width = lattice[-1] / 20
         edges = [0.0]
         for e in lattice:
@@ -104,11 +104,11 @@ def main():
             c = "C0" if key == "rocky_formation" else "C1"
             ax.hist(stats[key], bins=edges, color=c, alpha=0.45, density=True)
             ax.axvline(points[key], color=c, ls="--", lw=3, label=LABELS[key])
-            print(f"    {key:<16} x_k point = {points[key]:.2f}  "
+            print(f"    {key:<16} x_k^2 point = {points[key]:.2f}  "
                   f"(draws: {stats[key].mean():.2f} +- {stats[key].std():.2f})")
         ax.set_xlim(left=-0.05)
         ax.set_title(f"{blabel} (M>2) $I_\\oplus$")
-        ax.set_xlabel(r"$x_k = (f_k - f_{\rm obs})^2\,/\,\hat\sigma_{\rm obs}^2$")
+        ax.set_xlabel(r"$x_k^2 = (f_k - f_{\rm obs})^4\,/\,\hat\sigma_{\rm obs}^4$")
         ax.set_ylabel("Probability density")
         if i == 0:
             ax.legend(loc="upper right", handlelength=1.4)

@@ -423,7 +423,7 @@ def draw_tess(ax, out: pd.DataFrame) -> float:
     # Load official MES and model SNR
     official = pd.to_numeric(out.get("official_mes", pd.Series(np.nan, index=out.index)), errors="coerce")
     model = pd.to_numeric(out["tess_snr"], errors="coerce")
-    x_label, y_label, title = "TESS MES", "Model SNR", "TESS model planet recovery"
+    x_label, y_label, title = "TESS MES", "Model MES", "TESS model planet recovery"
 
     keep = official.gt(0) & model.gt(0)
     official, model = official[keep], model[keep]

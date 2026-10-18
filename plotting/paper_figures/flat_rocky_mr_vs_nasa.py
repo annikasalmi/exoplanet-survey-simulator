@@ -207,9 +207,8 @@ def make_otegi_1x2(nasa, m_sil, r_sil, rng, show_full_population=False):
     )
     fig, axes = plt.subplots(len(cuts), 2, figsize=(12.5, 5.6 * len(cuts)), squeeze=False)
     for ci, (cut_label, cut) in enumerate(cuts):
-        ax_hist, ax_mr = axes[ci, 0], axes[ci, 1]
-        # The mass-radius draw runs first so the density draws use the same random
-        # stream as before the panels were swapped.
+        ax_mr, ax_hist = axes[ci, 0], axes[ci, 1]
+        # Draw mass-radius first so the density panel's random stream is unchanged.
         _draw_scatter(ax_mr, arr, cut, nasa, m_sil, r_sil, rng, "",
                       labels=("Sub-Neptunes", "Sub-Neptunes and super-Earths"),
                       true_values=True, sil_range=(1e-3, MASS_LIMS[1]))

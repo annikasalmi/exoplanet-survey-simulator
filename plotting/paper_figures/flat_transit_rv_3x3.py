@@ -74,7 +74,7 @@ YBINS = np.append(np.round(np.arange(Y_LIMS[0], 2.0 + 1e-9, 0.1), 2), Y_LIMS[1])
 Y_TICKS = [1.0, 1.5, 2.0]
 
 ROWS = [
-    ("Transit test", "transit_detected"),
+    (f"Transit ({TRANSIT_MISSION})", "transit_detected"),
     ("RV mass test", "rv_detected"),
     ("Transit + RV", "joint_detected"),
 ]
@@ -108,7 +108,6 @@ def main():
     print("=" * 70)
     rows = list(ROWS)
     if TRANSIT_MISSION != "TESS":
-        rows[0] = (f"Transit test ({TRANSIT_MISSION})", "transit_detected")
         rows[2] = (f"Transit ({TRANSIT_MISSION}) + RV", "joint_detected")
     m_ref, r_ref = load_rocky_reference_curve()
     shift = compute_rocky_threshold_shift(m_ref, r_ref)

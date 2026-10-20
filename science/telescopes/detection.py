@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from functools import lru_cache, partial
 from pathlib import Path
 
@@ -300,7 +301,8 @@ def make_detected_pool(
     """Generate, detect, and cache a population in bounded-memory chunks."""
     cache_dir = Path(cache_dir)
     cache_dir.mkdir(parents=True, exist_ok=True)
-    cache = cache_dir / f"selection_{mission}_{pool_name}_N{pool_size}_s{seed}_{_science_code_fingerprint()}.npz"
+    settings = hashlib.sha256(json.dumps({"box": box, "rv_mag_target": rv_mag_target, "chunk_size": chunk_size}, sort_keys=True).encode()).hexdigest()[:12]
+    cache = cache_dir / f"selection_{mission}_{pool_name}_N{pool_size}_s{seed}_{_science_code_fingerprint()}_{settings}.npz"
     if cache.exists():
         with np.load(cache) as archive:
             return pd.DataFrame({field: archive[field] for field in archive.files})
@@ -358,7 +360,7 @@ def select_rocky_transiting(catalog, curve_mass, curve_radius, *, minimum_radius
 
 
 def missed_fraction_in_window(
-    panel, test, *, max_insolation=50.0, min_radius=1.4, main_only=True,
+    panel, test, *, max_insolation=50.0, min_radius=1.4, min_mass=2.5, main_only=True,
 ):
     """Return missed fraction, denominator, and misses in a declared window."""
     if main_only and "main" in panel:
@@ -366,6 +368,7 @@ def missed_fraction_in_window(
     region = (
         (panel["insolation"] < max_insolation)
         & (panel["radius"] > min_radius)
+        & (panel["mass"] > min_mass)
         & panel["transit_eligible"]
     ).to_numpy()
     denominator = int(region.sum())

@@ -129,7 +129,7 @@ def desert_table(univ, nasa, m_sil, r_sil, rng, tag):
         ftxt = "  ".join(f"{lbl2[:5]}={p_by[key]:.3f}+-{p_sigma[key]:.3f}" for key, lbl2, _ in UNIVERSES)
         Ltxt = "  ".join(f"{lbl2[:5]}={L[key]:.2e}" for key, lbl2, _ in UNIVERSES)
         postxt = "  ".join(f"{lbl2[:5]}={post[key]:.2f}" for key, lbl2, _ in UNIVERSES)
-        cut = " (M>2)" if mcut else ""
+        cut = " (M>2.5, R>1.4)" if mcut else ""
         print(f"  {lbl + cut:<24} NASA vol {k}/{n} (v/n={k/n:.3f}+-{nasa_sigma:.3f})")
         print(f"      f_k : {ftxt}")
         print(f"      L_k : {Ltxt}")
@@ -161,7 +161,7 @@ def save_stats_table(rows, tag):
 
 
 def print_bayes_factors(rows):
-    print("\n  ---- pairwise Bayes factors (headline: I<50 low-insolation super-Earth desert, M>2) ----")
+    print("\n  ---- pairwise Bayes factors (headline: I<50 low-insolation super-Earth desert, M>2.5, R>1.4) ----")
     desert = next((r for r in rows if r["label"].startswith("I < 50")), None)
     if desert is None:
         return
@@ -179,7 +179,7 @@ def _nasa_overlay(ax, nasa, lo, hi, norm, mass_min=None):
     mass_min, if given, applies the same super-Earth cut used by the panel it is drawn on."""
     nsel = nasa["insolation"].between(lo, hi, inclusive="left")
     if mass_min:
-        nsel &= nasa["mass"] > mass_min
+        nsel &= (nasa["mass"] > mass_min) & (nasa["radius"] > 1.4)
     if nsel.sum() == 0:
         return None
     ax.errorbar(nasa.loc[nsel, "mass"], nasa.loc[nsel, "radius"],
@@ -259,7 +259,7 @@ def fig_posterior_predictive(univ, nasa, m_sil, r_sil):
             ax = axes[i, j]
             sel = (u["joint_detected"]
                    & u["insolation"].between(lo, hi, inclusive="left")
-                   & (u["mass"] > MASS_MIN))
+                   & (u["mass"] > MASS_MIN) & (u["radius"] > 1.4))
             H, _, _ = np.histogram2d(u["mass"][sel], u["radius"][sel], bins=[M_EDGES, R_EDGES])
             # log stretch: the flat_nonphysical track dams a density spike at the M=12 box wall that a
             # linear+clip scale saturates into a flat slab; log1p renders it as a smooth gradient.
@@ -315,7 +315,7 @@ def fig_model_odds(rows):
                label=f"even split (1/{len(UNIVERSES)})")
     ax.set_title(f"Which universe does NASA prefer? ({_MISSION_LABEL[MISSION]} transit + RV; normalized "
                  "binomial composition likelihood)\n"
-                 "headline = I<50 low-insolation super-Earth desert (M>2); transiting planets only", fontsize=11)
+                 "headline = I<50 low-insolation super-Earth desert (M>2.5, R>1.4); transiting planets only", fontsize=11)
     ax.grid(alpha=0.2, axis="y"); ax.legend(fontsize=9)
     fig.tight_layout()
     out = os.path.join(ANALYSIS_DIR, _OUT_NAME[MISSION], "model_odds.png")
@@ -364,7 +364,7 @@ def fig_model_stats(rows):
     ax2.set_yscale("log")
     ax2.set_ylabel(r"binomial likelihood $L_k$")
     ax2.set_xticks(x)
-    ax2.set_xticklabels([l.replace(" (M>2)", "\n(M>2)") for l in labels])
+    ax2.set_xticklabels([l.replace(" (M>2.5, R>1.4)", "\n(M>2.5, R>1.4)") for l in labels])
     ax2.grid(alpha=0.2, axis="y"); ax2.legend(fontsize=9)
     ax2.set_title(r"Binomial likelihoods $L_k$ (log axis): the small $f$ gap becomes orders "
                   "of magnitude", fontsize=11)
@@ -392,7 +392,7 @@ def main(mission="kepler"):
         print("\n--> reconciliation vs paper Table 6 (Flat All / Flat Vol detected f_vol):")
         for lbl, lo, hi, mcut, ref in [("all bins, no cut", BOX["f_lo"], BOX["f_hi"], None,
                                         "All 0.43 / Vol 0.70"),
-                                       ("low-insolation I<50, M>2", BOX["f_lo"], LOW_INSOLATION_MAX, MASS_MIN,
+                                       ("low-insolation I<50, M>2.5, R>1.4", BOX["f_lo"], LOW_INSOLATION_MAX, MASS_MIN,
                                         "All 0.44 / Vol 0.74")]:
             pa = predicted_volatile_fraction(
                 univ["rocky_formation"], lo, hi, m_sil, r_sil, rng,
@@ -441,7 +441,7 @@ def main(mission="kepler"):
     print("    survey effort cancel. No absolute-rate prior is used.")
     print("  - Point-estimate binomial => overconfident; beta-binomial + NASA error propagation")
     print("    is the honest next step (I<10 especially is data-poor).")
-    print("  - escape_only removes TRUE rocky M>2; measurement noise keeps p<1 so one confirmed")
+    print("  - escape_only removes TRUE rocky M>2.5, R>1.4; measurement noise keeps p<1 so one confirmed")
     print("    low-insolation rocky planet (LHS 1140 b) does not send its likelihood to 0.")
 
 

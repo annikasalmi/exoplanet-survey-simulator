@@ -10,7 +10,8 @@ from science import physics_constants as const
 from tools.paths import SILICON_CURVE
 
 
-SUPER_EARTH_MIN_MASS = 2.0
+SUPER_EARTH_MIN_MASS = 2.5
+COMPARISON_MIN_RADIUS = 1.4
 
 
 def apparent_bolometric_mag(l_sun, distance_pc):
@@ -131,6 +132,7 @@ def is_cold_rocky_super_earth(
     insolation = np.asarray(insolation, dtype=float)
     return (
         is_super_earth(mass, radius, minimum_mass=minimum_mass)
+        & (np.asarray(radius, dtype=float) > COMPARISON_MIN_RADIUS)
         & (insolation < max_insolation)
     )
 

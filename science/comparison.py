@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 from science.catalogs import COMPARISON_PARAMETER_BOX
-from science.physics import is_super_earth, is_volatile
+from science.physics import COMPARISON_MIN_RADIUS, SUPER_EARTH_MIN_MASS, is_super_earth, is_volatile
 from science.statistics import (
     NASA_MEASUREMENT_ERROR,
     SIMULATED_MEASUREMENT_ERROR,
@@ -19,7 +19,7 @@ COLD_DESERT_MAX_INSOLATION = 50.0
 INSOLATION_BINS = [
     ("I < 10", COMPARISON_PARAMETER_BOX["f_lo"], 10.0),
     ("I < 50", COMPARISON_PARAMETER_BOX["f_lo"], COLD_DESERT_MAX_INSOLATION),
-    ("I > 50", COLD_DESERT_MAX_INSOLATION, COMPARISON_PARAMETER_BOX["f_hi"]),
+    ("I ≥ 50", COLD_DESERT_MAX_INSOLATION, COMPARISON_PARAMETER_BOX["f_hi"]),
 ]
 
 
@@ -55,7 +55,7 @@ def monte_carlo_population_fraction(
             mass[chosen], radius[chosen], rng, error
         )
         if cut.get("mass_min") is not None:
-            keep = observed_mass > cut["mass_min"]
+            keep = (observed_mass > cut["mass_min"]) & (observed_radius > cut.get("radius_min", COMPARISON_MIN_RADIUS))
             observed_mass, observed_radius = observed_mass[keep], observed_radius[keep]
         if observed_mass.size < 5:
             continue
@@ -95,7 +95,7 @@ def monte_carlo_observed_fraction(
             rng,
         )
         if cut.get("mass_min") is not None:
-            keep = mass > cut["mass_min"]
+            keep = (mass > cut["mass_min"]) & (radius > cut.get("radius_min", COMPARISON_MIN_RADIUS))
             mass, radius = mass[keep], radius[keep]
         if mass.size < 5:
             continue
@@ -113,7 +113,7 @@ def observed_measurement_arrays(sample, cut):
     if cut.get("insol_max") is not None:
         selected &= sample["insolation"].to_numpy() < cut["insol_max"]
     if cut.get("mass_min") is not None:
-        selected &= sample["mass"].to_numpy() > cut["mass_min"]
+        selected &= (sample["mass"].to_numpy() > cut["mass_min"]) & (sample["radius"].to_numpy() > cut.get("radius_min", COMPARISON_MIN_RADIUS))
     columns = (
         "mass", "radius", "mass_error_plus", "mass_error_minus",
         "radius_error_plus", "radius_error_minus",
@@ -141,7 +141,7 @@ def noised_detected_population_sample(
     true_mass = mass[idx]
     true_radius = radius[idx]
     if cut.get("mass_min") is not None:
-        keep = observed_mass > cut["mass_min"]
+        keep = (observed_mass > cut["mass_min"]) & (observed_radius > cut.get("radius_min", COMPARISON_MIN_RADIUS))
         observed_mass = observed_mass[keep]
         observed_radius = observed_radius[keep]
         true_mass = true_mass[keep]
@@ -181,7 +181,7 @@ def true_detected_population_sample(
     if cut.get("insol_max") is not None:
         selected &= population["insolation"].to_numpy() < cut["insol_max"]
     if cut.get("mass_min") is not None:
-        selected &= mass > cut["mass_min"]
+        selected &= (mass > cut["mass_min"]) & (radius > cut.get("radius_min", COMPARISON_MIN_RADIUS))
     if exclude_super_earths:
         selected &= ~is_super_earth(mass, radius)
     idx = np.flatnonzero(selected)
@@ -196,7 +196,7 @@ def observed_volatile_count(
     """Count volatile and total observed planets in an insolation interval."""
     selected = sample["insolation"].between(lo, hi, inclusive="left").to_numpy(copy=True)
     if mass_min is not None:
-        selected &= sample["mass"].to_numpy() > mass_min
+        selected &= (sample["mass"].to_numpy() > mass_min) & (sample["radius"].to_numpy() > COMPARISON_MIN_RADIUS)
     volatile = is_volatile(
         sample.loc[selected, "mass"],
         sample.loc[selected, "radius"],
@@ -245,7 +245,7 @@ def predicted_volatile_fraction(
     for index in range(repeats):
         observed_mass, observed_radius = perturb_fractional(mass, radius, rng, error)
         if mass_min is not None:
-            keep = observed_mass > mass_min
+            keep = (observed_mass > mass_min) & (observed_radius > COMPARISON_MIN_RADIUS)
             observed_mass, observed_radius = observed_mass[keep], observed_radius[keep]
         if observed_mass.size < 5:
             continue
@@ -289,7 +289,8 @@ def mock_survey_volatile_fractions(
     sample_size,
     *,
     repeats=5000,
-    mass_min=2.0,
+    mass_min=SUPER_EARTH_MIN_MASS,
+    radius_min=COMPARISON_MIN_RADIUS,
     error=NASA_MEASUREMENT_ERROR,
     exclude_super_earths=False,
 ):
@@ -306,7 +307,7 @@ def mock_survey_volatile_fractions(
     fractions = np.full(repeats, np.nan)
     for index in range(repeats):
         observed_mass, observed_radius = perturb_fractional(mass, radius, rng, error)
-        eligible = np.flatnonzero(observed_mass > mass_min)
+        eligible = np.flatnonzero((observed_mass > mass_min) & (observed_radius > radius_min))
         if eligible.size < sample_size:
             continue
         chosen = rng.choice(eligible, sample_size, replace=False)
@@ -325,7 +326,8 @@ def observed_volatile_fraction_draws(
     rng,
     *,
     repeats=5000,
-    mass_min=2.0,
+    mass_min=SUPER_EARTH_MIN_MASS,
+    radius_min=COMPARISON_MIN_RADIUS,
     error=NASA_MEASUREMENT_ERROR,
 ):
     """Volatile fractions after a declared fractional observed-data error model."""
@@ -336,7 +338,7 @@ def observed_volatile_fraction_draws(
     fractions = np.full(repeats, np.nan)
     for index in range(repeats):
         observed_mass, observed_radius = perturb_fractional(mass, radius, rng, error)
-        keep = observed_mass > mass_min
+        keep = (observed_mass > mass_min) & (observed_radius > radius_min)
         observed_mass = observed_mass[keep]
         if observed_mass.size == 0:
             continue

@@ -1,41 +1,17 @@
-"""Paper MC figure (mc_comparison_statistic_<N_DRAWS>.png) showing how accurate draws are to observed populations.
-fig 5 in the paper
+"""Original discrepancy display, evaluated from the shared population-comparison draws.
+
+The saved sidecar retains the shared count likelihood and posterior calculation.
 """
-
-import os
-import time
-
+import json
 import numpy as np
 import matplotlib.pyplot as plt
-
-from science.physics import (
-    SUPER_EARTH_MIN_MASS,
-    load_mass_radius_curve,
-)
-from science.catalogs import COMPARISON_PARAMETER_BOX, load_measured_planets
-from science.comparison import (
-    INSOLATION_BINS,
-    mock_survey_volatile_fractions,
-    observed_volatile_count,
-    observed_volatile_fraction_draws,
-)
-
-from science.telescopes.detection import make_detected_pool, split_universes
-from science.statistics import NASA_MEASUREMENT_ERROR
-from tools.paths import ANALYSIS_DIR, PAPER_FIGURES_DIR, PSCOMPPARS_CSV
+from science.population_comparison import BINS, ComparisonConfig, run_comparison
+from tools.paths import PAPER_FIGURES_DIR
 from tools.plotting_constants import PAPER_STYLE
 
-OUT_DIR = os.path.join(ANALYSIS_DIR, "mc_comparison_statistic")
-
-MC_POOL_SIZE = 2_000_000
-MC_CHUNK_SIZE = 2_000_000
-N_DRAWS = int(os.environ.get("N_DRAWS", "5000"))
-
+N_DRAWS = ComparisonConfig().draws
 LABELS = {"rocky_formation": "Sub-Neptune + Super-Earth",
           "escape_only": "Sub-Neptune"}
-
-# The sample's precision cuts (M +-25%, R +-8%) as the noise model, on NASA and simulated planets alike.
-COMPARISON_ERROR = NASA_MEASUREMENT_ERROR
 
 BIG_TEXT_STYLE = {
     "font.size": 30,
@@ -47,45 +23,22 @@ BIG_TEXT_STYLE = {
 }
 
 
+
 def main():
-    os.makedirs(OUT_DIR, exist_ok=True)
-    t0 = time.time()
-    m_sil, r_sil = load_mass_radius_curve()
-    nasa = load_measured_planets(
-        PSCOMPPARS_CSV,
-        mass_bounds=(COMPARISON_PARAMETER_BOX["m_lo"], COMPARISON_PARAMETER_BOX["m_hi"]),
-        radius_bounds=(COMPARISON_PARAMETER_BOX["r_lo"], COMPARISON_PARAMETER_BOX["r_hi"]),
-        insolation_bounds=(COMPARISON_PARAMETER_BOX["f_lo"], COMPARISON_PARAMETER_BOX["f_hi"]),
-        max_relative_error=NASA_MEASUREMENT_ERROR,
-        missing_relative_error=NASA_MEASUREMENT_ERROR,
-    )
-
-    print("--> building superearths_supneptunes pool (rocky_formation; escape_only is only_subneptunes)")
-    univ = split_universes(make_detected_pool(
-        "superearths_supneptunes", pool_size=MC_POOL_SIZE, chunk_size=MC_CHUNK_SIZE,
-        cache_dir=OUT_DIR, box=COMPARISON_PARAMETER_BOX))
-
+    summary, arrays = run_comparison(ComparisonConfig(draws=N_DRAWS))
     plt.rcParams.update(PAPER_STYLE | BIG_TEXT_STYLE)
-    rng = np.random.default_rng(0)
     fig, axes = plt.subplots(1, 3, figsize=(24, 7.5), layout="constrained")
-    for i, (ax, (blabel, lo, hi)) in enumerate(zip(axes, INSOLATION_BINS)):
-        k_obs, n_obs = observed_volatile_count(
-            nasa, lo, hi, m_sil, r_sil, mass_min=SUPER_EARTH_MIN_MASS)
-        f_obs = k_obs / n_obs
-        fobs_t = observed_volatile_fraction_draws(
-            nasa, lo, hi, m_sil, r_sil, rng, repeats=N_DRAWS,
-            mass_min=SUPER_EARTH_MIN_MASS, error=COMPARISON_ERROR,
-        )
-        sig_obs = float(fobs_t.std())
-        print(f"[{blabel}] NASA v/n = {k_obs}/{n_obs} = {f_obs:.3f} +- {sig_obs:.3f}")
+    for i, (ax, (blabel, _, _)) in enumerate(zip(axes, BINS)):
+        result = summary["bins"][blabel]
+        n_obs = result["n_observed"]
+        f_obs = result["k_observed"] / n_obs
+        sig_obs = arrays[f"b{i}_observed"].std()
+        if not np.isfinite(sig_obs) or sig_obs <= 0:
+            raise ValueError(f"{blabel}: discrepancy display requires nonzero observed uncertainty")
         stats, points = {}, {}
         for key in ("rocky_formation", "escape_only"):
-            fk = mock_survey_volatile_fractions(
-                univ[key], lo, hi, m_sil, r_sil, rng, n_obs,
-                repeats=N_DRAWS, mass_min=SUPER_EARTH_MIN_MASS,
-                error=COMPARISON_ERROR,
-            )
-            stats[key] = ((fk - f_obs) / sig_obs) ** 4   # x_k^2, vs the raw observed number
+            fk = arrays[f"b{i}_{key}"]
+            stats[key] = ((fk - f_obs) / sig_obs) ** 4
             points[key] = ((fk.mean() - f_obs) / sig_obs) ** 4
         # an n_obs-planet survey can only give x_k^(1/4) = m * step for integer m. Put edges
         # halfway between allowed values (so no bin is empty), merging neighbours until each
@@ -107,17 +60,19 @@ def main():
             print(f"    {key:<16} x_k^2 point = {points[key]:.2f}  "
                   f"(draws: {stats[key].mean():.2f} +- {stats[key].std():.2f})")
         ax.set_xlim(left=-0.05)
-        ax.set_title(f"{blabel} (M>2) $I_\\oplus$")
+        ax.set_title(f"{blabel} $I_\\oplus$\n" + r"$M>2.5\,M_\oplus$, $R>1.4\,R_\oplus$")
         ax.set_xlabel(r"$x_k^2 = (f_k - f_{\rm obs})^4\,/\,\hat\sigma_{\rm obs}^4$")
         ax.set_ylabel("Probability density")
         if i == 0:
             ax.legend(loc="upper right", handlelength=1.4)
 
     fig.suptitle("MCMC Volatile-Fraction Discrepancy Relative to Observations", fontsize=30)
-    os.makedirs(PAPER_FIGURES_DIR, exist_ok=True)
-    out = os.path.join(PAPER_FIGURES_DIR, f"mc_comparison_statistic_{N_DRAWS}.png")
+    PAPER_FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+    out = PAPER_FIGURES_DIR / f"mc_comparison_statistic_{N_DRAWS}.png"
     fig.savefig(out, dpi=150, bbox_inches="tight")
-    print(f"--> Saved: {out}  ({time.time()-t0:.0f}s)")
+    plt.close(fig)
+    out.with_name(out.stem+"_posterior.json").write_text(json.dumps(summary,indent=2,ensure_ascii=False)+"\n")
+    print(f"Saved {out}")
 
 
 if __name__ == "__main__":

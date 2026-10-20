@@ -140,7 +140,7 @@ def main():
     fig, axes = plt.subplots(3, 3, figsize=(17, 15), sharex="col", sharey=True,
                              constrained_layout=True)
     mesh = None
-    print("\nLow-insolation Super-Earth Desert detected fraction (S<50, R>1.4, among transiting):")
+    print("\nLow-insolation Super-Earth Desert detected fraction (S<50, M>2.5, R>1.4, among transiting):")
     for j, stype in enumerate(COLUMNS):
         panel = panels[stype]
         r = rocky_win[rocky_win["stype_clean"] == stype]
@@ -190,7 +190,7 @@ def main():
                     [rocky_scatter.LOW_INSOLATION_REGION_RADIUS, Y_LIMS[1]], color="red", lw=2.6, zorder=6)
             fn, n_denom, n_missed = missed_fraction_in_window(
                 panel, test, max_insolation=rocky_scatter.LOW_INSOLATION_REGION_INSOL,
-                min_radius=rocky_scatter.LOW_INSOLATION_REGION_RADIUS,
+                min_radius=rocky_scatter.LOW_INSOLATION_REGION_RADIUS, min_mass=2.5,
             )
             if fn is not None:
                 n_pass = n_denom - n_missed
@@ -238,7 +238,7 @@ def main():
                               markersize=10, label="Other observatories"))
     handles += [
         Patch(facecolor="red", alpha=0.15, edgecolor="red", lw=2.0,
-              label=(r"$R>%.1f\,R_\oplus$, $I<%g\,I_\oplus$"
+              label=(r"$M>2.5\,M_\oplus$, $R>%.1f\,R_\oplus$, $I<%g\,I_\oplus$"
                      % (rocky_scatter.LOW_INSOLATION_REGION_RADIUS, rocky_scatter.LOW_INSOLATION_REGION_INSOL))),
     ]
     # Bottom annotations are manually anchored so the horizontal colorbar sits

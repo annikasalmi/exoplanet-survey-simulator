@@ -675,7 +675,7 @@ def plot_mr_insolation_panels(m_ref, r_ref, nasa_win: pd.DataFrame,
                 m_line,
                 LOW_INSOLATION_REGION_RADIUS,
                 r_curve,
-                where=np.isfinite(r_curve) & (r_curve >= LOW_INSOLATION_REGION_RADIUS),
+                where=np.isfinite(r_curve) & (r_curve >= LOW_INSOLATION_REGION_RADIUS) & (m_line > 2.5),
                 color=LOW_INSOLATION_REGION_COLOR,
                 alpha=0.35,
                 lw=0,
@@ -705,7 +705,7 @@ def plot_mr_insolation_panels(m_ref, r_ref, nasa_win: pd.DataFrame,
     handles.append(Line2D([0], [0], color="0.5", lw=2.0,
                           label="Earth-like rocky curve"))
     handles.append(Patch(facecolor=LOW_INSOLATION_REGION_COLOR, alpha=0.35,
-                         label=r"$R>1.4\,R_\oplus$, $I<50\,I_\oplus$"))
+                         label=r"$M>2.5\,M_\oplus$, $R>1.4\,R_\oplus$, $I<50\,I_\oplus$"))
 
     fig.legend(handles=handles, loc="outside right center",
                ncol=1, fontsize=20, framealpha=0.9)
@@ -738,7 +738,7 @@ def plot_rocky_scatter_standalone(rocky_win: pd.DataFrame, shift: float) -> Path
         (INSOLATION_LIMITS[0], LOW_INSOLATION_REGION_RADIUS),
         LOW_INSOLATION_REGION_INSOL - INSOLATION_LIMITS[0], RADIUS_LIMITS[1] - LOW_INSOLATION_REGION_RADIUS,
         fill=False, edgecolor="red", lw=2.2, zorder=6,
-        label=r"$R>1.4\,R_\oplus$, $I<50\,I_\oplus$",
+        label=r"$M>2.5\,M_\oplus$, $R>1.4\,R_\oplus$, $I<50\,I_\oplus$",
     ))
 
     # Labelled planets (LHS 1140 b, Earth, Venus) use the same style as their

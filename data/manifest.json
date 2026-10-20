@@ -1,6 +1,6 @@
 {
   "manifest_version": 1,
-  "last_reviewed": "2026-09-18",
+  "last_reviewed": "2026-10-20",
   "scope": "Tracked exoplanet catalog snapshots and Gaia/TESS reference inputs used by the simulator.",
   "coverage": {
     "globs": [
@@ -236,7 +236,8 @@
         "date_evidence": "Unknown; the file was first committed on 2026-09-04.",
         "first_committed_at": "2026-09-04T15:49:25+02:00",
         "first_commit": "115770cbbb3a4108d45302fe9ca10df65d64db74",
-        "row_count": 6360
+        "row_count": 6360,
+        "targeted_updates": [{"date": "2026-10-20", "planet": "LHS 1478 b", "parameters": "mass, radius, insolation, uncertainties, flags and references where available", "source": "NASA PSCompPars; August et al. 2025; arXiv:2410.11048"}, {"date": "2026-10-20", "planet": "TOI-2427 b", "parameters": "full current NASA composite row in existing columns, including measured mass, radius, insolation, errors, RV and stellar parameters and references", "source": "NASA PSCompPars; Schmerling et al. 2025; doi:10.1051/0004-6361/202452620"}]
       },
       "schema": {
         "documentation_url": "https://exoplanetarchive.ipac.caltech.edu/docs/API_PS_columns.html",
@@ -251,8 +252,8 @@
         "command": "Run source.retrieval.query at source.retrieval.endpoint with format=csv and save the response to data/exoplanet_csv/pscomppars_2026.csv."
       },
       "integrity": {
-        "bytes": 1923280,
-        "sha256": "b79bf94bebc11f0adaa28b3c866f29825af5bd0858f34a68c71de47dee3e8b37"
+        "bytes": 1923496,
+        "sha256": "9cc6900aad2548693d51112cf6db12c37bdf25dfeae19ecb8f4b58422e05b5d2"
       }
     },
     {
@@ -276,7 +277,8 @@
         "date_evidence": "Recorded in README.md when the offline snapshot was added.",
         "first_committed_at": "2026-09-18T14:14:41+02:00",
         "first_commit": "94e33a7f0b4100a5416c859a007408912af97146",
-        "row_count": 4500
+        "row_count": 4500,
+        "targeted_updates": [{"date": "2026-10-20", "planet": "LHS 1478 b", "parameters": "mass, radius, insolation, uncertainties, flags and references where available", "source": "NASA PSCompPars; August et al. 2025; arXiv:2410.11048"}, {"date": "2026-10-20", "planet": "TOI-2427 b", "parameters": "full current NASA composite row in existing columns, including measured mass, radius, insolation, errors, RV and stellar parameters and references", "source": "NASA PSCompPars; Schmerling et al. 2025; doi:10.1051/0004-6361/202452620"}]
       },
       "schema": {
         "documentation_url": "https://exoplanetarchive.ipac.caltech.edu/docs/API_PS_columns.html",
@@ -291,8 +293,8 @@
         "command": "Run source.retrieval.query at source.retrieval.endpoint with format=csv and save the response to data/exoplanet_csv/pscomppars_transiting_mass_insol.csv."
       },
       "integrity": {
-        "bytes": 1740370,
-        "sha256": "8d9f1438114cd5e0d98163c4f05060ab703cd7ca9fa2ed79ee845cd69e3e6ded"
+        "bytes": 1740538,
+        "sha256": "bfc92dc1dc48cd3490d42750c068c995dd1f49b963054742d8623356de84f406"
       }
     },
     {

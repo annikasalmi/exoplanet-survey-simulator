@@ -49,9 +49,9 @@ BOX = dict(r_lo=0.5, r_hi=2.2, m_lo=0.1, m_hi=12.0, f_lo=1e-2, f_hi=1e4)
 ROWS = [("flat", "FLAT universe", [(True, "flat only_subneptunes", "tab:orange"), (False, "flat superearths_supneptunes", "tab:blue")]),
         ("ppop", "P-Pop universe", [(True, "P-Pop only_subneptunes", "tab:red"), (False, "P-Pop superearths_supneptunes", "tab:purple")])]
 CUTS = [("all (no cut)", {}),
-        ("mass > 2 M⊕", dict(mass_min=2.0)),
+        ("mass > 2.5 M⊕", dict(mass_min=2.5)),
         ("insolation < 50 I⊕", dict(insol_max=50.0)),
-        ("mass>2 & insol<50", dict(mass_min=2.0, insol_max=50.0))]
+        ("mass>2.5, radius>1.4 & insol<50", dict(mass_min=2.5, insol_max=50.0))]
 
 
 def main():

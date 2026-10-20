@@ -44,7 +44,7 @@ OUT_DIR = os.path.join(ANALYSIS_DIR, "likelihood_ratio_catalog")
 FLAT_N_POOL = 1_000_000
 RNG_SEED = 0
 RV_MAG_TARGET = 12.0
-MASS_MIN = 2.0
+MASS_MIN = 2.5
 LOW_INSOLATION_MAX = COLD_DESERT_MAX_INSOLATION
 NASA_MASS_PREC = 0.25
 NASA_RAD_PREC = 0.08
@@ -495,7 +495,7 @@ def explainer_universes(cfg, m_sil, r_sil):
         _mr_axis(ax, m_sil, r_sil)
     axes[0].scatter(m[pn], r[pn], s=8, color="0.65", alpha=0.55, label="other low-insolation planets")
     axes[0].scatter(m[pc], r[pc], s=16, color="tab:red", alpha=0.8,
-                    label="corner planets (low-insolation rocky M>2)")
+                    label="corner planets (low-insolation rocky M>2.5, R>1.4)")
     axes[0].set_title("(a) superearths_supneptunes — flat occurrence:\ncorner planets EXIST (red)",
                       fontsize=10)
     axes[1].scatter(m[pn], r[pn], s=8, color="0.65", alpha=0.55)

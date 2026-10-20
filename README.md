@@ -72,6 +72,12 @@ This writes every paper figure to `results/paper/`, downloading and caching the 
 it needs; no P-Pop universe is required. To run them individually instead, the paper
 figure scripts are under `plotting/paper_figures/`.
 
+The population-comparison plots and numerical likelihood report share one configuration,
+strict NASA sample, and saved Monte Carlo draws. See
+[Population comparison methods](POPULATION_COMPARISON_METHODS.md) for the selection,
+conditional observed-size survey model, likelihood approximation, and commands for
+convergence and measurement-error sensitivity checks.
+
 This table summarizes the detectors:
 ## Instrument model fidelity
 

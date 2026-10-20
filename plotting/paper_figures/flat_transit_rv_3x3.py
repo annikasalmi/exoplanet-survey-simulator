@@ -111,7 +111,7 @@ def main():
         rows[2] = (f"Transit ({TRANSIT_MISSION}) + RV", "joint_detected")
     m_ref, r_ref = load_rocky_reference_curve()
     shift = compute_rocky_threshold_shift(m_ref, r_ref)
-    _, rocky = load_and_filter_nasa(NASA_FLAGS_CACHE, m_ref, r_ref, shift)
+    nasa_all, rocky = load_and_filter_nasa(NASA_FLAGS_CACHE, m_ref, r_ref, shift)
     rocky_win = restrict_science_window(
         rocky,
         insolation=rocky_scatter.INSOLATION_LIMITS,
@@ -122,10 +122,17 @@ def main():
     # except TESS and Kepler/K2 is grouped as "Other observatories".
     rocky_win = rocky_win.assign(discovery_facility=rocky_win["discovery_facility"].replace(
         {"Kepler": "Kepler and K2", "K2": "Kepler and K2"}))
-    color_map, major, counts = rocky_scatter.build_facility_styles(rocky_win, contrast_overrides=True)
+    # Match rocky_mr_insolation: derive the palette from its full context sample.
+    nasa_win = restrict_science_window(
+        nasa_all, insolation=rocky_scatter.INSOLATION_LIMITS,
+        radius=rocky_scatter.RADIUS_LIMITS, stellar_types=rocky_scatter.STAR_ORDER,
+    )
+    nasa_win = nasa_win.assign(discovery_facility=nasa_win["discovery_facility"].replace(
+        {"Kepler": "Kepler and K2", "K2": "Kepler and K2"}))
+    color_map, major, _ = rocky_scatter.build_facility_styles(nasa_win)
+    counts = rocky_win["discovery_facility"].value_counts()
     major = [f for f in major
              if f in ("Transiting Exoplanet Survey Satellite (TESS)", "Kepler and K2")]
-    color_map["Kepler and K2"] = rocky_scatter.FACILITY_COLOR_OVERRIDES["K2"]  # brown reads on viridis
     lhs_mask = rocky_win["planet_label"].str.contains(r"LHS\s*1140\s*b", case=False,
                                                       na=False, regex=True)
     for st in COLUMNS:
@@ -233,7 +240,7 @@ def main():
                label=rocky_scatter.FACILITY_RELABEL.get(f, f))
         for f in major
     ]
-    if len(rocky_win) > sum(counts[f] for f in major):
+    if len(rocky_win) > sum(counts.get(f, 0) for f in major):
         handles.append(Line2D([0], [0], marker="o", linestyle="", color=rocky_scatter.OTHER_COLOR,
                               markersize=10, label="Other observatories"))
     handles += [
@@ -245,13 +252,23 @@ def main():
     # on the left while the legend stacks to its right.
     fig.legend(handles=handles, loc="upper right", bbox_to_anchor=(1.01, -0.02),
                ncol=1, framealpha=0.9)
-    cbar_ax = fig.add_axes([0.095, -0.085, 0.54, 0.035])
+    cbar_ax = fig.add_axes([0.095, -0.085, 0.486, 0.035])
     cbar = fig.colorbar(mesh, cax=cbar_ax, orientation="horizontal",
                         format=FuncFormatter(lambda v, _: f"{v * 100:.0f}"))
     cbar.ax.tick_params(labelsize=COLORBAR_TICKSIZE)
     cbar.set_label("Percent planets detected", fontsize=COLORBAR_LABELSIZE)
     # Panels sit edge to edge with no gaps between rows or columns.
     fig.get_layout_engine().set(w_pad=0.0, h_pad=0.0, wspace=0.0, hspace=0.0)
+    # Measure at the export DPI so rotated label extents match the saved image.
+    # Align the bar with the outer edge of the y-axis labels after layout.
+    # Freeze that layout so savefig cannot move the labels independently.
+    fig.set_dpi(170)
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    label_left = min(ax.yaxis.label.get_window_extent(renderer).x0
+                     for ax in axes[:, 0]) / fig.bbox.width
+    fig.set_layout_engine("none")
+    cbar_ax.set_position([label_left, -0.085, 0.486, 0.035])
 
     suffix = "" if TRANSIT_MISSION == "TESS" else f"_{TRANSIT_MISSION.lower()}"
     out = PAPER_FIG_DIR / f"flat_transit_rv_3x3_otegi{suffix}.png"
